@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://codebywire.com/sitemap-index.xml
+Sitemap: https://cbw.liyu.dev/sitemap-index.xml
