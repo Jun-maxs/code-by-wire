@@ -13,12 +13,11 @@
   "license": "MIT",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@11.5.3",
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",
-    "@astrojs/vercel": "^11.0.2",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
-    "@vercel/analytics": "^2.0.1",
     "astro": "^7.0.7",
     "markdown-it": "^14.3.0",
     "sharp": "^0.35.3"
@@ -29,6 +28,7 @@
     "@types/markdown-it": "^14.1.2",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.149.0"
   }
 }

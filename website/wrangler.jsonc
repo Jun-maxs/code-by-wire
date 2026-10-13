@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "code-by-wire-website",
+  "compatibility_date": "2026-10-13",
+  // Assets-only Worker: no script, Cloudflare serves the static build directly.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+  },
+  "routes": [{ "pattern": "cbw.liyu.dev", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": true,
+  // Required by `wrangler preview`, the Workers Builds non-production deploy command.
+  "previews": {},
+}

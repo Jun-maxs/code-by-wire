@@ -166,9 +166,9 @@ Do all the prep on a branch and open the PR. **Do not tag.**
    Otherwise, poll until CI is green — this is still a real precondition to
    wait out, not a re-ask of the go-ahead already given. `statusCheckRollup`
    mixes two GraphQL shapes on the same array: GitHub Actions checks come
-   back as `CheckRun` (`status: "COMPLETED"`, `conclusion: "SUCCESS"`/…), but
-   non-Actions integrations — this repo's Vercel preview deployment, in
-   particular — report a `StatusContext` instead, which has no `status`
+   back as `CheckRun` (`status: "COMPLETED"`, `conclusion: "SUCCESS"`/…) —
+   as does the website's Workers Builds check — but integrations that post a
+   commit status report a `StatusContext` instead, which has no `status`
    field at all, only `state`. A poll that maps every entry through `.status`
    and waits for them all to equal `"COMPLETED"` will loop forever the moment
    a `StatusContext` entry is present, since its `.status` is always `null`

@@ -14,10 +14,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Website
 
-`website/` (marketing site, Astro + Vercel) is a separate project sharing this
-repo — it has its own `pnpm-workspace.yaml`, isolating its install and
-lockfile from the root workspace. Run its commands from inside `website/`:
-`pnpm install`, `pnpm dev`, `pnpm run check` (typecheck), `pnpm test`.
+`website/` (marketing site, Astro + Cloudflare Workers, served at
+`cbw.liyu.dev`) is a separate project sharing this repo — it has its own
+`pnpm-workspace.yaml`, isolating its install and lockfile from the root
+workspace. Run its commands from inside `website/`: `pnpm install`, `pnpm dev`,
+`pnpm run check` (typecheck), `pnpm test`.
+
+It deploys as an assets-only Worker (`website/wrangler.jsonc`, no adapter)
+via Workers Builds on push to `main`, with preview builds on other branches.
+The build reads the repo-root `CHANGELOG.md` (`src/pages/changelog.astro`),
+so it needs the whole repo checked out, not just `website/`.
 
 ## Architecture
 

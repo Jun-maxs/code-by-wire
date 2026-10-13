@@ -4,3 +4,5 @@
 allowBuilds:
   # esbuild is pulled in by astro/vite; its postinstall fetches the native binary.
   esbuild: true
+  # workerd is wrangler's local runtime; its postinstall links the platform binary.
+  workerd: true
