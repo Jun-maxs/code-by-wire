@@ -42,6 +42,12 @@ const ogImage = new URL(`${base}og.png`, Astro.site).href;
     <meta name="twitter:image" content={ogImage} />
 
     <ClientRouter />
+    <script
+      is:inline
+      type="module"
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "3f4e3334039d43d58b2959742f47e51d"}'
+    ></script>
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to content</a>
