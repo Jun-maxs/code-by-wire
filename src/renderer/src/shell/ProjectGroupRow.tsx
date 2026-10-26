@@ -134,7 +134,15 @@ export function ProjectGroupRow({
         className="group/project-toggle flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md py-0.5 pl-2 text-left"
       >
         <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-tertiary)">
-          <Icon name={collapsed ? "folder" : "folder-open"} size={14} />
+          {group.color ? (
+            <span
+              aria-hidden
+              className="size-2 rounded-full"
+              style={{ background: group.color }}
+            />
+          ) : (
+            <Icon name={collapsed ? "folder" : "folder-open"} size={14} />
+          )}
         </span>
         <span className="min-w-0 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
           {group.label}

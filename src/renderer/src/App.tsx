@@ -1,3 +1,4 @@
+import { ProductsProvider } from "./products/ProductsProvider";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@nanostores/react";
 import type { Session, ModelSelection, Account } from "@shared/types";
@@ -563,28 +564,30 @@ export function App() {
           hoverReveal
           forceCollapsed={narrow}
         >
-          <LeftSidebar
-            sessions={all}
-            homeDir={homeDir}
-            projectState={projectState}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onNew={() => {
-              setQuickAddPrefill(null); // manual open starts blank, not on a stale failure
-              setSelectedId(NEW_SESSION_ID);
-            }}
-            onQuickAdd={quickAddSession}
-            canSpawnFor={(a) => spawnGateFor(cliStatus, a).canSpawn}
-            onResume={resumeSession}
-            onFork={forkSession}
-            onEnd={endSession}
-            onRename={(id, title) => void renameSession(id, title)}
-            onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
-            onSetProjectPlacement={setProjectPlacement}
-            updatePending={updatePending}
-            route={route}
-            onRoute={setSelectedId}
-          />
+          <ProductsProvider>
+            <LeftSidebar
+              sessions={all}
+              homeDir={homeDir}
+              projectState={projectState}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onNew={() => {
+                setQuickAddPrefill(null); // manual open starts blank, not on a stale failure
+                setSelectedId(NEW_SESSION_ID);
+              }}
+              onQuickAdd={quickAddSession}
+              canSpawnFor={(a) => spawnGateFor(cliStatus, a).canSpawn}
+              onResume={resumeSession}
+              onFork={forkSession}
+              onEnd={endSession}
+              onRename={(id, title) => void renameSession(id, title)}
+              onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
+              onSetProjectPlacement={setProjectPlacement}
+              updatePending={updatePending}
+              route={route}
+              onRoute={setSelectedId}
+            />
+          </ProductsProvider>
         </Pane>
         <PaneMain>{middle}</PaneMain>
         <Pane

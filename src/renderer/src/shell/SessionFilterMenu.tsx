@@ -47,6 +47,33 @@ export function SessionFilterMenu({
       <div className="my-1 border-t border-(--ui-stroke-tertiary)" />
       <fieldset className="m-0 border-0 p-0">
         <legend className="px-2 pb-1 pt-0.5 text-[0.6875rem] font-medium text-(--ui-text-quaternary)">
+          {t.shell.sidebar.groupBy}
+        </legend>
+        {(["folder", "product"] as const).map((grouping) => (
+          <label key={grouping} className={itemClass}>
+            <input
+              type="radio"
+              name="session-grouping"
+              value={grouping}
+              checked={(preferences.grouping ?? "folder") === grouping}
+              onChange={() =>
+                onChange({
+                  showAgentIcons: preferences.showAgentIcons,
+                  agent: preferences.agent,
+                  ...(grouping === "product" ? { grouping } : {}),
+                })
+              }
+            />
+            {grouping === "folder"
+              ? t.shell.sidebar.groupByFolder
+              : t.shell.sidebar.groupByProduct}
+          </label>
+        ))}
+      </fieldset>
+
+      <div className="my-1 border-t border-(--ui-stroke-tertiary)" />
+      <fieldset className="m-0 border-0 p-0">
+        <legend className="px-2 pb-1 pt-0.5 text-[0.6875rem] font-medium text-(--ui-text-quaternary)">
           {t.shell.sidebar.agentGroup}
         </legend>
         <label className={itemClass}>
