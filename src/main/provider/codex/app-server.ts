@@ -22,7 +22,11 @@ export interface AppServerChild {
 export type AppServerSpawn = (
   file: string,
   args: string[],
-  opts: { detached: boolean; stdio: ["pipe", "pipe", "ignore"] },
+  opts: {
+    detached: boolean;
+    stdio: ["pipe", "pipe", "ignore"];
+    windowsHide: boolean;
+  },
 ) => AppServerChild;
 
 export interface AppServerClient {
@@ -73,6 +77,8 @@ export async function withCodexAppServer<T>(
     child = spawnFn(file, args, {
       detached: platform !== "win32",
       stdio: ["pipe", "pipe", "ignore"],
+      // `cmd /c codex` from a GUI process otherwise opens a visible console window.
+      windowsHide: true,
     });
   } catch {
     return null;

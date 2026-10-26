@@ -35,7 +35,11 @@ export interface ProbeChild {
 export type ProbeSpawn = (
   file: string,
   args: string[],
-  opts: { detached: boolean; stdio: ["ignore", "pipe", "ignore"] },
+  opts: {
+    detached: boolean;
+    stdio: ["ignore", "pipe", "ignore"];
+    windowsHide: boolean;
+  },
 ) => ProbeChild;
 
 const realSpawn: ProbeSpawn = (file, args, opts) => spawn(file, args, opts);
@@ -67,6 +71,8 @@ export function createProbeExec(
       const child = spawnFn(file, args, {
         detached: platform !== "win32",
         stdio: ["ignore", "pipe", "ignore"],
+        // A GUI process starting a console program (cmd.exe /c claude) otherwise flashes a window.
+        windowsHide: true,
       });
       let stdout = "";
       let settled = false;

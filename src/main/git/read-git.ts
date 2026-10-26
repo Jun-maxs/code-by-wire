@@ -38,6 +38,7 @@ function git(cwd: string, args: string[]): Promise<string | null> {
         cwd,
         env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
         timeout: SPAWN_TIMEOUT_MS,
+        windowsHide: true,
       },
       (err, stdout) => resolve(err ? null : stdout.trim()),
     );

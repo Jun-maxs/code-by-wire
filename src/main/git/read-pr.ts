@@ -51,7 +51,12 @@ function defaultRun(cwd: string): Promise<string | null> {
     execFile(
       "gh",
       ["pr", "view", "--json", "url,number,title"],
-      { cwd, env: prCommandEnv(process.env, correctedPath), timeout: 8000 },
+      {
+        cwd,
+        env: prCommandEnv(process.env, correctedPath),
+        timeout: 8000,
+        windowsHide: true,
+      },
       (err, stdout) => resolve(err ? null : stdout),
     );
   });

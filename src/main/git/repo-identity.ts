@@ -45,6 +45,7 @@ const revParse: RevParse = (cwd) => {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
         env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+        windowsHide: true,
       },
     );
   } catch {
