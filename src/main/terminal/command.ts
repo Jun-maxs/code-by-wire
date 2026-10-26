@@ -4,6 +4,12 @@ import { resolvePosixLoginCommand, type PosixShellDeps } from "./shell-command";
 import { quoteShellArg } from "./shell-quote";
 import { windowsPowerShell, windowsSystemTool } from "./windows-system";
 
+/** The program a Claude session runs: `CBW_CLAUDE_LAUNCHER` when set (reclaude's rec.exe, see
+ *  reclaude.ts, which takes claude's own arguments), else the bare `claude` command. */
+export function claudeLauncher(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CBW_CLAUDE_LAUNCHER || "claude";
+}
+
 export interface ClaudeCommand {
   file: string;
   args: string[];
@@ -26,7 +32,7 @@ export function buildClaudeCommand(opts: {
   extraArgs?: string[];
 }): ClaudeCommand {
   return {
-    file: "claude",
+    file: claudeLauncher(),
     args: [
       "--session-id",
       opts.id,
@@ -152,7 +158,7 @@ export function buildResumeCommand(opts: {
 }): ClaudeCommand {
   if (opts.agent === "claude")
     return {
-      file: "claude",
+      file: claudeLauncher(),
       args: ["--resume", opts.id, ...(opts.extraArgs ?? [])],
     };
   return {
@@ -175,7 +181,7 @@ export function buildForkCommand(opts: {
   extraArgs?: string[];
 }): ClaudeCommand {
   return {
-    file: "claude",
+    file: claudeLauncher(),
     args: [
       "--resume",
       opts.sourceId,

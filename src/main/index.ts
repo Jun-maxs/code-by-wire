@@ -65,6 +65,7 @@ import {
   shouldCorrectPath,
 } from "./terminal/shell-path";
 import { restoreWindowsPath } from "./terminal/windows-path";
+import { adoptReclaude } from "./reclaude";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
@@ -79,6 +80,10 @@ app.commandLine.appendSwitch("force-color-profile", "srgb");
 // A stripped launch environment can leave PATH without System32 or the user's own folders, so a
 // session's cmd.exe can't find `claude`. Restore it before anything spawns (see windows-path.ts).
 if (process.platform === "win32") restoreWindowsPath();
+
+// reclaude's selected account, unless CLAUDE_CONFIG_DIR is already set: sessions are read from its
+// config dir and launched through rec.exe (see reclaude.ts). Before anything resolves claudeDir.
+adoptReclaude();
 
 /** The BrowserWindow's native background, painted before the page loads — must match the
  *  persisted app theme or the window flashes the wrong color on launch. Native window chrome, so
