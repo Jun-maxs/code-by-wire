@@ -246,6 +246,12 @@ export const zh: Translations = {
       fork: "复刻",
       forking: "复刻中…",
       endSession: "结束",
+      deleteSession: "删除（移到回收站）",
+      deleteLiveTitle: "先结束会话再删除",
+      deleteConfirmTitle: "删除这个会话？",
+      deleteConfirmBody:
+        "会话记录和子代理文件会移到系统回收站，需要时还能从回收站还原。",
+      deleteFailed: (detail) => `删除失败：${detail}`,
       openIn: "打开方式",
       resumeConfirmTitle: "恢复未记录模型的会话？",
       resumeConfirmBody:

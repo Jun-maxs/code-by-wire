@@ -281,6 +281,12 @@ export const en = {
       fork: "Fork",
       forking: "Forking…",
       endSession: "End",
+      deleteSession: "Delete (move to trash)",
+      deleteLiveTitle: "End the session before deleting it",
+      deleteConfirmTitle: "Delete this session?",
+      deleteConfirmBody:
+        "Its transcript and subagent files move to the system trash, so you can still restore them from there.",
+      deleteFailed: (detail: string) => `Couldn't delete: ${detail}`,
       openIn: "Open in",
       resumeConfirmTitle: "Resume a session with no recorded model?",
       resumeConfirmBody:

@@ -1,3 +1,4 @@
+import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
 import type { ProductsData } from "@shared/products";
 import { readProducts } from "./products";
 import {
@@ -10,7 +11,7 @@ import {
   shell,
 } from "electron";
 import { cpus, freemem, homedir, release, totalmem } from "node:os";
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import {
   IPC,
@@ -596,6 +597,36 @@ export function registerIpc({
     }
     return overviewNow();
   });
+  ipcMain.handle(
+    IPC.trashSession,
+    async (_e, id: string): Promise<TrashResult> => {
+      const row = overviewNow().sessions.find((s) => s.id === id);
+      const live = row !== undefined && row.state !== "ended";
+      const result = await trashSessionFiles(
+        {
+          resolveTranscriptPath: (sid) => provider.resolveTranscriptPath(sid),
+          trash: (path) => shell.trashItem(path),
+          exists: existsSync,
+        },
+        id,
+        live,
+      );
+      if (result.ok) {
+        try {
+          db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+          sessionTitles?.set(id, null);
+          sessionPins?.set(id, false);
+        } catch (err) {
+          logError(
+            "session-trash-index",
+            "trashed files but index cleanup failed",
+            err,
+          );
+        }
+      }
+      return result;
+    },
+  );
   ipcMain.handle(IPC.readProducts, (): ProductsData | null => {
     const dirs = productsDirs?.();
     if (!dirs) return null;
