@@ -157,11 +157,6 @@ export function SessionMenuDropdown({
                 }
                 danger
               />
-              {deleteError && (
-                <p role="alert" className="px-2 py-1 text-xs text-danger">
-                  {deleteError}
-                </p>
-              )}
 
               <div
                 role="separator"
@@ -227,6 +222,15 @@ export function SessionMenuDropdown({
           tone="danger"
           onConfirm={confirmDelete}
           onCancel={() => setDeleteConfirm(false)}
+        />
+      )}
+      {deleteError && (
+        <ConfirmDialog
+          title={t.shell.sessionMenu.deleteConfirmTitle}
+          body={deleteError}
+          confirmLabel={t.common.close}
+          onConfirm={() => setDeleteError(null)}
+          onCancel={() => setDeleteError(null)}
         />
       )}
       {diagnosticOpen && (
