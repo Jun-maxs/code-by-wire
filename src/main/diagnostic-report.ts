@@ -28,6 +28,14 @@ const KNOWN_ENTRY_TYPES: Record<AgentId, ReadonlySet<string>> = {
     "session_meta",
     "turn_context",
   ]),
+  pi: new Set([
+    "context_edit",
+    "custom",
+    "message",
+    "model_change",
+    "session",
+    "thinking_level_change",
+  ]),
 };
 
 export interface TranscriptScanData {

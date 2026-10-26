@@ -982,6 +982,7 @@ export function registerIpc({
   const walkCaches: Record<AgentId, WalkCache | null> = {
     claude: null,
     codex: null,
+    pi: null,
   };
   // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
   // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is
@@ -990,7 +991,9 @@ export function registerIpc({
     agent: AgentId,
     now: number,
   ): { targets: ScanTarget[]; fresh: boolean } => {
-    const dir = agent === "claude" ? claudeDir : codexDir;
+    // Pi has no stats source (hasStats off): nothing to walk.
+    const dir =
+      agent === "claude" ? claudeDir : agent === "codex" ? codexDir : null;
     if (!dir) return { targets: [], fresh: true };
     const cache = walkCaches[agent];
     const fresh = !cache || now - cache.atMs >= WALK_TTL_MS;
@@ -1010,7 +1013,9 @@ export function registerIpc({
     agent: AgentId,
     now: number,
   ): ScanProgress & { wrote: boolean } => {
-    const dir = agent === "claude" ? claudeDir : codexDir;
+    // Pi has no stats source (hasStats off): nothing to walk.
+    const dir =
+      agent === "claude" ? claudeDir : agent === "codex" ? codexDir : null;
     if (!analyticsDb || !dir) return { ...doneProgress(), wrote: false };
     try {
       const walk = scanTargets(agent, now);

@@ -16,8 +16,13 @@ import { migrate, getSessionAgent } from "./db/store";
 import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
 import { createCodexProvider } from "./provider/codex";
+import { createPiProvider, resolvePiDir } from "./provider/pi";
 import { createCodexLimitsService } from "./provider/codex/limits";
-import { createRelayUsageService, locateCodexRelay } from "./usage/relay";
+import {
+  createRelayUsageService,
+  locateCodexRelay,
+  locatePiRelay,
+} from "./usage/relay";
 import { createCodexThreadMetadataService } from "./provider/codex/thread-metadata";
 import { resolveCodexDir } from "./provider/codex/config";
 import { listRollouts, readRolloutHead } from "./provider/codex/rollout";
@@ -395,13 +400,27 @@ app
         codexEntries: () => managed.codexEntries(),
       },
     });
+    // Pi: its session files, and its relay's usage when models.json points at one.
+    const piDir = resolvePiDir();
+    const piProvider = createPiProvider({
+      piDir,
+      recentWindowMs,
+      managed: {
+        has: (id) => managed.agentOf(id) === "pi",
+        cwdOf: (id) => managed.cwdOf(id),
+      },
+      relay: createRelayUsageService({
+        locate: locatePiRelay(piDir),
+        fetchFn: net.fetch.bind(net),
+      }),
+    });
     // id → agent: live drafts answer from the registry; indexed rows from the sessions table;
     // anything unknown is claude (the legacy default — never a projects/ sweep for a codex id).
     const agentOf = (id: string): AgentId =>
       managed.agentOf(id) ?? getSessionAgent(db, id) ?? "claude";
     services.agentOf = agentOf;
     const provider = createCompositeProvider(
-      { claude: claudeProvider, codex: codexProvider },
+      { claude: claudeProvider, codex: codexProvider, pi: piProvider },
       agentOf,
     );
     services.provider = provider;
@@ -418,7 +437,7 @@ app
       dir: app.getPath("userData"),
     });
     const cliStatus = createCliStatusController({
-      configDirs: { claude: claudeDir, codex: codexDir },
+      configDirs: { claude: claudeDir, codex: codexDir, pi: piDir },
     });
     services.cliStatus = cliStatus;
     // Warm every agent's verdict in the background; each check is async and the window is already up.
@@ -536,7 +555,10 @@ app
       statuslineLaunchFault,
       caffeinate,
       usage,
-      sessionOverlays: [(sessions) => codexProvider.overlaySessions(sessions)],
+      sessionOverlays: [
+        (sessions) => codexProvider.overlaySessions(sessions),
+        (sessions) => piProvider.overlaySessions(sessions),
+      ],
     });
 
     // One-shot launch check: packaged only, and only when the user hasn't turned it off. Deferred so it

@@ -68,12 +68,31 @@ function CodexMark({ size, className }: { size: number; className?: string }) {
   );
 }
 
+/** Pi's mark: the 4×4 block "P" Pi ships as a monochrome template image (lobe-icons' pi asset in
+ *  Agent HUD), redrawn as squares. It has no brand color, so it takes the text color like a lucide
+ *  glyph. Cells, row by row: ███· / █·█· / ██·█ / █··█. */
+function PiMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M0 0h18v6H0zM0 6h6v18H0zM12 6h6v6h-6zM6 12h6v6H6zM18 12h6v12h-6z" />
+    </svg>
+  );
+}
+
 const AGENT_GLYPHS: Record<
   AgentId,
   (p: { size: number; className?: string }) => React.JSX.Element
 > = {
   claude: ClaudeMark,
   codex: CodexMark,
+  pi: PiMark,
 };
 
 /** The agent's official brand mark at glyph scale, sized like lucide's Icon — fixed brand color

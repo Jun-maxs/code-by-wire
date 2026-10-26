@@ -1,16 +1,17 @@
+import type { AgentId } from "../../src/shared/agents";
 import { describe, it, expect } from "vitest";
 import { createCompositeProvider } from "../../src/main/provider/composite";
 import type { Provider } from "../../src/main/provider/types";
 import type { SessionCandidate } from "@shared/types";
 
-const cand = (id: string, agent: "claude" | "codex"): SessionCandidate => ({
+const cand = (id: string, agent: AgentId): SessionCandidate => ({
   id,
   agent,
   alive: false,
   cwd: "/w",
   transcriptMtimeMs: 1,
 });
-function fake(agent: "claude" | "codex", calls: string[]): Provider {
+function fake(agent: AgentId, calls: string[]): Provider {
   return {
     id: agent,
     listCandidates: () => [cand(`${agent}-1`, agent)],
@@ -53,18 +54,30 @@ describe("createCompositeProvider", () => {
   it("unions listCandidates and dispatches summarize/restate by candidate.agent", async () => {
     const calls: string[] = [];
     const p = createCompositeProvider(
-      { claude: fake("claude", calls), codex: fake("codex", calls) },
+      {
+        claude: fake("claude", calls),
+        codex: fake("codex", calls),
+        pi: fake("pi", calls),
+      },
       () => "claude",
     );
     const cands = await p.listCandidates();
-    expect(cands.map((c) => c.id).sort()).toEqual(["claude-1", "codex-1"]);
+    expect(cands.map((c) => c.id).sort()).toEqual([
+      "claude-1",
+      "codex-1",
+      "pi-1",
+    ]);
     await p.summarize(cands.find((c) => c.agent === "codex")!);
     expect(calls).toContain("summarize:codex:codex-1");
   });
   it("routes per-id reads through the agent resolver", async () => {
     const calls: string[] = [];
     const p = createCompositeProvider(
-      { claude: fake("claude", calls), codex: fake("codex", calls) },
+      {
+        claude: fake("claude", calls),
+        codex: fake("codex", calls),
+        pi: fake("pi", calls),
+      },
       (id) => (id.startsWith("codex") ? "codex" : "claude"),
     );
     await p.readTranscript("codex-9");

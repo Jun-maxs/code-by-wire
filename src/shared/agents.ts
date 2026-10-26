@@ -3,7 +3,7 @@
  *  branch in terminal/command.ts, one probe spec in main/cli-status.ts, one settings card, one
  *  icon in ui/agent-icons.tsx. Every picker/dropdown/menu iterates AGENT_IDS — never a hardcoded
  *  pair — so the surfaces pick a new agent up from here alone. */
-export const AGENT_IDS = ["claude", "codex"] as const;
+export const AGENT_IDS = ["claude", "codex", "pi"] as const;
 
 export type AgentId = (typeof AGENT_IDS)[number];
 
@@ -95,6 +95,18 @@ export const AGENTS: Record<AgentId, AgentDescriptor> = {
       hasRateLimits: true,
       canResume: true,
       hasStats: true,
+    },
+  },
+  // pi: sessions, transcripts and the telemetry sidebar (provider/pi). New sessions spawn the bare
+  // `pi`; resume, fork, activity and stats stay gated off until their readers land.
+  pi: {
+    id: "pi",
+    label: "Pi",
+    binary: "pi",
+    capabilities: {
+      ...NONE,
+      hasTranscript: true,
+      hasTelemetry: true,
     },
   },
 };

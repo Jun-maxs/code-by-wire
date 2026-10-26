@@ -205,10 +205,7 @@ export function PressurePanel({
 
 /** Money as the relay's dashboard shows it: four decimals under one unit (a relay bills in
  *  fractions of a cent), two above. */
-export function formatRelayMoney(
-  amount: number,
-  currency: "CNY" | "USD",
-): string {
+function formatRelayMoney(amount: number, currency: "CNY" | "USD"): string {
   const symbol = currency === "CNY" ? "¥" : "$";
   return `${symbol}${amount.toFixed(Math.abs(amount) < 1 ? 4 : 2)}`;
 }
