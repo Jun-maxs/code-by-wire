@@ -37,6 +37,7 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.renameSession, id, title),
   setSessionPinned: (id, pinned) =>
     ipcRenderer.invoke(IPC.setSessionPinned, id, pinned),
+  readProducts: () => ipcRenderer.invoke(IPC.readProducts),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>
     ipcRenderer.invoke(IPC.launchPresetsSet, presets),

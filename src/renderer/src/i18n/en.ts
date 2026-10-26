@@ -245,6 +245,12 @@ export const en = {
           ? `${count} ${count === 1 ? "subagent" : "subagents"} in this group · ${active} active`
           : `${count} ${count === 1 ? "subagent" : "subagents"} in this group`,
       detachedSubagent: "Detached subagent",
+      product: {
+        domain: "Domain",
+        doing: "Latest",
+        loose: "Unfinished",
+        decide: "Waiting on you",
+      },
       threadKind: {
         subagent: "Subagent",
         review: "Review",

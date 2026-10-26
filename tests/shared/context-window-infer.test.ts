@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hydrate } from "../../src/main/db/store";
 import { windowForUsage } from "@shared/models";
 import { applyLearnedWindows, type StatusLineSample } from "@shared/statusline";
-import type { PersistedSession, Session } from "@shared/types";
+import type { PersistedSession } from "@shared/types";
 
 function persisted(over: Partial<PersistedSession>): PersistedSession {
   return {
@@ -105,7 +105,7 @@ describe("applyLearnedWindows", () => {
     const [, b, c] = applyLearnedWindows(
       [captured, uncaptured, otherModel],
       byId,
-    ) as Session[];
+    );
     expect(b.contextWindow).toBe(1_000_000);
     expect(b.contextPct).toBe(6);
     expect(c.contextWindow).toBe(200_000);

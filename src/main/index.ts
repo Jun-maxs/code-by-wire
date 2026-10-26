@@ -516,6 +516,13 @@ app
       managed,
       sessionTitles,
       sessionPins,
+      productsDirs: () => {
+        // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
+        const cardsDir =
+          process.env.CBW_PRODUCT_CARDS ??
+          "E:/0项目/平台整合规划/workbench/cards";
+        return { cardsDir, stateDir: join(cardsDir, "..", "data", "state") };
+      },
       launchPresets,
       projectState,
       updater,

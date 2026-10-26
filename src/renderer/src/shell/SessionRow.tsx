@@ -6,6 +6,8 @@ import { AgentIcon } from "../ui/agent-icons";
 import { useI18n } from "../i18n";
 import { useSessionMenu } from "./use-session-menu";
 import { SessionMenuDropdown } from "./SessionMenuDropdown";
+import { useSessionProduct } from "../products/products-context";
+import { ProductHoverCard } from "../products/ProductHoverCard";
 
 /**
  * The hermes single-line sidebar row: a 26px-tall strip with a state `Lamp` and the title. A
@@ -60,6 +62,9 @@ export function SessionRow({
     onRename,
     onTogglePin,
   });
+  // Fork feature: which product this session is about (workbench cards) — a color dot before the
+  // title and a hover card with the product's domain and progress.
+  const product = useSessionProduct(session);
   const hasChildren = descendantCount > 0 && onToggleChildren !== undefined;
   const cappedDepth = Math.min(depth, 2);
   const rowStyle =
@@ -101,144 +106,153 @@ export function SessionRow({
     ? t.shell.sessionRow.threadKind[session.threadKind]
     : null;
   return (
-    <div
-      style={rowStyle}
-      className={cx(
-        "group relative flex min-h-[1.625rem] min-w-0 items-center gap-1 rounded-md transition-colors duration-100 ease-out hover:transition-none",
-        selected && "rounded-md bg-(--ui-row-active-background)",
-        !selected && "hover:bg-(--ui-row-hover-background)",
-      )}
-    >
-      {depth > 0 && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -left-1.5 top-0 h-1/2 w-2 border-b border-l border-(--ui-stroke-tertiary)"
-        />
-      )}
-      <button
-        type="button"
-        onClick={onSelect}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          menu.openAt(event.clientX, event.clientY);
-        }}
-        aria-pressed={selected}
-        aria-label={t.shell.sessionRow.openSession(session.title)}
+    <ProductHoverCard product={product}>
+      <div
+        style={rowStyle}
         className={cx(
-          "flex min-h-[1.625rem] min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md py-0.5 pl-2 text-left",
+          "group relative flex min-h-[1.625rem] min-w-0 items-center gap-1 rounded-md transition-colors duration-100 ease-out hover:transition-none",
+          selected && "rounded-md bg-(--ui-row-active-background)",
+          !selected && "hover:bg-(--ui-row-hover-background)",
         )}
       >
-        <span className="grid size-3.5 shrink-0 place-items-center">
-          <Lamp state={session.state} management={session.management} />
-        </span>
-        <span
-          className={cx(
-            "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
-            selected && "text-fg",
-          )}
-          title={session.title}
-        >
-          {session.title}
-        </span>
-        {hasChildren && (
+        {depth > 0 && (
           <span
-            className={cx(
-              "shrink-0 text-[0.68rem] tabular-nums text-(--ui-text-quaternary)",
-              activeDescendantCount > 0 && "text-primary",
-            )}
-            title={t.shell.sessionRow.subagentCount(
-              descendantCount,
-              activeDescendantCount,
-            )}
-          >
-            {descendantCount}
-          </span>
+            aria-hidden
+            className="pointer-events-none absolute -left-1.5 top-0 h-1/2 w-2 border-b border-l border-(--ui-stroke-tertiary)"
+          />
         )}
-        {!hasChildren && session.worktree && (
-          <span
-            className={cx(
-              "flex min-w-0 shrink-[2] items-center gap-1 text-[0.72rem] leading-none text-(--ui-text-quaternary)",
-              "group-hover:hidden group-has-[:focus-visible]:hidden",
-              menu.open && "hidden",
-            )}
-          >
-            <Icon name="worktree" size={10} className="shrink-0" />
-            <span className="truncate">{session.worktree.name}</span>
-          </span>
-        )}
-      </button>
-      {hasChildren && (
         <button
           type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleChildren();
+          onClick={onSelect}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            menu.openAt(event.clientX, event.clientY);
           }}
-          aria-expanded={childrenExpanded}
-          aria-label={
-            childrenExpanded
-              ? t.shell.sessionRow.collapseSubagents(descendantCount)
-              : t.shell.sessionRow.expandSubagents(descendantCount)
-          }
-          className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+          aria-pressed={selected}
+          aria-label={t.shell.sessionRow.openSession(session.title)}
+          className={cx(
+            "flex min-h-[1.625rem] min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md py-0.5 pl-2 text-left",
+          )}
         >
-          <Icon
-            name="chevron-right"
-            size={13}
-            className={cx(
-              "transition-transform",
-              childrenExpanded && "rotate-90",
-            )}
-          />
-        </button>
-      )}
-      <div
-        ref={menu.rootRef}
-        className={cx(
-          "relative mr-1 flex h-5 shrink-0 items-center justify-end",
-          !threadKindLabel && "w-5",
-        )}
-      >
-        {threadKindLabel ? (
-          <span
-            className={cx(
-              "shrink-0 rounded-sm bg-(--ui-control-active-background) px-1 py-0.5 text-[0.625rem] leading-none text-(--ui-text-quaternary) transition-opacity duration-100",
-              trailingContentVisibility,
-            )}
-            title={threadKindLabel}
-          >
-            {threadKindLabel}
+          <span className="grid size-3.5 shrink-0 place-items-center">
+            <Lamp state={session.state} management={session.management} />
           </span>
-        ) : (
-          showAgentIcon && (
+          {product && (
             <span
               aria-hidden
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ background: product.color }}
+            />
+          )}
+          <span
+            className={cx(
+              "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
+              selected && "text-fg",
+            )}
+            title={session.title}
+          >
+            {session.title}
+          </span>
+          {hasChildren && (
+            <span
               className={cx(
-                "pointer-events-none grid size-5 place-items-center transition-opacity duration-100",
-                trailingContentVisibility,
+                "shrink-0 text-[0.68rem] tabular-nums text-(--ui-text-quaternary)",
+                activeDescendantCount > 0 && "text-primary",
+              )}
+              title={t.shell.sessionRow.subagentCount(
+                descendantCount,
+                activeDescendantCount,
               )}
             >
-              <AgentIcon agent={session.agent} size={13} />
+              {descendantCount}
             </span>
-          )
+          )}
+          {!hasChildren && session.worktree && (
+            <span
+              className={cx(
+                "flex min-w-0 shrink-[2] items-center gap-1 text-[0.72rem] leading-none text-(--ui-text-quaternary)",
+                "group-hover:hidden group-has-[:focus-visible]:hidden",
+                menu.open && "hidden",
+              )}
+            >
+              <Icon name="worktree" size={10} className="shrink-0" />
+              <span className="truncate">{session.worktree.name}</span>
+            </span>
+          )}
+        </button>
+        {hasChildren && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleChildren();
+            }}
+            aria-expanded={childrenExpanded}
+            aria-label={
+              childrenExpanded
+                ? t.shell.sessionRow.collapseSubagents(descendantCount)
+                : t.shell.sessionRow.expandSubagents(descendantCount)
+            }
+            className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+          >
+            <Icon
+              name="chevron-right"
+              size={13}
+              className={cx(
+                "transition-transform",
+                childrenExpanded && "rotate-90",
+              )}
+            />
+          </button>
         )}
-        <button
-          type="button"
-          onClick={() => menu.toggleMenu()}
-          aria-label={t.shell.sessionRow.sessionActions}
-          aria-expanded={menu.open}
-          aria-haspopup="menu"
+        <div
+          ref={menu.rootRef}
           className={cx(
-            "pointer-events-none absolute right-0 top-0 grid size-5 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:pointer-events-auto focus-visible:opacity-100",
-            reveal,
-            menu.open &&
-              "pointer-events-auto opacity-100 bg-(--ui-control-active-background) text-fg",
+            "relative mr-1 flex h-5 shrink-0 items-center justify-end",
+            !threadKindLabel && "w-5",
           )}
         >
-          <Icon name="ellipsis" size={13} />
-        </button>
+          {threadKindLabel ? (
+            <span
+              className={cx(
+                "shrink-0 rounded-sm bg-(--ui-control-active-background) px-1 py-0.5 text-[0.625rem] leading-none text-(--ui-text-quaternary) transition-opacity duration-100",
+                trailingContentVisibility,
+              )}
+              title={threadKindLabel}
+            >
+              {threadKindLabel}
+            </span>
+          ) : (
+            showAgentIcon && (
+              <span
+                aria-hidden
+                className={cx(
+                  "pointer-events-none grid size-5 place-items-center transition-opacity duration-100",
+                  trailingContentVisibility,
+                )}
+              >
+                <AgentIcon agent={session.agent} size={13} />
+              </span>
+            )
+          )}
+          <button
+            type="button"
+            onClick={() => menu.toggleMenu()}
+            aria-label={t.shell.sessionRow.sessionActions}
+            aria-expanded={menu.open}
+            aria-haspopup="menu"
+            className={cx(
+              "pointer-events-none absolute right-0 top-0 grid size-5 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:pointer-events-auto focus-visible:opacity-100",
+              reveal,
+              menu.open &&
+                "pointer-events-auto opacity-100 bg-(--ui-control-active-background) text-fg",
+            )}
+          >
+            <Icon name="ellipsis" size={13} />
+          </button>
+        </div>
+        <SessionMenuDropdown session={session} menu={menu} />
       </div>
-      <SessionMenuDropdown session={session} menu={menu} />
-    </div>
+    </ProductHoverCard>
   );
 }

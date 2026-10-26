@@ -1,3 +1,5 @@
+import type { ProductsData } from "@shared/products";
+import { readProducts } from "./products";
 import {
   app,
   BrowserWindow,
@@ -161,6 +163,9 @@ export interface IpcDeps {
   sessionTitles?: SessionTitleStore;
   /** Durable pinned-session marks, stamped onto overview rows as pinnedAtMs. Defaults to no pins. */
   sessionPins?: SessionPinStore;
+  /** Where the workbench keeps product cards and per-session hook state (sidebar product tags).
+   *  Absent → products:read serves null. */
+  productsDirs?: () => { cardsDir: string; stateDir: string };
   /** Durable launch-args presets for the New-session picker. Defaults to no presets. */
   launchPresets?: LaunchPresetStore;
   /** Durable project-group placements, keyed by the sidebar's canonical project key. */
@@ -213,6 +218,7 @@ export function registerIpc({
   managed,
   sessionTitles,
   sessionPins,
+  productsDirs,
   launchPresets,
   projectState,
   updater,
@@ -589,6 +595,20 @@ export function registerIpc({
       );
     }
     return overviewNow();
+  });
+  ipcMain.handle(IPC.readProducts, (): ProductsData | null => {
+    const dirs = productsDirs?.();
+    if (!dirs) return null;
+    try {
+      return readProducts(dirs.cardsDir, dirs.stateDir);
+    } catch (err) {
+      logError(
+        "products-read-failed",
+        "readProducts failed; serving no tags",
+        err,
+      );
+      return null;
+    }
   });
   ipcMain.handle(
     IPC.launchPresetsGet,

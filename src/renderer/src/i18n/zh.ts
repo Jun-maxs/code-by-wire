@@ -213,6 +213,12 @@ export const zh: Translations = {
           ? `组内 ${count} 个子代理 · ${active} 个活跃`
           : `组内 ${count} 个子代理`,
       detachedSubagent: "已脱离的子代理",
+      product: {
+        domain: "域名",
+        doing: "最近在做",
+        loose: "没收尾",
+        decide: "等你决定",
+      },
       threadKind: {
         subagent: "子代理",
         review: "审查",

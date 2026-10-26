@@ -1,3 +1,4 @@
+import { ProductsProvider } from "../products/ProductsProvider";
 import {
   useEffect,
   useLayoutEffect,
@@ -472,328 +473,332 @@ export function LeftSidebar({
   };
 
   return (
-    <>
-      <div className="flex h-full flex-col border-r border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background)">
-        <div
-          className="drag-region shrink-0 select-none"
-          style={{ height: "var(--titlebar-height)" }}
-        />
+    <ProductsProvider>
+      <>
+        <div className="flex h-full flex-col border-r border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background)">
+          <div
+            className="drag-region shrink-0 select-none"
+            style={{ height: "var(--titlebar-height)" }}
+          />
 
-        <div className="flex shrink-0 flex-col gap-px px-2.5 pb-2 pt-1.5">
-          <button
-            type="button"
-            onClick={onNew}
-            disabled={!anySpawnable}
-            title={anySpawnable ? undefined : t.settings.cli.unavailableReason}
-            className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
-              anySpawnable
-                ? "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg"
-                : "cursor-not-allowed text-(--ui-text-quaternary)",
-            )}
-          >
-            <Icon name="rocket" size={16} className="shrink-0 opacity-70" />
-            {t.shell.sidebar.newSession}
-          </button>
-          <button
-            type="button"
-            onClick={() => onRoute(OVERVIEW_ID)}
-            aria-pressed={route === OVERVIEW_ID}
-            className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
-              route === OVERVIEW_ID
-                ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
-            )}
-          >
-            <Icon
-              name="chart-column"
-              size={16}
-              className="shrink-0 opacity-70"
-            />
-            {t.shell.sidebar.stats}
-          </button>
-          <button
-            type="button"
-            onClick={() => onRoute(SETTINGS_ID)}
-            aria-pressed={route === SETTINGS_ID}
-            title={
-              updatePending ? t.shell.sidebar.updatePendingTitle : undefined
-            }
-            className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
-              route === SETTINGS_ID
-                ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
-            )}
-          >
-            <span className="relative grid shrink-0 place-items-center">
-              <Icon name="settings" size={16} className="opacity-70" />
-              {updatePending && (
-                // Ring stays the sidebar surface even on row hover/active — accepted halo (spec §UI).
-                <span
-                  aria-hidden
-                  className="absolute -right-[3px] -top-[2px] size-[7px] rounded-full border-[1.5px] border-(--ui-sidebar-surface-background) bg-accent"
-                />
+          <div className="flex shrink-0 flex-col gap-px px-2.5 pb-2 pt-1.5">
+            <button
+              type="button"
+              onClick={onNew}
+              disabled={!anySpawnable}
+              title={
+                anySpawnable ? undefined : t.settings.cli.unavailableReason
+              }
+              className={cx(
+                "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+                anySpawnable
+                  ? "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+                  : "cursor-not-allowed text-(--ui-text-quaternary)",
               )}
-            </span>
-            {t.settings.nav.settings}
-            {updatePending && (
-              <span className="sr-only">
-                {t.shell.sidebar.updatePendingSrOnly}
+            >
+              <Icon name="rocket" size={16} className="shrink-0 opacity-70" />
+              {t.shell.sidebar.newSession}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRoute(OVERVIEW_ID)}
+              aria-pressed={route === OVERVIEW_ID}
+              className={cx(
+                "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+                route === OVERVIEW_ID
+                  ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+                  : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+              )}
+            >
+              <Icon
+                name="chart-column"
+                size={16}
+                className="shrink-0 opacity-70"
+              />
+              {t.shell.sidebar.stats}
+            </button>
+            <button
+              type="button"
+              onClick={() => onRoute(SETTINGS_ID)}
+              aria-pressed={route === SETTINGS_ID}
+              title={
+                updatePending ? t.shell.sidebar.updatePendingTitle : undefined
+              }
+              className={cx(
+                "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+                route === SETTINGS_ID
+                  ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+                  : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+              )}
+            >
+              <span className="relative grid shrink-0 place-items-center">
+                <Icon name="settings" size={16} className="opacity-70" />
+                {updatePending && (
+                  // Ring stays the sidebar surface even on row hover/active — accepted halo (spec §UI).
+                  <span
+                    aria-hidden
+                    className="absolute -right-[3px] -top-[2px] size-[7px] rounded-full border-[1.5px] border-(--ui-sidebar-surface-background) bg-accent"
+                  />
+                )}
               </span>
-            )}
-          </button>
-        </div>
+              {t.settings.nav.settings}
+              {updatePending && (
+                <span className="sr-only">
+                  {t.shell.sidebar.updatePendingSrOnly}
+                </span>
+              )}
+            </button>
+          </div>
 
-        {/* Hermes SearchField chrome (borderless, underline on focus, ghost clear button), but
+          {/* Hermes SearchField chrome (borderless, underline on focus, ghost clear button), but
           full-width by maintainer preference — hermes hugs the text via field-sizing:content;
           here the input flexes so the clear button stays pinned at the row's end. px-4.5 =
           hermes's px-2 wrapper INSIDE SidebarContent's px-2.5 (10+8px) — we flattened that
           outer container, so the wrapper carries both, keeping the icon flush with the nav
           icons above. */}
-        <div className="shrink-0 px-4.5 pb-1 pt-1">
-          <div className="flex w-full items-center gap-1.5 border-b border-transparent transition-colors focus-within:border-(--ui-stroke-secondary)">
-            <Icon
-              name="search"
-              size={14}
-              className="pointer-events-none shrink-0 text-(--ui-text-tertiary)/70"
-            />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.shell.sidebar.searchPlaceholder}
-              aria-label={t.shell.sidebar.searchLabel}
-              className="h-7 min-w-0 flex-1 bg-transparent text-[0.8125rem] text-fg placeholder:text-(--ui-text-tertiary) focus:outline-none"
-            />
-            {query && (
-              <button
-                type="button"
-                aria-label={t.shell.sidebar.clearSearch}
-                onClick={() => setQuery("")}
-                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-(--ui-text-tertiary)/85 transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
-              >
-                <Icon name="x" size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <OverlayScroll className="min-h-0 flex-1" contentClassName="pb-2">
-          <div>
-            <div className="sticky top-0 z-10 flex items-center bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
-              <SidebarPanelLabel className="pl-2">
-                {t.shell.sidebar.pinnedLabel}
-              </SidebarPanelLabel>
+          <div className="shrink-0 px-4.5 pb-1 pt-1">
+            <div className="flex w-full items-center gap-1.5 border-b border-transparent transition-colors focus-within:border-(--ui-stroke-secondary)">
+              <Icon
+                name="search"
+                size={14}
+                className="pointer-events-none shrink-0 text-(--ui-text-tertiary)/70"
+              />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.shell.sidebar.searchPlaceholder}
+                aria-label={t.shell.sidebar.searchLabel}
+                className="h-7 min-w-0 flex-1 bg-transparent text-[0.8125rem] text-fg placeholder:text-(--ui-text-tertiary) focus:outline-none"
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label={t.shell.sidebar.clearSearch}
+                  onClick={() => setQuery("")}
+                  className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-(--ui-text-tertiary)/85 transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+                >
+                  <Icon name="x" size={16} />
+                </button>
+              )}
             </div>
-            {pinned.length === 0 ? (
-              <div className="px-2.5">
-                <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
-                  {t.shell.sidebar.noPinnedSessions}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-px px-2.5">
-                {pinned.map((s) => (
-                  <PinnedSessionRow
-                    key={s.id}
-                    session={s}
-                    selected={s.id === selectedId}
-                    onSelect={() => onSelect(s.id)}
-                    canSpawn={canSpawnFor(s.agent)}
-                    onResume={onResume}
-                    onFork={onFork}
-                    onEnd={onEnd}
-                    onRename={onRename}
-                    onTogglePin={onTogglePin}
-                  />
-                ))}
-              </div>
-            )}
           </div>
-          <div>
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-1 bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
-              <SidebarPanelLabel className="pl-2">
-                {t.shell.sidebar.sessionsLabel}
-              </SidebarPanelLabel>
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Expand-all is NOT a manual expand: empty folders open silently, no empty-state line.
-                    setCollapsed((current) =>
-                      toggleProjectGroups(current, collapsibleGroups),
-                    );
-                    if (!allCollapsed) {
-                      setManuallyExpanded(new Set());
-                      // Collapsing every folder ends every Older errand, same as closing one by hand.
-                      setOlderLimits(new Map());
+
+          <OverlayScroll className="min-h-0 flex-1" contentClassName="pb-2">
+            <div>
+              <div className="sticky top-0 z-10 flex items-center bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
+                <SidebarPanelLabel className="pl-2">
+                  {t.shell.sidebar.pinnedLabel}
+                </SidebarPanelLabel>
+              </div>
+              {pinned.length === 0 ? (
+                <div className="px-2.5">
+                  <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
+                    {t.shell.sidebar.noPinnedSessions}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-px px-2.5">
+                  {pinned.map((s) => (
+                    <PinnedSessionRow
+                      key={s.id}
+                      session={s}
+                      selected={s.id === selectedId}
+                      onSelect={() => onSelect(s.id)}
+                      canSpawn={canSpawnFor(s.agent)}
+                      onResume={onResume}
+                      onFork={onFork}
+                      onEnd={onEnd}
+                      onRename={onRename}
+                      onTogglePin={onTogglePin}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-1 bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
+                <SidebarPanelLabel className="pl-2">
+                  {t.shell.sidebar.sessionsLabel}
+                </SidebarPanelLabel>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Expand-all is NOT a manual expand: empty folders open silently, no empty-state line.
+                      setCollapsed((current) =>
+                        toggleProjectGroups(current, collapsibleGroups),
+                      );
+                      if (!allCollapsed) {
+                        setManuallyExpanded(new Set());
+                        // Collapsing every folder ends every Older errand, same as closing one by hand.
+                        setOlderLimits(new Map());
+                      }
+                    }}
+                    title={
+                      allCollapsed
+                        ? t.shell.sidebar.expandAll
+                        : t.shell.sidebar.collapseAll
                     }
-                  }}
-                  title={
-                    allCollapsed
-                      ? t.shell.sidebar.expandAll
-                      : t.shell.sidebar.collapseAll
-                  }
-                  className="grid size-5 cursor-pointer place-items-center rounded-sm border border-transparent text-(--ui-text-quaternary) transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
-                >
-                  <Icon
-                    name={
-                      allCollapsed ? "chevrons-up-down" : "chevrons-down-up"
-                    }
-                    size={12}
-                  />
-                </button>
-                <button
-                  ref={filterTriggerRef}
-                  type="button"
-                  onClick={() => {
-                    if (filterMenuOpen) {
-                      setFilterMenuOpen(false);
+                    className="grid size-5 cursor-pointer place-items-center rounded-sm border border-transparent text-(--ui-text-quaternary) transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+                  >
+                    <Icon
+                      name={
+                        allCollapsed ? "chevrons-up-down" : "chevrons-down-up"
+                      }
+                      size={12}
+                    />
+                  </button>
+                  <button
+                    ref={filterTriggerRef}
+                    type="button"
+                    onClick={() => {
+                      if (filterMenuOpen) {
+                        setFilterMenuOpen(false);
+                        setFilterMenuPosition(null);
+                        return;
+                      }
                       setFilterMenuPosition(null);
-                      return;
-                    }
-                    setFilterMenuPosition(null);
-                    setFilterMenuOpen(true);
-                  }}
-                  aria-pressed={agentFilterActive}
-                  aria-expanded={filterMenuOpen}
-                  aria-haspopup="menu"
-                  aria-label={t.shell.sidebar.filterMenuLabel}
-                  title={t.shell.sidebar.filterMenuLabel}
-                  className={cx(
-                    "grid size-5 cursor-pointer place-items-center rounded-sm border transition-colors duration-100 ease-out hover:transition-none",
-                    agentFilterActive
-                      ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                      : "border-transparent text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                      setFilterMenuOpen(true);
+                    }}
+                    aria-pressed={agentFilterActive}
+                    aria-expanded={filterMenuOpen}
+                    aria-haspopup="menu"
+                    aria-label={t.shell.sidebar.filterMenuLabel}
+                    title={t.shell.sidebar.filterMenuLabel}
+                    className={cx(
+                      "grid size-5 cursor-pointer place-items-center rounded-sm border transition-colors duration-100 ease-out hover:transition-none",
+                      agentFilterActive
+                        ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+                        : "border-transparent text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                    )}
+                  >
+                    <Icon name="filter" size={12} />
+                  </button>
+                </div>
+              </div>
+              <div className="px-2.5">
+                <div className="flex flex-col gap-px">
+                  {pinnedProjects.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
+                      {t.shell.sidebar.noPinnedProjects}
+                    </p>
+                  ) : (
+                    pinnedProjects.map((g) => renderProjectGroup(g, "pinned"))
                   )}
-                >
-                  <Icon name="filter" size={12} />
-                </button>
+                  <div className="mx-2 my-1 border-t border-sidebar-border" />
+                  {groups.length === 0 ? (
+                    <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
+                      {agentFilterActive && sessions.length > 0
+                        ? t.shell.sidebar.noMatchingSessions
+                        : t.shell.sidebar.noSessionsYet}
+                    </p>
+                  ) : (
+                    otherProjects.map((g) => renderProjectGroup(g, "ordinary"))
+                  )}
+                </div>
               </div>
             </div>
             <div className="px-2.5">
-              <div className="flex flex-col gap-px">
-                {pinnedProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
-                    {t.shell.sidebar.noPinnedProjects}
-                  </p>
-                ) : (
-                  pinnedProjects.map((g) => renderProjectGroup(g, "pinned"))
-                )}
-                <div className="mx-2 my-1 border-t border-sidebar-border" />
-                {groups.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
-                    {agentFilterActive && sessions.length > 0
-                      ? t.shell.sidebar.noMatchingSessions
-                      : t.shell.sidebar.noSessionsYet}
-                  </p>
-                ) : (
-                  otherProjects.map((g) => renderProjectGroup(g, "ordinary"))
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="px-2.5">
-            <div className="mx-2 mt-1 border-t border-sidebar-border" />
-            <button
-              type="button"
-              onClick={() => setHiddenCollapsed((value) => !value)}
-              aria-expanded={!hiddenCollapsed}
-              className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-(--ui-text-quaternary) hover:bg-(--ui-row-hover-background) hover:text-fg"
-            >
-              <span className="text-[0.64rem] font-semibold uppercase tracking-[0.12em]">
-                {t.shell.sidebar.hiddenLabel}
-              </span>
-              <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-[0.64rem] tabular-nums">
-                {hiddenCount}
-              </span>
-              <Icon
-                name={hiddenCollapsed ? "chevron-right" : "chevron-down"}
-                size={12}
-              />
-            </button>
-            {!hiddenCollapsed && (
-              <div className="flex flex-col gap-px">
-                {hiddenProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
-                    {t.shell.sidebar.noHiddenProjects}
-                  </p>
-                ) : (
-                  hiddenProjects.map((g) => renderProjectGroup(g, "hidden"))
-                )}
-              </div>
-            )}
-          </div>
-        </OverlayScroll>
-      </div>
-      {agentMenu &&
-        createPortal(
-          <div
-            ref={agentMenuRef}
-            role="menu"
-            style={{
-              position: "fixed",
-              left: agentMenu.left,
-              top: agentMenu.top,
-              width: 176,
-            }}
-            className="z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1.5 shadow-(--shadow-md) backdrop-blur-xl"
-          >
-            {AGENT_IDS.map((a) => (
+              <div className="mx-2 mt-1 border-t border-sidebar-border" />
               <button
-                key={a}
                 type="button"
-                role="menuitem"
-                disabled={!canSpawnFor(a)}
-                title={
-                  canSpawnFor(a)
-                    ? t.shell.sidebar.newSessionWith(
-                        AGENTS[a].label,
-                        agentMenu.cwd,
-                      )
-                    : t.settings.cli.unavailableReasonFor(AGENTS[a].label)
-                }
-                onClick={() => {
-                  const m = agentMenu;
-                  setAgentMenu(null);
-                  void quickAdd(m.key, m.cwd, a);
-                }}
-                className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted transition-colors enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg disabled:cursor-default disabled:opacity-40"
+                onClick={() => setHiddenCollapsed((value) => !value)}
+                aria-expanded={!hiddenCollapsed}
+                className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-(--ui-text-quaternary) hover:bg-(--ui-row-hover-background) hover:text-fg"
               >
-                <AgentIcon agent={a} size={13} />
-                {AGENTS[a].label}
+                <span className="text-[0.64rem] font-semibold uppercase tracking-[0.12em]">
+                  {t.shell.sidebar.hiddenLabel}
+                </span>
+                <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-[0.64rem] tabular-nums">
+                  {hiddenCount}
+                </span>
+                <Icon
+                  name={hiddenCollapsed ? "chevron-right" : "chevron-down"}
+                  size={12}
+                />
               </button>
-            ))}
-          </div>,
-          document.body,
-        )}
-      {filterMenuOpen &&
-        createPortal(
-          <div
-            ref={filterMenuRef}
-            className="z-50"
-            style={{
-              position: "fixed",
-              left: filterMenuPosition?.left ?? 0,
-              top: filterMenuPosition?.top ?? 0,
-              visibility: filterMenuPosition ? "visible" : "hidden",
-              maxHeight: "calc(100vh - 16px)",
-              overflowY: "auto",
-            }}
-          >
-            <SessionFilterMenu
-              preferences={preferences}
-              onChange={updatePreferences}
-              onClose={() => {
-                setFilterMenuOpen(false);
-                setFilterMenuPosition(null);
+              {!hiddenCollapsed && (
+                <div className="flex flex-col gap-px">
+                  {hiddenProjects.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
+                      {t.shell.sidebar.noHiddenProjects}
+                    </p>
+                  ) : (
+                    hiddenProjects.map((g) => renderProjectGroup(g, "hidden"))
+                  )}
+                </div>
+              )}
+            </div>
+          </OverlayScroll>
+        </div>
+        {agentMenu &&
+          createPortal(
+            <div
+              ref={agentMenuRef}
+              role="menu"
+              style={{
+                position: "fixed",
+                left: agentMenu.left,
+                top: agentMenu.top,
+                width: 176,
               }}
-            />
-          </div>,
-          document.body,
-        )}
-    </>
+              className="z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1.5 shadow-(--shadow-md) backdrop-blur-xl"
+            >
+              {AGENT_IDS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  role="menuitem"
+                  disabled={!canSpawnFor(a)}
+                  title={
+                    canSpawnFor(a)
+                      ? t.shell.sidebar.newSessionWith(
+                          AGENTS[a].label,
+                          agentMenu.cwd,
+                        )
+                      : t.settings.cli.unavailableReasonFor(AGENTS[a].label)
+                  }
+                  onClick={() => {
+                    const m = agentMenu;
+                    setAgentMenu(null);
+                    void quickAdd(m.key, m.cwd, a);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted transition-colors enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg disabled:cursor-default disabled:opacity-40"
+                >
+                  <AgentIcon agent={a} size={13} />
+                  {AGENTS[a].label}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )}
+        {filterMenuOpen &&
+          createPortal(
+            <div
+              ref={filterMenuRef}
+              className="z-50"
+              style={{
+                position: "fixed",
+                left: filterMenuPosition?.left ?? 0,
+                top: filterMenuPosition?.top ?? 0,
+                visibility: filterMenuPosition ? "visible" : "hidden",
+                maxHeight: "calc(100vh - 16px)",
+                overflowY: "auto",
+              }}
+            >
+              <SessionFilterMenu
+                preferences={preferences}
+                onChange={updatePreferences}
+                onClose={() => {
+                  setFilterMenuOpen(false);
+                  setFilterMenuPosition(null);
+                }}
+              />
+            </div>,
+            document.body,
+          )}
+      </>
+    </ProductsProvider>
   );
 }
