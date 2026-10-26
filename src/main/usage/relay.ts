@@ -44,7 +44,7 @@ const record = (v: unknown): Record<string, unknown> | null =>
 export function codexRelay(configToml: string, env: Env): RelayTarget | null {
   let config: Record<string, unknown>;
   try {
-    config = parseToml(configToml) as Record<string, unknown>;
+    config = parseToml(configToml);
   } catch {
     return null;
   }
