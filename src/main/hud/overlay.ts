@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, screen, type Display } from "electron";
 import type * as Hud from "@shared/hud-native";
 import { logWarn } from "../log-buffer";
+import { watchFullscreen } from "./fullscreen-watch";
 
 /**
  * The HUD overlay: Agent HUD's edge strip, glow and hover panel (vendored under renderer/hud) in a
@@ -12,6 +13,7 @@ import { logWarn } from "../log-buffer";
  *   sends `hud:pointer`, which drives the strip's hover and the panel's open/close.
  * - Data rides `native_request`, which the page polls (main runs no data timer).
  * - Geometry is the canvas this window covers on its display.
+ * - While a full-screen app (a game) is in front the overlays hide, so they never sit over it.
  */
 
 type Rect = Hud.HudRect;
@@ -74,6 +76,8 @@ function canvasFor(d: Display): Rect {
 export function createHudOverlay(deps: HudOverlayDeps) {
   const overlays = new Map<string, Overlay>();
   let timer: NodeJS.Timeout | null = null;
+  let unwatch: (() => void) | null = null;
+  let fullscreen = false;
 
   const send = (o: Overlay, event: string, payload: unknown) => {
     if (!o.win.isDestroyed())
@@ -115,6 +119,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
   /** Where the cursor is relative to each overlay, and whether it is over the HUD there. */
   const poll = () => {
     const cursor = screen.getCursorScreenPoint();
+    if (fullscreen) return;
     for (const o of overlays.values()) {
       const point = { x: cursor.x - o.canvas.x, y: cursor.y - o.canvas.y };
       const inside = o.regions.some(
@@ -237,7 +242,9 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     win.webContents.on("render-process-gone", (_e, d) =>
       logWarn("hud-page", `HUD page gone: ${d.reason}`),
     );
-    win.once("ready-to-show", () => win.showInactive());
+    win.once("ready-to-show", () => {
+      if (!fullscreen) win.showInactive();
+    });
     win.on("closed", () => overlays.delete(o.screenId));
     deps.load(win, { screen: o.screenId, label: `hud-${d.id}` });
   };
@@ -257,6 +264,21 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     for (const o of overlays.values()) send(o, "hud:monitors", monitors());
   };
 
+  /** Hide every overlay while a full-screen app is in front; bring them back after. */
+  const setFullscreen = (next: boolean) => {
+    if (next === fullscreen) return;
+    fullscreen = next;
+    for (const o of overlays.values()) {
+      if (o.win.isDestroyed()) continue;
+      if (next) {
+        o.win.hide();
+        o.pointer = outside(o.screenId);
+        o.win.setIgnoreMouseEvents(true, { forward: true });
+        send(o, "hud:pointer", o.pointer);
+      } else o.win.showInactive();
+    }
+  };
+
   return {
     /** Show the HUD along the top of the primary display. */
     start() {
@@ -265,10 +287,14 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       screen.on("display-metrics-changed", relayout);
       screen.on("display-removed", relayout);
       timer = setInterval(poll, POINTER_POLL_MS);
+      unwatch = watchFullscreen(setFullscreen);
     },
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
+      unwatch?.();
+      unwatch = null;
+      fullscreen = false;
       screen.off("display-metrics-changed", relayout);
       screen.off("display-removed", relayout);
       for (const o of overlays.values()) o.win.destroy();
