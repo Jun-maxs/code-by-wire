@@ -87,6 +87,12 @@ app.commandLine.appendSwitch("force-color-profile", "srgb");
 // session's cmd.exe can't find `claude`. Restore it before anything spawns (see windows-path.ts).
 if (process.platform === "win32") restoreWindowsPath();
 
+// A second copy of the app (a dev build beside the installed one) keeps its own userData when
+// CBW_USER_DATA_DIR names one: the session index prunes every row its own providers didn't list, so
+// two builds that know different agents sharing one index.db would keep deleting each other's rows.
+if (process.env.CBW_USER_DATA_DIR)
+  app.setPath("userData", process.env.CBW_USER_DATA_DIR);
+
 // reclaude's selected account, unless CLAUDE_CONFIG_DIR is already set: sessions are read from its
 // config dir and launched through rec.exe (see reclaude.ts). Before anything resolves claudeDir.
 adoptReclaude();
