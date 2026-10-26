@@ -35,6 +35,7 @@ import { createManagedRegistry } from "./managed-registry";
 import type { ManagedRegistry } from "./managed-registry";
 import { applyRotations } from "./provider/claude/rotation";
 import { readSessionFiles } from "./provider/claude/discover";
+import { readParentMap } from "./process-tree";
 import { registerIpc } from "./ipc";
 import { createSettingsManager } from "./settings/manager";
 import { createStatusLineReader } from "./statusline/reader";
@@ -509,6 +510,7 @@ app
     // Before each discovery sweep, follow any /clear that rotated a Managed pty's session id: relabel the
     // registry and re-key the live pty + renderer, so the rotated session stays Managed instead of being
     // re-derived as a read-only Observed one.
+    const checkedUnderPtys = new Set<string>();
     const reconcile = async (): Promise<void> => {
       await applyRotations(
         {
@@ -521,7 +523,21 @@ app
           parseWorker
             .call({ op: "readSessionFiles", claudeDir })
             .catch(() => readSessionFiles(claudeDir)),
-        renameInWindow,
+        (from, to) => {
+          renameInWindow(from, to);
+          // The pty keeps running under HAPI after a phone takeover or /clear, so the new id is remote
+          // too; the old id stays marked for its own Resume.
+          try {
+            if (remoteSessions.has(from)) remoteSessions.set(to, true);
+          } catch (err) {
+            logError(
+              "remote-session-follow-failed",
+              "could not carry the remote mark to the rotated session id",
+              err,
+            );
+          }
+        },
+        { read: () => readParentMap(), seen: checkedUnderPtys },
       );
       // Codex claims land in the same beforeSync slot, so the re-key + rollout binding hit the
       // very pass that first discovers the rollout — no duplicate-row window between polls. Order

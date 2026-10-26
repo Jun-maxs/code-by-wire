@@ -26,6 +26,8 @@ export interface RawSessionFile {
   kind?: string;
   /** Present only on background sessions (agent view / `claude --bg`); the agent-view short id. */
   jobId?: string;
+  /** When the process registered (ms); rotation.ts uses it to pick the newest claude under a pty. */
+  startedAt?: number;
 }
 
 export interface CandidateDeps {
@@ -115,6 +117,7 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
           updatedAt: j.updatedAt,
           kind: typeof j.kind === "string" ? j.kind : undefined,
           jobId: typeof j.jobId === "string" ? j.jobId : undefined,
+          startedAt: typeof j.startedAt === "number" ? j.startedAt : undefined,
         });
       }
     } catch {
