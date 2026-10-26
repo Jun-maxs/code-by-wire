@@ -115,6 +115,11 @@ const api: AppApi = {
     ipcRenderer.on(IPC.updateState, handler);
     return () => ipcRenderer.removeListener(IPC.updateState, handler);
   },
+  onSelectSession: (cb) => {
+    const handler = (_e: IpcRendererEvent, id: string) => cb(id);
+    ipcRenderer.on(IPC.selectSession, handler);
+    return () => ipcRenderer.removeListener(IPC.selectSession, handler);
+  },
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
     resume: (req) => ipcRenderer.invoke(TERMINAL.resume, req),
@@ -180,3 +185,23 @@ const api: AppApi = {
 };
 
 contextBridge.exposeInMainWorld("api", api);
+
+// The HUD overlay window (main/hud/overlay.ts) runs the vendored Agent HUD page, whose native calls
+// reach main through this bridge (renderer/hud/shim). Harmless in the main window, which never uses it.
+const hudListeners = new Map<string, Set<(payload: unknown) => void>>();
+ipcRenderer.on("hud:event", (_e, event: string, payload: unknown) => {
+  for (const handler of hudListeners.get(event) ?? []) handler(payload);
+});
+contextBridge.exposeInMainWorld("hudBridge", {
+  label: new URLSearchParams(location.search).get("label") ?? "",
+  invoke: (command: string, args?: unknown) =>
+    ipcRenderer.invoke("hud:invoke", command, args),
+  emit: (event: string, payload?: unknown) =>
+    ipcRenderer.send("hud:emit", event, payload),
+  on: (event: string, handler: (payload: unknown) => void) => {
+    const set = hudListeners.get(event) ?? new Set();
+    set.add(handler);
+    hudListeners.set(event, set);
+    return () => set.delete(handler);
+  },
+});

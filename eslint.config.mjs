@@ -16,6 +16,11 @@ export default tseslint.config(
   // .gitignore by default; this keeps ESLint in lockstep with it.
   includeIgnoreFile(gitignorePath),
 
+  // The HUD overlay page vendors Agent HUD's packages (src/renderer/hud/vendor, app) and is
+  // type-checked on its own (tsconfig.hud.json, part of `pnpm typecheck`); type-aware linting would
+  // resolve it against the wrong project.
+  { ignores: ["src/renderer/hud/**"] },
+
   // Base recommended JS rules.
   js.configs.recommended,
 

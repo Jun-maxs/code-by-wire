@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.web.json",
+  "compilerOptions": {
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@agent-hud/hud/*": ["src/renderer/hud/vendor/hud/src/*"],
+      "@agent-hud/ui/components/*": ["src/renderer/hud/vendor/ui/src/ui/*"],
+      "@agent-hud/ui/*": ["src/renderer/hud/vendor/ui/src/*"],
+      "@agent-hud/protocol": ["src/shared/hud-protocol/index.ts"],
+      "@agent-hud/protocol/*": ["src/shared/hud-protocol/*"],
+      "@tauri-apps/api/core": ["src/renderer/hud/shim/tauri-core.ts"],
+      "@tauri-apps/api/event": ["src/renderer/hud/shim/tauri-event.ts"],
+      "@tauri-apps/api/webviewWindow": [
+        "src/renderer/hud/shim/tauri-webview-window.ts"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/renderer/hud", "src/shared"]
+}

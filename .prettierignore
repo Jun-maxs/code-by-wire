@@ -5,3 +5,6 @@ pnpm-lock.yaml
 .claude/skills/
 CHANGELOG.md
 docs/superpowers/
+# Vendored from agent-hud-open (Apache-2.0); kept in its upstream formatting.
+src/renderer/hud/vendor/
+src/renderer/hud/app/

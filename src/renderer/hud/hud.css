@@ -1,0 +1,6 @@
+/* The HUD overlay's stylesheet: Agent HUD's shared theme, scanning the vendored HUD components and
+   this window's own code for the utility classes they use. */
+@import "./vendor/ui/src/global.css";
+@source "./vendor/hud/src";
+@source "./vendor/ui/src";
+@source "./app";

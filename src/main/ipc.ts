@@ -1,13 +1,6 @@
-import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  ipcMain,
-  nativeTheme,
-  shell,
-} from "electron";
+import { app, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
 import { cpus, freemem, homedir, release, totalmem } from "node:os";
+import { appWindows } from "./hud/overlay";
 import { statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import {
@@ -221,7 +214,7 @@ export function registerIpc({
   caffeinate,
   usage,
   sessionOverlays,
-}: IpcDeps): { sync: () => Promise<void> } {
+}: IpcDeps): { sync: () => Promise<void>; overview: () => OverviewData } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
   const readDefaults =
@@ -749,7 +742,7 @@ export function registerIpc({
         { fileName: value.fileName, markdown: value.markdown },
         {
           showSaveDialog: async (options) => {
-            const window = BrowserWindow.getAllWindows()[0];
+            const window = appWindows()[0];
             return window
               ? dialog.showSaveDialog(window, options)
               : dialog.showSaveDialog(options);
@@ -1188,5 +1181,5 @@ export function registerIpc({
     }
   });
 
-  return { sync };
+  return { sync, overview: overviewNow };
 }

@@ -29,7 +29,7 @@ import { listRollouts, readRolloutHead } from "./provider/codex/rollout";
 import { applyClaims, scanClaimableRollouts } from "./provider/codex/claim";
 import { createCompositeProvider } from "./provider/composite";
 import type { Provider } from "./provider/types";
-import { AGENT_IDS, type AgentId } from "@shared/agents";
+import { AGENT_IDS, AGENTS, type AgentId } from "@shared/agents";
 import { createManagedRegistry } from "./managed-registry";
 import type { ManagedRegistry } from "./managed-registry";
 import { applyRotations } from "./provider/claude/rotation";
@@ -71,6 +71,19 @@ import {
   shouldCorrectPath,
 } from "./terminal/shell-path";
 import { restoreWindowsPath } from "./terminal/windows-path";
+import { appWindows, createHudOverlay, isHudWindow } from "./hud/overlay";
+import {
+  buildHudSnapshot,
+  hourlyTimeline,
+  HOURLY_TOKENS_SQL,
+} from "./hud/snapshot";
+import {
+  sessionsResponse,
+  statisticsResponse,
+  TURN_BUCKETS_SQL,
+  type TurnBucketRow,
+} from "./hud/queries";
+import type { StatisticsQuery as HudStatisticsQuery } from "@shared/hud-protocol";
 import { adoptReclaude } from "./reclaude";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
@@ -290,11 +303,11 @@ app
       );
     openWindow();
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) openWindow();
+      if (appWindows().length === 0) openWindow();
     });
     // Push update-state to whatever window is open (resolved at send-time, like the fullscreen push).
     const sendUpdate = (state: import("@shared/update").UpdateState): void => {
-      const w = BrowserWindow.getAllWindows()[0];
+      const w = appWindows()[0];
       if (w && !w.isDestroyed()) w.webContents.send(IPC.updateState, state);
     };
     const updater = createUpdater({
@@ -532,7 +545,7 @@ app
       });
     };
     const caffeinate = createCaffeinate({ blocker: powerSaveBlocker });
-    const { sync } = registerIpc({
+    const { sync, overview } = registerIpc({
       db,
       provider,
       statusLine,
@@ -589,6 +602,110 @@ app
         err,
       );
     }
+
+    // The HUD overlay (Agent HUD's edge strip and panel) along the top of the primary display. It
+    // polls for its snapshot; a poll also syncs the index when the last sync is 10s old, so the HUD
+    // stays current while the main window is minimized and not polling.
+    let lastHudSync = Date.now();
+    const HOUR = 3_600_000;
+    const hudLanguage = (): "zh" | "en" =>
+      (appSettings.read().appLocale ??
+        (app.getLocale().startsWith("zh") ? "zh" : "en")) === "zh"
+        ? "zh"
+        : "en";
+    const hudSnapshot = () => {
+      const now = Date.now();
+      if (now - lastHudSync > 10_000) {
+        lastHudSync = now;
+        void sync().catch((err) =>
+          logError("hud-sync-failed", "HUD sync failed", err),
+        );
+      }
+      const o = overview();
+      const rows = (analyticsDb
+        ?.prepare(HOURLY_TOKENS_SQL)
+        .all(now - 24 * HOUR) ?? []) as {
+        hour: number;
+        input: number;
+        output: number;
+        cache: number;
+      }[];
+      return buildHudSnapshot({
+        sessions: o.sessions,
+        account: o.account,
+        timeline: hourlyTimeline(rows, now),
+        now,
+        language: hudLanguage(),
+        appearance: appSettings.read().appTheme ?? "dark",
+      });
+    };
+    const showMain = (sessionId?: string) => {
+      if (appWindows().length === 0) openWindow();
+      const w = appWindows()[0];
+      if (!w) return;
+      if (w.isMinimized()) w.restore();
+      w.show();
+      w.focus();
+      if (sessionId) w.webContents.send(IPC.selectSession, sessionId);
+    };
+    const hud = createHudOverlay({
+      preload: join(__dirname, "../preload/index.js"),
+      load: (win, query) => {
+        if (process.env.ELECTRON_RENDERER_URL)
+          void win.loadURL(
+            `${process.env.ELECTRON_RENDERER_URL}/hud.html?${new URLSearchParams(query)}`,
+          );
+        else
+          void win.loadFile(join(__dirname, "../renderer/hud.html"), { query });
+      },
+      request: (method, params) => {
+        const now = Date.now();
+        switch (method) {
+          case "snapshot":
+          case "refresh":
+            return hudSnapshot();
+          case "sessions":
+            return sessionsResponse(params, hudSnapshot().sessions, now);
+          case "statistics": {
+            const q = params as unknown as HudStatisticsQuery;
+            const rows = (analyticsDb
+              ?.prepare(TURN_BUCKETS_SQL)
+              .all(
+                q.bucketMinutes * 60_000,
+                Date.parse(q.from),
+                Date.parse(q.to),
+              ) ?? []) as TurnBucketRow[];
+            return statisticsResponse(
+              q,
+              rows,
+              AGENT_IDS.map((id) => ({ id, name: AGENTS[id].label })),
+              now,
+            );
+          }
+          case "open_session":
+            showMain(typeof params.id === "string" ? params.id : undefined);
+            return true;
+          default:
+            return null;
+        }
+      },
+      showMain,
+    });
+    hud.start();
+    // Closing the last app window quits on Windows/Linux: the overlay goes first, or its window
+    // would keep "window-all-closed" from ever firing.
+    app.on("browser-window-created", (_e, w) => {
+      if (isHudWindow(w)) return;
+      w.on("closed", () => {
+        if (process.platform !== "darwin" && appWindows().length === 0)
+          hud.stop();
+      });
+    });
+    for (const w of appWindows())
+      w.on("closed", () => {
+        if (process.platform !== "darwin" && appWindows().length === 0)
+          hud.stop();
+      });
   })
   .catch((err) => {
     // Last resort: never let a startup throw vanish as a silent unhandled rejection.

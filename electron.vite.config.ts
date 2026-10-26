@@ -11,6 +11,39 @@ const { version } = JSON.parse(
   readFileSync(resolve("package.json"), "utf8"),
 ) as { version: string };
 
+// The HUD overlay page (src/renderer/hud) imports Agent HUD's packages by name; they are vendored
+// under it, and Tauri's API is served by shims over the HUD bridge. Most specific prefix first.
+const HUD = "src/renderer/hud";
+const dir = (p: string) => resolve(p).split("\\").join("/");
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+/** Map `prefix/<rest>` onto `<target dir>/<rest>`. */
+const under = (prefix: string, target: string) => ({
+  find: new RegExp(`^${escape(prefix)}/(.*)$`),
+  replacement: `${dir(target)}/$1`,
+});
+/** Map exactly `id` onto one file. */
+const exactly = (id: string, file: string) => ({
+  find: new RegExp(`^${escape(id)}$`),
+  replacement: dir(file),
+});
+const hudAliases = [
+  under("@agent-hud/hud", `${HUD}/vendor/hud/src`),
+  under("@agent-hud/ui/components", `${HUD}/vendor/ui/src/ui`),
+  under("@agent-hud/ui", `${HUD}/vendor/ui/src`),
+  exactly(
+    "@agent-hud/protocol/capabilities",
+    "src/shared/hud-protocol/capabilities.json",
+  ),
+  under("@agent-hud/protocol", "src/shared/hud-protocol"),
+  exactly("@agent-hud/protocol", "src/shared/hud-protocol/index.ts"),
+  exactly("@tauri-apps/api/core", `${HUD}/shim/tauri-core.ts`),
+  exactly("@tauri-apps/api/event", `${HUD}/shim/tauri-event.ts`),
+  exactly(
+    "@tauri-apps/api/webviewWindow",
+    `${HUD}/shim/tauri-webview-window.ts`,
+  ),
+];
+
 export default defineConfig({
   main: {
     build: {
@@ -38,13 +71,21 @@ export default defineConfig({
     define: { __APP_VERSION__: JSON.stringify(version) },
     plugins: [react(), tailwindcss()],
     resolve: {
-      alias: {
-        "@shared": resolve("src/shared"),
-        "@renderer": resolve("src/renderer/src"),
-      },
+      alias: [
+        { find: "@shared", replacement: resolve("src/shared") },
+        { find: "@renderer", replacement: resolve("src/renderer/src") },
+        // The HUD overlay page (src/renderer/hud): Agent HUD's packages, vendored, resolved by the
+        // package names their code imports, and Tauri's API served by shims over the HUD bridge.
+        ...hudAliases,
+      ],
     },
     build: {
-      rollupOptions: { input: { index: resolve("src/renderer/index.html") } },
+      rollupOptions: {
+        input: {
+          index: resolve("src/renderer/index.html"),
+          hud: resolve("src/renderer/hud.html"),
+        },
+      },
     },
   },
 });

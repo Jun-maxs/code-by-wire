@@ -84,6 +84,7 @@ export const IPC = {
   launchPresetsSet: "launchPresets:set",
   /** PUSH: main -> renderer on every update-state transition. */
   updateState: "update:state",
+  selectSession: "window:selectSession",
 } as const;
 
 /** What the clipboard holds besides text: an image (a screenshot), or files copied in the file
@@ -382,4 +383,6 @@ export type AppApi = IpcApi & {
   /** Subscribe to update-state pushes. Main sends on every transition (including download progress);
    *  the returned fn unsubscribes. Mirrors onFullscreenChange. */
   onUpdateState(cb: (state: UpdateState) => void): () => void;
+  /** Subscribe to main asking the window to show a session (the HUD panel's session rows). */
+  onSelectSession(cb: (id: string) => void): () => void;
 };
