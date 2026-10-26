@@ -1,3 +1,7 @@
+import {
+  windowsPowerShell,
+  windowsSystemTool,
+} from "../../src/main/terminal/windows-system";
 import { describe, it, expect } from "vitest";
 import { launchForm } from "../../src/main/terminal/command";
 
@@ -9,14 +13,14 @@ describe("launchForm", () => {
   it("wraps a .cmd via cmd.exe /c on win32", () => {
     const c = { file: "C:\\npm\\claude.cmd", args: ["--resume", "x"] };
     expect(launchForm(c, "win32")).toEqual({
-      file: "cmd.exe",
+      file: windowsSystemTool("cmd.exe"),
       args: ["/c", "C:\\npm\\claude.cmd", "--resume", "x"],
     });
   });
   it("wraps a .ps1 via powershell on win32", () => {
     const c = { file: "C:\\bin\\claude.ps1", args: ["--session-id", "x"] };
     expect(launchForm(c, "win32")).toEqual({
-      file: "powershell.exe",
+      file: windowsPowerShell(),
       args: [
         "-NoProfile",
         "-ExecutionPolicy",
@@ -36,7 +40,7 @@ describe("launchForm", () => {
       args: ["--session-id", "x", "--model", "opus"],
     };
     expect(launchForm(c, "win32")).toEqual({
-      file: "cmd.exe",
+      file: windowsSystemTool("cmd.exe"),
       args: ["/c", "claude", "--session-id", "x", "--model", "opus"],
     });
   });

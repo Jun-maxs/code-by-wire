@@ -1,3 +1,4 @@
+import { windowsSystemTool } from "../../src/main/terminal/windows-system";
 import { describe, it, expect } from "vitest";
 import {
   buildClaudeCommand,
@@ -52,7 +53,10 @@ describe("buildResumeCommand", () => {
   it("codex resume routes through the win32 PATHEXT shim like every bare command", () => {
     expect(
       launchForm(buildResumeCommand({ agent: "codex", id: "u-1" }), "win32"),
-    ).toEqual({ file: "cmd.exe", args: ["/c", "codex", "resume", "u-1"] });
+    ).toEqual({
+      file: windowsSystemTool("cmd.exe"),
+      args: ["/c", "codex", "resume", "u-1"],
+    });
   });
 });
 
@@ -94,7 +98,7 @@ describe("toSpawnForm", () => {
   it("routes through the Windows shim on win32, ignoring posixShell", () => {
     const cmd = { file: "claude", args: ["--session-id", "abc"] };
     expect(toSpawnForm(cmd, "win32", posixShell)).toEqual({
-      file: "cmd.exe",
+      file: windowsSystemTool("cmd.exe"),
       args: ["/c", "claude", "--session-id", "abc"],
     });
   });
@@ -149,7 +153,7 @@ describe("buildSpawnCommand", () => {
   });
   it("bare codex routes through the win32 PATHEXT shim like claude does", () => {
     expect(launchForm({ file: "codex", args: [] }, "win32")).toEqual({
-      file: "cmd.exe",
+      file: windowsSystemTool("cmd.exe"),
       args: ["/c", "codex"],
     });
   });

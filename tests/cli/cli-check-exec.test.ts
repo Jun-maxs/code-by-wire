@@ -1,3 +1,4 @@
+import { windowsSystemTool } from "../../src/main/terminal/windows-system";
 import { describe, it, expect } from "vitest";
 import {
   runVersion,
@@ -33,7 +34,7 @@ describe("runVersion probe invocation", () => {
   it("routes through cmd.exe's PATHEXT resolution on win32 (no absolute path to resolve — the shell finds it)", async () => {
     const { calls, exec } = recorder({ stdout: "1.2.3 (Claude Code)" });
     const r = await runVersion(AGENT_PROBES.claude, exec, "win32");
-    expect(calls[0].file).toBe("cmd.exe");
+    expect(calls[0].file).toBe(windowsSystemTool("cmd.exe"));
     expect(calls[0].args).toEqual(["/c", "claude", "--version"]);
     expect((calls[0].opts as { shell?: unknown }).shell).toBeUndefined();
     expect(r).toEqual({ status: "ok", raw: "1.2.3 (Claude Code)" });
@@ -85,7 +86,7 @@ describe("runAuth probe invocation", () => {
       throw: Object.assign(new Error("exit 1"), { code: 1 }),
     });
     const r = await runAuth(AGENT_PROBES.claude, exec, "win32");
-    expect(calls[0].file).toBe("cmd.exe");
+    expect(calls[0].file).toBe(windowsSystemTool("cmd.exe"));
     expect(calls[0].args).toEqual(["/c", "claude", "auth", "status"]);
     expect(r).toEqual({ status: "loggedOut" });
   });
@@ -112,7 +113,7 @@ describe("checkCliStatusWith orchestration", () => {
     });
     expect(s.kind).toBe("ready");
     expect(calls).toHaveLength(1); // version only — no auth probe
-    expect(calls[0].file).toBe("cmd.exe");
+    expect(calls[0].file).toBe(windowsSystemTool("cmd.exe"));
     expect(calls[0].args).toEqual(["/c", "codex", "--version"]);
   });
 

@@ -1,3 +1,4 @@
+import { windowsSystemTool } from "../../src/main/terminal/windows-system";
 import { describe, it, expect } from "vitest";
 import { FLOW } from "../../src/shared/terminal";
 import {
@@ -616,7 +617,9 @@ describe("launch (shell terminals)", () => {
       cols: 80,
       rows: 24,
     });
-    expect(h.ptys[0].state.spawnedWith?.file).toBe("cmd.exe");
+    expect(h.ptys[0].state.spawnedWith?.file).toBe(
+      windowsSystemTool("cmd.exe"),
+    );
     expect(h.ptys[0].state.spawnedWith?.args?.[0]).toBe("/c");
   });
 

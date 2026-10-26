@@ -2,6 +2,7 @@ import type { ModelSelection } from "@shared/models";
 import { AGENTS, type AgentId } from "@shared/agents";
 import { resolvePosixLoginCommand, type PosixShellDeps } from "./shell-command";
 import { quoteShellArg } from "./shell-quote";
+import { windowsPowerShell, windowsSystemTool } from "./windows-system";
 
 export interface ClaudeCommand {
   file: string;
@@ -59,18 +60,22 @@ export function buildSpawnCommand(opts: {
 
 /** Rewrite a Windows shim invocation into a launch form node-pty's ConPTY backend can run. A real `.exe`
  *  is launched directly; a `.cmd`/`.bat` goes through `cmd.exe /c` and a `.ps1` through PowerShell, because
- *  CreateProcess only runs PE executables. POSIX is always pass-through. Form confirmed by the PR3 spike. */
+ *  CreateProcess only runs PE executables. Both hosts are named by their System32 path, never looked up
+ *  on PATH (see windowsSystemTool). POSIX is always pass-through. Form confirmed by the PR3 spike. */
 export function launchForm(
   cmd: ClaudeCommand,
   platform: NodeJS.Platform,
 ): ClaudeCommand {
   if (platform !== "win32") return cmd;
   if (/\.(cmd|bat)$/i.test(cmd.file)) {
-    return { file: "cmd.exe", args: ["/c", cmd.file, ...cmd.args] };
+    return {
+      file: windowsSystemTool("cmd.exe"),
+      args: ["/c", cmd.file, ...cmd.args],
+    };
   }
   if (/\.ps1$/i.test(cmd.file)) {
     return {
-      file: "powershell.exe",
+      file: windowsPowerShell(),
       args: [
         "-NoProfile",
         "-ExecutionPolicy",
@@ -87,7 +92,10 @@ export function launchForm(
   // session dies with a bare "[process exited]". Route it through cmd.exe, which resolves PATHEXT,
   // exactly as a plain `claude` typed at a Windows prompt would.
   if (!/[\\/]/.test(cmd.file) && !/\.[^.]+$/.test(cmd.file)) {
-    return { file: "cmd.exe", args: ["/c", cmd.file, ...cmd.args] };
+    return {
+      file: windowsSystemTool("cmd.exe"),
+      args: ["/c", cmd.file, ...cmd.args],
+    };
   }
   return cmd;
 }

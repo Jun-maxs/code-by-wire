@@ -64,6 +64,7 @@ import {
   resolveShellPath,
   shouldCorrectPath,
 } from "./terminal/shell-path";
+import { restoreWindowsPath } from "./terminal/windows-path";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
@@ -74,6 +75,10 @@ import { logError, logWarn } from "./log-buffer";
 // renders sRGB, so this only changes the packaged build, making it match dev. Must run before the
 // 'ready' event (before the GPU process starts), so it lives at module top level.
 app.commandLine.appendSwitch("force-color-profile", "srgb");
+
+// A stripped launch environment can leave PATH without System32 or the user's own folders, so a
+// session's cmd.exe can't find `claude`. Restore it before anything spawns (see windows-path.ts).
+if (process.platform === "win32") restoreWindowsPath();
 
 /** The BrowserWindow's native background, painted before the page loads — must match the
  *  persisted app theme or the window flashes the wrong color on launch. Native window chrome, so
