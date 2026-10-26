@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { useSessionMenu } from "./use-session-menu";
 import { SessionMenuDropdown } from "./SessionMenuDropdown";
 import { useSessionProduct } from "../products/products-context";
+import { isUnsentSession } from "./session-list-model";
 import { ProductHoverCard } from "../products/ProductHoverCard";
 
 /**
@@ -65,6 +66,9 @@ export function SessionRow({
   // Fork feature: which product this session is about (workbench cards) — a color dot before the
   // title and a hover card with the product's domain and progress.
   const product = useSessionProduct(session);
+  const displayTitle = isUnsentSession(session)
+    ? t.shell.sessionRow.unsentTitle
+    : session.title;
   const hasChildren = descendantCount > 0 && onToggleChildren !== undefined;
   const cappedDepth = Math.min(depth, 2);
   const rowStyle =
@@ -149,9 +153,9 @@ export function SessionRow({
               "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
               selected && "text-fg",
             )}
-            title={session.title}
+            title={displayTitle}
           >
-            {session.title}
+            {displayTitle}
           </span>
           {hasChildren && (
             <span

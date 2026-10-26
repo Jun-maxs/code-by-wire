@@ -249,6 +249,7 @@ export const en = {
           ? `${count} ${count === 1 ? "subagent" : "subagents"} in this group · ${active} active`
           : `${count} ${count === 1 ? "subagent" : "subagents"} in this group`,
       detachedSubagent: "Detached subagent",
+      unsentTitle: "New session · no message yet",
       product: {
         domain: "Domain",
         doing: "Latest",

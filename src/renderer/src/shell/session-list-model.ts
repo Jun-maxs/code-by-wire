@@ -6,6 +6,18 @@ import type { ProjectState } from "@shared/ipc";
 
 /** One flat list, no visible section split: live sessions first (newest-created first), then
  *  ended sessions appended (most-recently-active first) — see design spec §4. */
+/** A live session that hasn't taken its first turn: no transcript yet, so main fell back to the folder
+ *  name for its title. Rendered as "New session · no message yet" instead — otherwise a just-created
+ *  task seems to vanish from the sidebar the moment discovery replaces its draft row with a row
+ *  titled after the folder (fork fix, 2026-10-26). */
+export function isUnsentSession(session: Session): boolean {
+  return (
+    !session.resumable &&
+    session.state !== "ended" &&
+    session.title === session.project
+  );
+}
+
 export function sortSessions(sessions: Session[]): Session[] {
   const active = sessions
     .filter((s) => s.state !== "ended")
