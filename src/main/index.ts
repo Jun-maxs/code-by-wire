@@ -17,6 +17,7 @@ import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
 import { createCodexProvider } from "./provider/codex";
 import { createCodexLimitsService } from "./provider/codex/limits";
+import { createRelayUsageService, locateCodexRelay } from "./usage/relay";
 import { createCodexThreadMetadataService } from "./provider/codex/thread-metadata";
 import { resolveCodexDir } from "./provider/codex/config";
 import { listRollouts, readRolloutHead } from "./provider/codex/rollout";
@@ -376,11 +377,17 @@ app
       codexDir,
       fetchFn: net.fetch.bind(net),
     });
+    // A relay in config.toml (new-api style) in place of OpenAI: its key's usage, same lazy contract.
+    const codexRelay = createRelayUsageService({
+      locate: locateCodexRelay(codexDir),
+      fetchFn: net.fetch.bind(net),
+    });
     const codexThreadMetadata = createCodexThreadMetadataService();
     const codexProvider = createCodexProvider({
       codexDir,
       recentWindowMs,
       limits: codexLimits,
+      relay: codexRelay,
       threadMetadata: codexThreadMetadata,
       managed: {
         has: (id) => managed.agentOf(id) === "codex",

@@ -5,6 +5,7 @@ import type {
   RateLimit,
   RateLimitWindows,
   ExtraUsage,
+  RelayUsage,
 } from "@shared/types";
 import { pickWindow, showRateRow } from "@shared/statusline";
 import { contextView } from "@shared/context";
@@ -75,6 +76,7 @@ export function PressurePanel({
   account,
   rateLimits,
   windowRowsWhenFetchedOnly,
+  relayUsage,
 }: {
   live: ContextBreakdown | null;
   context: ContextBreakdown | null;
@@ -87,6 +89,8 @@ export function PressurePanel({
    *  first fetch is pending (codex: window durations are plan-tier-dependent). Default: static
    *  always-rendered rows (Claude). */
   windowRowsWhenFetchedOnly?: boolean;
+  /** The agent's API key usage on a relay, when it reaches its models through one. */
+  relayUsage?: RelayUsage | null;
 }) {
   const { t } = useI18n();
   const view = useMemo(
@@ -193,8 +197,63 @@ export function PressurePanel({
         {account?.extraUsage?.enabled && (
           <ExtraRow extra={account.extraUsage} />
         )}
+        {relayUsage && <RelayRow usage={relayUsage} />}
       </div>
     </PanelSection>
+  );
+}
+
+/** Money as the relay's dashboard shows it: four decimals under one unit (a relay bills in
+ *  fractions of a cent), two above. */
+export function formatRelayMoney(
+  amount: number,
+  currency: "CNY" | "USD",
+): string {
+  const symbol = currency === "CNY" ? "¥" : "$";
+  return `${symbol}${amount.toFixed(Math.abs(amount) < 1 ? 4 : 2)}`;
+}
+
+/** The relay key's usage: label · bar (a limited key) or the relay's host (no limit) · % · money —
+ *  what is left on a limited key, what was spent on an unlimited one. The tooltip says both. */
+function RelayRow({ usage }: { usage: RelayUsage }) {
+  const { t } = useI18n();
+  const spent = formatRelayMoney(usage.spent, usage.currency);
+  const remaining =
+    usage.remaining != null
+      ? formatRelayMoney(usage.remaining, usage.currency)
+      : null;
+  const pct =
+    usage.usedPct != null ? clampPct(Math.round(usage.usedPct)) : null;
+  return (
+    <div
+      className="flex items-center gap-1"
+      title={t.dock.pressure.relayDetail(usage.host, spent, remaining)}
+    >
+      <span className="w-7 shrink-0 text-xs text-(--ui-text-tertiary)">
+        {t.dock.pressure.relay}
+      </span>
+      <div className="min-w-0 flex-1">
+        {pct !== null ? (
+          <FillGauge
+            pct={pct}
+            fill={ctxColor(pct)}
+            caution={CONTEXT_WARN_PCT}
+            danger={CONTEXT_DANGER_PCT}
+            height={4}
+          />
+        ) : (
+          <span className="block truncate text-xs text-(--ui-text-tertiary)">
+            {usage.host}
+          </span>
+        )}
+      </div>
+      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-secondary)">
+        {pct !== null ? `${pct}%` : ""}
+      </span>
+      <span className="w-17 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+        {remaining ?? spent}
+      </span>
+    </div>
   );
 }
 

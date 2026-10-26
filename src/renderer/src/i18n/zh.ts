@@ -466,10 +466,15 @@ export const zh: Translations = {
     },
     pressure: {
       heading: "压力",
-      info: "剩余多少余量：当前提示词的上下文占用超过窗口的比例，随后是本会话的速率限制窗口（已用百分比、重置倒计时——优先取会话自身的数据，会话未上报时用账户 API 数据补全）。Extra 为账户的付费额外用量额度。柱状条超过 70% 转琥珀色，超过 85% 转红色警戒。",
+      info: "剩余多少余量：当前提示词的上下文占用超过窗口的比例，随后是本会话的速率限制窗口（已用百分比、重置倒计时——优先取会话自身的数据，会话未上报时用账户 API 数据补全）。Extra 为账户的付费额外用量额度。中转为本 agent 的 API key 在所配置中转站的已用金额，按中转站自己的币种显示（key 设了额度上限时另显示已用比例）。柱状条超过 70% 转琥珀色，超过 85% 转红色警戒。",
       noContext: "尚未采集到上下文数据。",
       contextUnit: "% 上下文",
       extra: "Extra",
+      relay: "中转",
+      relayDetail: (host: string, spent: string, remaining: string | null) =>
+        remaining === null
+          ? `${host}：已用 ${spent}，不限额度`
+          : `${host}：已用 ${spent}，剩余 ${remaining}`,
       windowFiveHour: "5h",
       windowSevenDay: "7d",
       windowSevenDaySonnet: "7d S",

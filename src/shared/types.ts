@@ -214,6 +214,9 @@ export interface Session {
    *  API-fetched windows (capture wins per window). Absent when the session has no capture or the
    *  capture carried none. */
   rateLimits?: RateLimitWindows;
+  /** The API key's usage on the relay the agent is configured to reach (a new-api / one-api
+   *  gateway in place of the vendor's own plan). Absent when the agent talks to its vendor. */
+  relayUsage?: RelayUsage;
   /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */
   compactionCount?: number;
   /** Tokens reclaimed across those compactions; the row's tooltip. */
@@ -327,6 +330,20 @@ export interface RateLimit {
    *  Claude's windows, whose duration is always implied by which named slot (fiveHour/sevenDay/...) they
    *  occupy. */
   windowMinutes?: number;
+}
+
+/** An API key's usage on a relay, in the money the relay itself shows (its quota display type and
+ *  exchange rate), so it matches the relay's own dashboard. */
+export interface RelayUsage {
+  /** The relay's host, e.g. `dafeyu.com`. */
+  host: string;
+  /** Spent with this key. */
+  spent: number;
+  /** Left on this key; absent for a key without a limit. */
+  remaining?: number;
+  /** Share of the key's limit spent, 0–100; absent for a key without a limit. */
+  usedPct?: number;
+  currency: "CNY" | "USD";
 }
 
 /** The four rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by

@@ -21,8 +21,11 @@ export function CodexPanels({ session, metrics, doc }: SidebarPanelsProps) {
         contextPct={session.contextPct}
         contextWindow={session.contextWindow}
         account={null}
-        rateLimits={session.rateLimits ?? null}
+        // On a relay there is no ChatGPT plan to read: its usage stands as the fetched answer, so
+        // the plan's window rows hide rather than wait on a limits fetch that can't land.
+        rateLimits={session.rateLimits ?? (session.relayUsage ? {} : null)}
         windowRowsWhenFetchedOnly
+        relayUsage={session.relayUsage ?? null}
       />
       <SectionDivider />
       <SpendPanel

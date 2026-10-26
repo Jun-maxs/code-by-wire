@@ -2,6 +2,7 @@ import type { Provider } from "../types";
 import type {
   PersistedSession,
   RateLimitWindows,
+  RelayUsage,
   Session,
   SessionCandidate,
   Usage,
@@ -66,6 +67,8 @@ export interface CodexProviderDeps {
   };
   /** Account-scoped rate limits (limits.ts service). Optional so existing tests build without it. */
   limits?: { read(): RateLimitWindows | null };
+  /** The key's usage when Codex reaches its models through a relay (usage/relay.ts). */
+  relay?: { read(): RelayUsage | null };
   /** Stable App Server thread metadata. Optional for older Codex versions and focused tests. */
   threadMetadata?: { read(id: string): CodexThreadMetadata | null };
 }
@@ -400,7 +403,8 @@ export function createCodexProvider(
         if (s.agent !== "codex") return s;
         const tel = telemetryFor(s.id);
         const limits = deps.limits?.read() ?? null;
-        if (!tel && !limits) return s;
+        const relay = deps.relay?.read() ?? null;
+        if (!tel && !limits && !relay) return s;
         const window = tel?.modelContextWindow ?? s.contextWindow;
         return {
           ...s,
@@ -411,6 +415,7 @@ export function createCodexProvider(
               : s.contextPct,
           liveContext: tel?.liveContext ?? undefined,
           rateLimits: limits ?? undefined,
+          relayUsage: relay ?? undefined,
         };
       }),
   };
