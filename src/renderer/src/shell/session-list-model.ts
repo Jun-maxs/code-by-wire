@@ -1,3 +1,4 @@
+import type { ProductInfo } from "@shared/products";
 import type { Session } from "@shared/types";
 import { tNow } from "../i18n";
 import type { SessionsListPreferences } from "./session-list-preferences";
@@ -5,6 +6,18 @@ import type { ProjectState } from "@shared/ipc";
 
 /** One flat list, no visible section split: live sessions first (newest-created first), then
  *  ended sessions appended (most-recently-active first) — see design spec §4. */
+/** A live session that hasn't taken its first turn: no transcript yet, so main fell back to the folder
+ *  name for its title. Rendered as "New session · no message yet" instead — otherwise a just-created
+ *  task seems to vanish from the sidebar the moment discovery replaces its draft row with a row
+ *  titled after the folder (fork fix, 2026-10-26). */
+export function isUnsentSession(session: Session): boolean {
+  return (
+    !session.resumable &&
+    session.state !== "ended" &&
+    session.title === session.project
+  );
+}
+
 export function sortSessions(sessions: Session[]): Session[] {
   const active = sessions
     .filter((s) => s.state !== "ended")
@@ -70,6 +83,8 @@ export type SessionGroup = {
   label: string;
   /** Dimmed parent-path hint (e.g. "~/a"), set only when 2+ groups share a label. */
   hint?: string;
+  /** Product color for product-keyed groups (fork feature); absent for folder groups. */
+  color?: string;
   sessions: Session[];
 };
 
@@ -387,6 +402,46 @@ export function parentHint(cwd: string, homeDir: string): string {
   if (homeDir && parent.startsWith(homeDir + "/"))
     return "~" + parent.slice(homeDir.length);
   return parent;
+}
+
+/** Fork feature (2026-10-26): group by product instead of folder. Nearly every session starts in the
+ *  same scratch folder, so folder groups lump parallel tasks together; this keys each family by its
+ *  root session's product (a subagent stays with its root). Untagged families share one `otherLabel`
+ *  group. Same ordering rules as groupSessionsByProject; groups carry no cwd (no folder quick-add). */
+export function groupSessionsByProduct(
+  sessions: Session[],
+  productOf: (session: Session) => ProductInfo | null,
+  otherLabel: string,
+): SessionGroup[] {
+  const byId = new Map(sessions.map((session) => [session.id, session]));
+  const buckets = new Map<
+    string,
+    { label: string; color?: string; sessions: Session[] }
+  >();
+  for (const s of sessions) {
+    const product = productOf(relationshipRoot(s, byId));
+    const key = `product:${product?.key ?? "-"}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.sessions.push(s);
+    else
+      buckets.set(key, {
+        label: product?.name ?? otherLabel,
+        color: product?.color,
+        sessions: [s],
+      });
+  }
+  return [...buckets.entries()]
+    .map(([key, b]) => ({
+      key,
+      label: b.label,
+      ...(b.color ? { color: b.color } : {}),
+      sessions: sortSessions(b.sessions),
+    }))
+    .sort(
+      (a, b) =>
+        Math.max(...b.sessions.map((s) => s.lastActivityMs)) -
+        Math.max(...a.sessions.map((s) => s.lastActivityMs)),
+    );
 }
 
 /** Hermes-style sidebar grouping (design spec §left-sidebar), keyed by the session's repo root — the

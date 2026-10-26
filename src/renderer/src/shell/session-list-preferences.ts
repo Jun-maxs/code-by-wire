@@ -12,6 +12,9 @@ export const DEFAULT_SESSIONS_LIST_PREFERENCES = {
 export type SessionsListPreferences = {
   showAgentIcons: boolean;
   agent: "all" | AgentId;
+  /** Fork feature: group sidebar sessions by product card instead of folder. Absent = folder
+   *  (upstream behavior), so blobs and callers that predate it are unchanged. */
+  grouping?: "product";
 };
 
 export function loadSessionsListPreferences(
@@ -34,6 +37,7 @@ export function loadSessionsListPreferences(
         value.agent === "all" || AGENT_IDS.includes(value.agent as AgentId)
           ? (value.agent as "all" | AgentId)
           : DEFAULT_SESSIONS_LIST_PREFERENCES.agent,
+      ...(value.grouping === "product" ? { grouping: "product" as const } : {}),
     };
   } catch {
     return { ...DEFAULT_SESSIONS_LIST_PREFERENCES };

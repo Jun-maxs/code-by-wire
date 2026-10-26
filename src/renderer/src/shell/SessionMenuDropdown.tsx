@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import { cx } from "../ui/atoms";
@@ -45,6 +46,17 @@ export function SessionMenuDropdown({
     endTitle,
   } = menu;
   const { t } = useI18n();
+  // Fork feature: delete an ended session (transcript → OS trash). The row drops on the next poll.
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const canDelete = session.state === "ended";
+  const confirmDelete = (): void => {
+    setDeleteConfirm(false);
+    void window.api.trashSession(session.id).then((r) => {
+      if (!r.ok)
+        setDeleteError(t.shell.sessionMenu.deleteFailed(r.detail ?? r.reason));
+    });
+  };
 
   return (
     <>
@@ -131,6 +143,20 @@ export function SessionMenuDropdown({
                 title={endTitle}
                 danger
               />
+              <MenuItem
+                icon="archive"
+                label={t.shell.sessionMenu.deleteSession}
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteConfirm(true);
+                  closeMenu();
+                }}
+                disabled={!canDelete}
+                title={
+                  canDelete ? undefined : t.shell.sessionMenu.deleteLiveTitle
+                }
+                danger
+              />
 
               <div
                 role="separator"
@@ -186,6 +212,25 @@ export function SessionMenuDropdown({
           tone="danger"
           onConfirm={end.confirmYes}
           onCancel={end.confirmNo}
+        />
+      )}
+      {deleteConfirm && (
+        <ConfirmDialog
+          title={t.shell.sessionMenu.deleteConfirmTitle}
+          body={t.shell.sessionMenu.deleteConfirmBody}
+          confirmLabel={t.shell.sessionMenu.deleteSession}
+          tone="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirm(false)}
+        />
+      )}
+      {deleteError && (
+        <ConfirmDialog
+          title={t.shell.sessionMenu.deleteConfirmTitle}
+          body={deleteError}
+          confirmLabel={t.common.close}
+          onConfirm={() => setDeleteError(null)}
+          onCancel={() => setDeleteError(null)}
         />
       )}
       {diagnosticOpen && (

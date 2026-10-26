@@ -694,3 +694,106 @@ describe("launch (shell terminals)", () => {
     expect(bad.exited).toEqual([["s1", 1]]);
   });
 });
+
+describe("remote sessions (fork feature)", () => {
+  function remoteHarness(platform: NodeJS.Platform) {
+    const ptys: ReturnType<typeof fakePty>[] = [];
+    const manager = createTerminalManager({
+      send: () => {},
+      notifyExit: () => {},
+      onSpawned: () => {},
+      onClosed: () => {},
+      createPty: (o: SpawnOptions) => {
+        const p = fakePty(3000 + ptys.length);
+        p.state.spawnedWith = o;
+        ptys.push(p);
+        return p.proc;
+      },
+      createBufferer: passthroughBufferer,
+      createRecorder: recorderFactory().create,
+      platform,
+      statDir: () => true,
+      posixShell: { isExecutable: () => true, findOnPath: () => null },
+      remoteCommand: () => "claude-r",
+    });
+    const argv = (i: number) => {
+      const s = ptys[i].state.spawnedWith!;
+      return [s.file, ...s.args];
+    };
+    return { manager, argv };
+  }
+
+  it("starts a remote spawn, resume and fork through claude-r with the same claude flags", () => {
+    const h = remoteHarness("win32");
+    h.manager.spawn({
+      id: "r1",
+      cwd: "/p",
+      model: "opus",
+      agent: "claude",
+      remote: true,
+      cols: 80,
+      rows: 24,
+    });
+    h.manager.resume({
+      id: "r2",
+      cwd: "/p",
+      agent: "claude",
+      remote: true,
+      cols: 80,
+      rows: 24,
+    });
+    h.manager.fork({
+      id: "r3",
+      sourceId: "r2",
+      model: "opus",
+      cwd: "/p",
+      remote: true,
+      cols: 80,
+      rows: 24,
+    });
+    const cmd = windowsSystemTool("cmd.exe");
+    expect(h.argv(0)).toEqual([
+      cmd,
+      "/c",
+      "claude-r",
+      "--session-id",
+      "r1",
+      "--model",
+      "opus",
+    ]);
+    expect(h.argv(1)).toEqual([cmd, "/c", "claude-r", "--resume", "r2"]);
+    expect(h.argv(2)).toEqual([
+      cmd,
+      "/c",
+      "claude-r",
+      "--resume",
+      "r2",
+      "--session-id",
+      "r3",
+      "--fork-session",
+    ]);
+  });
+
+  it("leaves plain sessions and other agents on their own binary", () => {
+    const h = remoteHarness("win32");
+    h.manager.spawn({
+      id: "p1",
+      cwd: "/p",
+      model: "default",
+      agent: "claude",
+      cols: 80,
+      rows: 24,
+    });
+    h.manager.spawn({
+      id: "x1",
+      cwd: "/p",
+      model: "default",
+      agent: "codex",
+      remote: true,
+      cols: 80,
+      rows: 24,
+    });
+    expect(h.argv(0).slice(2)).toEqual(["claude", "--session-id", "p1"]);
+    expect(h.argv(1)).not.toContain("claude-r");
+  });
+});

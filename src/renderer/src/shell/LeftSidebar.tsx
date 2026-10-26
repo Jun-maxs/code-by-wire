@@ -1,4 +1,7 @@
+import { productForSession } from "@shared/products";
+import { ProductsContext } from "../products/products-context";
 import {
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -20,6 +23,7 @@ import {
   filterGroups,
   filterSessions,
   groupSessionsByProject,
+  groupSessionsByProduct,
   partitionProjectGroups,
   projectGroupsForCollapse,
   isSessionFamilyCollapsed,
@@ -130,8 +134,19 @@ export function LeftSidebar({
   const pinned = pinnedSessions(searched);
   // Build families before project grouping so a child follows its root even if its own rollout cwd
   // differs. filterGroups applies search + preferences together and retains ancestor context.
+  // Fork feature: group by product card instead of folder when chosen (and cards are present).
+  const products = useContext(ProductsContext);
   const groups = filterGroups(
-    groupSessionsByProject(sessions, homeDir),
+    preferences.grouping === "product" && products
+      ? groupSessionsByProduct(
+          sessions,
+          (s) => {
+            const key = productForSession(products, s);
+            return key ? products.products[key] : null;
+          },
+          t.shell.sidebar.otherProduct,
+        )
+      : groupSessionsByProject(sessions, homeDir),
     preferences,
     query,
   );

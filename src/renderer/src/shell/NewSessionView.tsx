@@ -38,6 +38,7 @@ export function NewSessionView({
     model: ModelSelection,
     agent: AgentId,
     extraArgs: string,
+    remote: boolean,
   ) => void | Promise<void>;
   /** Per-agent spawn gate: an agent whose CLI check failed renders as a disabled option. */
   canSpawnFor: (agent: AgentId) => boolean;
@@ -63,6 +64,9 @@ export function NewSessionView({
   const [internalBusy, setInternalBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [extraArgs, setExtraArgs] = useState("");
+  // Fork feature: start through claude-r (HAPI) so the phone can continue it. Off by default — plain
+  // sessions stay exactly as before; only the ones meant for the phone opt in.
+  const [remote, setRemote] = useState(false);
   const [presets, setPresets] = useState<LaunchPresets>(emptyLaunchPresets());
   const busy = internalBusy || (externalBusy ?? false);
 
@@ -112,7 +116,13 @@ export function NewSessionView({
     setError(null);
     saveLastAgent(window.localStorage, agent);
     try {
-      await onCreate(cwd, model, agent, extraArgs);
+      await onCreate(
+        cwd,
+        model,
+        agent,
+        extraArgs,
+        remote && agent === "claude",
+      );
     } catch (e) {
       setInternalBusy(false);
       setError(
@@ -248,6 +258,32 @@ export function NewSessionView({
                 onSavePreset={savePreset}
                 onDeletePreset={deletePreset}
               />
+
+              {agent === "claude" && (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-body text-fg">
+                      <Icon name="smartphone" size={13} />
+                      {t.shell.newSession.remote}
+                    </div>
+                    <div className="mt-0.5 text-meta text-fg-faint">
+                      {t.shell.newSession.remoteHint}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={remote}
+                    aria-label={t.shell.newSession.remote}
+                    onClick={() => setRemote(!remote)}
+                    className={`relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full transition-colors ${remote ? "bg-primary" : "bg-ink-700"}`}
+                  >
+                    <span
+                      className={`absolute top-[2px] h-[14px] w-[14px] rounded-full transition-all ${remote ? "right-[2px] bg-ink-900" : "left-[2px] bg-white"}`}
+                    />
+                  </button>
+                </div>
+              )}
 
               {error && <p className="text-aux text-danger">{error}</p>}
               <div className="flex justify-end">

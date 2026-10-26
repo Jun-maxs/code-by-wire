@@ -64,6 +64,24 @@ export function buildSpawnCommand(opts: {
   return { file: AGENTS[opts.agent].binary, args: [...(opts.extraArgs ?? [])] };
 }
 
+/**
+ * Fork feature: start a claude invocation through the remote command instead (`claude-r`, or e.g.
+ * `hapi claude`), which runs Claude Code under HAPI so the session can be continued from the phone.
+ * HAPI passes flags it does not own (`--session-id`, `--resume`, `--fork-session`, custom args) through to
+ * claude and takes `--model` itself, so the pinned id and Transcript correlation are unchanged. Whatever
+ * program the claude invocation names (bare `claude`, or a launcher such as rec.exe) is replaced, so the
+ * caller decides it is a Claude session. The command is split on whitespace (no quoting: it is a short
+ * command name, not user args); an empty command leaves the invocation untouched.
+ */
+export function asRemote(
+  cmd: ClaudeCommand,
+  remoteCommand: string,
+): ClaudeCommand {
+  const words = remoteCommand.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return cmd;
+  return { file: words[0], args: [...words.slice(1), ...cmd.args] };
+}
+
 /** Rewrite a Windows shim invocation into a launch form node-pty's ConPTY backend can run. A real `.exe`
  *  is launched directly; a `.cmd`/`.bat` goes through `cmd.exe /c` and a `.ps1` through PowerShell, because
  *  CreateProcess only runs PE executables. Both hosts are named by their System32 path, never looked up

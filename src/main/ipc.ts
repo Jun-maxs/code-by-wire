@@ -1,7 +1,10 @@
+import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
+import type { ProductsData } from "@shared/products";
+import { readProducts } from "./products";
 import { app, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
 import { cpus, freemem, homedir, release, totalmem } from "node:os";
 import { appWindows } from "./hud/overlay";
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import {
   IPC,
@@ -28,6 +31,7 @@ import type { Caffeinate } from "./caffeinate";
 import type { UsageService } from "./usage/fetch";
 import {
   deriveAccount,
+  applyLearnedWindows,
   overlaySessions,
   freshestBySession,
   CAPTURE_STALE_MS,
@@ -153,6 +157,11 @@ export interface IpcDeps {
   sessionTitles?: SessionTitleStore;
   /** Durable pinned-session marks, stamped onto overview rows as pinnedAtMs. Defaults to no pins. */
   sessionPins?: SessionPinStore;
+  /** Fork feature: sessions started with remote; stamped onto the overview so the sidebar can mark them. */
+  remoteSessions?: { read(): Record<string, true> };
+  /** Where the workbench keeps product cards and per-session hook state (sidebar product tags).
+   *  Absent → products:read serves null. */
+  productsDirs?: () => { cardsDir: string; stateDir: string };
   /** Durable launch-args presets for the New-session picker. Defaults to no presets. */
   launchPresets?: LaunchPresetStore;
   /** Durable project-group placements, keyed by the sidebar's canonical project key. */
@@ -205,6 +214,8 @@ export function registerIpc({
   managed,
   sessionTitles,
   sessionPins,
+  remoteSessions,
+  productsDirs,
   launchPresets,
   projectState,
   updater,
@@ -365,7 +376,11 @@ export function registerIpc({
     }
     // Apply user renames AFTER the statusLine overlay so a cbw rename wins over the derived title and
     // Claude's live session_name. Read fresh each call so a just-persisted rename shows immediately.
-    const overlaid = overlaySessions(base.sessions, byId);
+    // Uncaptured sessions borrow the window a capture reported for the same model (1M vs the 200k default).
+    const overlaid = applyLearnedWindows(
+      overlaySessions(base.sessions, byId),
+      byId,
+    );
     // Per-agent overlays (codex telemetry today): after the claude overlay, before renames/pins.
     const agentOverlaid = (sessionOverlays ?? []).reduce(
       (acc, overlay) => overlay(acc),
@@ -375,7 +390,10 @@ export function registerIpc({
       agentOverlaid,
       sessionTitles?.read() ?? {},
     );
-    const pinned = applyPinOverrides(named, sessionPins?.read() ?? {});
+    const remoteIds = remoteSessions?.read() ?? {};
+    const pinned = applyPinOverrides(named, sessionPins?.read() ?? {}).map(
+      (s) => (remoteIds[s.id] ? { ...s, remote: true } : s),
+    );
     // A6 last tier: fill the settings.json default only where no per-session source (capture or
     // transcript scan) answered. Claude-only — the default comes from claude's settings.json, so
     // it must never masquerade as another agent's effort.
@@ -578,6 +596,50 @@ export function registerIpc({
       );
     }
     return overviewNow();
+  });
+  ipcMain.handle(
+    IPC.trashSession,
+    async (_e, id: string): Promise<TrashResult> => {
+      const row = overviewNow().sessions.find((s) => s.id === id);
+      const live = row !== undefined && row.state !== "ended";
+      const result = await trashSessionFiles(
+        {
+          resolveTranscriptPath: (sid) => provider.resolveTranscriptPath(sid),
+          trash: (path) => shell.trashItem(path),
+          exists: existsSync,
+        },
+        id,
+        live,
+      );
+      if (result.ok) {
+        try {
+          db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+          sessionTitles?.set(id, null);
+          sessionPins?.set(id, false);
+        } catch (err) {
+          logError(
+            "session-trash-index",
+            "trashed files but index cleanup failed",
+            err,
+          );
+        }
+      }
+      return result;
+    },
+  );
+  ipcMain.handle(IPC.readProducts, (): ProductsData | null => {
+    const dirs = productsDirs?.();
+    if (!dirs) return null;
+    try {
+      return readProducts(dirs.cardsDir, dirs.stateDir);
+    } catch (err) {
+      logError(
+        "products-read-failed",
+        "readProducts failed; serving no tags",
+        err,
+      );
+      return null;
+    }
   });
   ipcMain.handle(
     IPC.launchPresetsGet,

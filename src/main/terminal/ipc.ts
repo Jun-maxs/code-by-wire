@@ -35,6 +35,7 @@ import { createPtyProcess } from "./pty-process";
 import { createRecorder } from "./recorder";
 import { gateResume, gateFork, type ResumeTarget } from "./resume-gate";
 import type { LaunchArgsStore } from "../launch-args";
+import type { RemoteSessionStore } from "../remote-sessions";
 import { logError } from "../log-buffer";
 
 /** Resolve symlinks in the spawn cwd before recording it in the managed registry. The codex
@@ -107,6 +108,8 @@ export function registerTerminalIpc({
   env,
   posixShell,
   launchArgs,
+  remoteSessions,
+  remoteCommand,
 }: {
   window: BrowserWindow;
   managed: ManagedRegistry;
@@ -127,6 +130,10 @@ export function registerTerminalIpc({
   /** Durable per-session custom launch args: written at spawn, read back for resume/fork so the
    *  args survive the whole session lifecycle. Optional — tests that don't care omit it. */
   launchArgs?: LaunchArgsStore;
+  /** Fork feature: which sessions were started with remote, so Resume and Fork keep them remote. */
+  remoteSessions?: RemoteSessionStore;
+  /** The remote command (claude-r by default); see remote-sessions.ts. */
+  remoteCommand?: () => string;
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data, offset) => {
@@ -150,7 +157,21 @@ export function registerTerminalIpc({
     createRecorder,
     env,
     posixShell,
+    remoteCommand,
   });
+
+  // A remote mark that fails to save only costs Resume its remote-ness; the spawn still goes ahead.
+  function persistRemote(id: string, remote: boolean): void {
+    try {
+      remoteSessions?.set(id, remote);
+    } catch (err) {
+      logError(
+        "remote-persist-failed",
+        "remote mark persist failed; a later resume starts local",
+        err,
+      );
+    }
+  }
 
   // A launch-args write failure must not abort the spawn/fork itself — the pty the user is waiting
   // on still starts, it just won't have a saved entry to re-apply on a later resume. Mirrors the
@@ -177,12 +198,15 @@ export function registerTerminalIpc({
     const check = validateExtraArgs(req.agent, raw);
     if (!check.ok) throw new Error(extraArgsErrorMessage(check));
     persistLaunchArgs(req.id, raw);
+    const remote = req.remote === true && req.agent === "claude";
+    persistRemote(req.id, remote);
     manager.spawn({
       id: req.id,
       cwd: req.cwd,
       model: req.model,
       agent: req.agent,
       extraArgs: check.tokens,
+      remote,
       cols: req.cols,
       rows: req.rows,
     });
@@ -202,6 +226,7 @@ export function registerTerminalIpc({
       agent: d.agent,
       claimedRollout: d.claimedRollout,
       extraArgs: resolveStoredExtraArgs(d.agent, stored),
+      remote: d.agent === "claude" && remoteSessions?.has(req.id) === true,
       cols: req.cols,
       rows: req.rows,
     });
@@ -220,12 +245,15 @@ export function registerTerminalIpc({
     if (!d.ok) return { ok: false, reason: "unresolvable" };
     const stored = launchArgs?.get(req.sourceId) ?? "";
     if (stored) persistLaunchArgs(req.newId, stored);
+    const remote = remoteSessions?.has(req.sourceId) === true;
+    if (remote) persistRemote(req.newId, true);
     manager.fork({
       id: req.newId,
       sourceId: req.sourceId,
       model: req.model,
       cwd: d.cwd,
       extraArgs: resolveStoredExtraArgs("claude", stored),
+      remote,
       cols: req.cols,
       rows: req.rows,
     });

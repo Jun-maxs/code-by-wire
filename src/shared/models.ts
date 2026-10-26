@@ -78,6 +78,17 @@ export function contextWindowFor(model: Family): number {
   return specByFamily(model).contextWindow;
 }
 
+/** The extended window a session steps up to once its usage proves the assumed one too small. */
+export const LARGE_WINDOW = 1_000_000;
+
+/** An assumed window can't be smaller than what the session already holds: a transcript-only session
+ *  (no statusLine capture, no `[1m]` tag — e.g. a session started outside the wrapper) that reports
+ *  227k tokens of context against the 200k family default is really on the 1M window, not at 113%.
+ *  Steps up to LARGE_WINDOW; never shrinks a window that's already larger. */
+export function windowForUsage(window: number, contextTokens: number): number {
+  return contextTokens > window ? Math.max(window, LARGE_WINDOW) : window;
+}
+
 // A1 (ccstatusline model-context.ts:38-70): a window size embedded in the model string. The
 // delimited form is authoritative-looking punctuation — `(1M)` / `[200k]`; the bare form catches
 // `1M context` / a trailing `200k`. `m` → ×1e6, `k` → ×1e3; commas/underscores inside the number

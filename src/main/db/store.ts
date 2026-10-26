@@ -3,6 +3,7 @@ import {
   contextWindowFor,
   normalizeModelId,
   parseContextWindowSize,
+  windowForUsage,
 } from "@shared/models";
 import type { AgentCounts, IndexOverview } from "@shared/ipc";
 import { isResumable } from "@shared/resumable";
@@ -175,8 +176,11 @@ function pctOfWindow(tokens: number, window: number): number {
 export function hydrate(p: PersistedSession): Session {
   // A1: a window tag in the stored raw model id (`[1m]`) beats the flat family default, so an
   // uncaptured 1M session's % isn't measured against 200k.
-  const contextWindow =
-    parseContextWindowSize(p.modelRaw) ?? contextWindowFor(p.model);
+  // Usage already past that window proves a larger one (windowForUsage).
+  const contextWindow = windowForUsage(
+    parseContextWindowSize(p.modelRaw) ?? contextWindowFor(p.model),
+    p.contextTokens,
+  );
   // The panel reads usageByModel for everything. A session summarized with the column carries its real
   // per-model breakdown; an old cached row (pre-column) or an empty transcript falls back to a single
   // main-thread entry, so the panel still renders main-only until the next re-summarize. The fallback's

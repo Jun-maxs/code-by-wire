@@ -191,6 +191,10 @@ export const zh: Translations = {
       filterMenuLabel: "会话筛选",
       showAgentIcons: "显示智能体图标",
       agentGroup: "智能体",
+      groupBy: "分组方式",
+      groupByFolder: "按文件夹",
+      groupByProduct: "按产品",
+      otherProduct: "其他",
       allAgents: "所有智能体",
       noPinnedProjects: "没有置顶项目。",
       pinProject: "置顶项目",
@@ -222,6 +226,13 @@ export const zh: Translations = {
           ? `组内 ${count} 个子代理 · ${active} 个活跃`
           : `组内 ${count} 个子代理`,
       detachedSubagent: "已脱离的子代理",
+      unsentTitle: "新会话 · 还没发消息",
+      product: {
+        domain: "域名",
+        doing: "最近在做",
+        loose: "没收尾",
+        decide: "等你决定",
+      },
       threadKind: {
         subagent: "子代理",
         review: "审查",
@@ -249,6 +260,12 @@ export const zh: Translations = {
       fork: "复刻",
       forking: "复刻中…",
       endSession: "结束",
+      deleteSession: "删除（移到回收站）",
+      deleteLiveTitle: "先结束会话再删除",
+      deleteConfirmTitle: "删除这个会话？",
+      deleteConfirmBody:
+        "会话记录和子代理文件会移到系统回收站，需要时还能从回收站还原。",
+      deleteFailed: (detail) => `删除失败：${detail}`,
       openIn: "打开方式",
       resumeConfirmTitle: "恢复未记录模型的会话？",
       resumeConfirmBody:
@@ -289,6 +306,9 @@ export const zh: Translations = {
       reservedArg: (token: string) => `${token} 由应用管理，不能在此传入。`,
       unbalancedQuote: "参数中的引号未闭合。",
       failedToStart: "会话启动失败",
+      remote: "带远程",
+      remoteHint:
+        "用 claude-r（HAPI）启动，手机上打开 main.yuanjp.shop 就能接着这个会话用；以后恢复、分叉也照样带远程。",
       create: "创建",
       starting: "启动中…",
     },

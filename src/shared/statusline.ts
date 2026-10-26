@@ -169,6 +169,48 @@ export function deriveAccount(
   return null;
 }
 
+/** A model id stripped of any window tag (`[1m]`, `(1M)`) and case, so a capture's id and a
+ *  transcript's id for the same model compare equal. */
+function modelKey(raw: string | null | undefined): string | null {
+  const key = raw
+    ?.replace(/\s*[([][^)\]]*[)\]]\s*$/, "")
+    .trim()
+    .toLowerCase();
+  return key ? key : null;
+}
+
+/**
+ * Give sessions without a statusLine capture the context window a capture reported for the same
+ * model. A session started outside the wrapper (or whose capture landed in another config dir) has
+ * only its transcript, whose model id carries no window — so it fell to the 200k family default
+ * while a sibling on the same model reported 1M. Never shrinks a window; the context % is rescaled
+ * to the new window (it was derived from the same tokens over the old one). Run after
+ * overlaySessions. Same reference out when nothing was learned.
+ */
+export function applyLearnedWindows(
+  sessions: Session[],
+  byId: Map<string, StatusLineSample>,
+): Session[] {
+  const learned = new Map<string, number>();
+  for (const sample of byId.values()) {
+    const key = modelKey(sample.modelId);
+    if (key && sample.contextWindow)
+      learned.set(key, Math.max(learned.get(key) ?? 0, sample.contextWindow));
+  }
+  if (learned.size === 0) return sessions;
+  return sessions.map((s) => {
+    if (byId.has(s.id)) return s;
+    const key = modelKey(s.modelId ?? s.modelRaw);
+    const window = key ? learned.get(key) : undefined;
+    if (!window || window <= s.contextWindow) return s;
+    return {
+      ...s,
+      contextWindow: window,
+      contextPct: Math.round((s.contextPct * s.contextWindow) / window),
+    };
+  });
+}
+
 /**
  * Overlay live statusLine numbers onto each Session that has a sample: cost, lines, context split,
  * context %/window, model identity, and the title (a deliberately-named session_name wins over the

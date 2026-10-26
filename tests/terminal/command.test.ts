@@ -8,6 +8,7 @@ import {
   toSpawnForm,
   buildSpawnCommand,
   launchForm,
+  asRemote,
 } from "../../src/main/terminal/command";
 import { newSessionId } from "../../src/shared/terminal";
 
@@ -156,5 +157,35 @@ describe("buildSpawnCommand", () => {
       file: windowsSystemTool("cmd.exe"),
       args: ["/c", "codex"],
     });
+  });
+});
+
+describe("asRemote (fork feature)", () => {
+  it("swaps the bare claude for the remote command and keeps every claude flag", () => {
+    expect(
+      asRemote({ file: "claude", args: ["--session-id", "a"] }, "claude-r"),
+    ).toEqual({
+      file: "claude-r",
+      args: ["--session-id", "a"],
+    });
+    expect(
+      asRemote({ file: "claude", args: ["--resume", "a"] }, "  hapi   claude "),
+    ).toEqual({
+      file: "hapi",
+      args: ["claude", "--resume", "a"],
+    });
+  });
+  it("replaces a claude launcher too, and leaves an empty command alone", () => {
+    expect(
+      asRemote(
+        { file: "C:\\rec\\rec.exe", args: ["--resume", "a"] },
+        "claude-r",
+      ),
+    ).toEqual({
+      file: "claude-r",
+      args: ["--resume", "a"],
+    });
+    const claude = { file: "claude", args: [] };
+    expect(asRemote(claude, "   ")).toBe(claude);
   });
 });

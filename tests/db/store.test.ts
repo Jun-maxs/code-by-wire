@@ -162,11 +162,17 @@ describe("store", () => {
     expect(s.contextPct).toBe(25); // 50000 / 200000
   });
 
-  it("clamps context % at 100 when context exceeds the window", () => {
+  it("steps the window up to 1M when context exceeds the 200K default", () => {
     // A Sonnet/Haiku session on the 1M beta is modeled with a 200K window, so its real context can
-    // run past that. Context % must not render above 100.
+    // run past that — which proves the larger window (windowForUsage) instead of pinning at 100%.
     const s = hydrate(snap({ model: "sonnet", contextTokens: 600_000 }));
-    expect(s.contextWindow).toBe(200_000);
+    expect(s.contextWindow).toBe(1_000_000);
+    expect(s.contextPct).toBe(60);
+  });
+
+  it("still clamps context % at 100 past the largest window", () => {
+    const s = hydrate(snap({ model: "sonnet", contextTokens: 1_200_000 }));
+    expect(s.contextWindow).toBe(1_000_000);
     expect(s.contextPct).toBe(100);
   });
 

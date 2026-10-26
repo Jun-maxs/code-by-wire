@@ -220,6 +220,10 @@ export const en = {
       filterMenuLabel: "Session filters",
       showAgentIcons: "Show agent icons",
       agentGroup: "Agent",
+      groupBy: "Group by",
+      groupByFolder: "Folder",
+      groupByProduct: "Product",
+      otherProduct: "Other",
       allAgents: "All agents",
       noPinnedProjects: "No pinned projects.",
       pinProject: "Pin project",
@@ -255,6 +259,13 @@ export const en = {
           ? `${count} ${count === 1 ? "subagent" : "subagents"} in this group · ${active} active`
           : `${count} ${count === 1 ? "subagent" : "subagents"} in this group`,
       detachedSubagent: "Detached subagent",
+      unsentTitle: "New session · no message yet",
+      product: {
+        domain: "Domain",
+        doing: "Latest",
+        loose: "Unfinished",
+        decide: "Waiting on you",
+      },
       threadKind: {
         subagent: "Subagent",
         review: "Review",
@@ -285,6 +296,12 @@ export const en = {
       fork: "Fork",
       forking: "Forking…",
       endSession: "End",
+      deleteSession: "Delete (move to trash)",
+      deleteLiveTitle: "End the session before deleting it",
+      deleteConfirmTitle: "Delete this session?",
+      deleteConfirmBody:
+        "Its transcript and subagent files move to the system trash, so you can still restore them from there.",
+      deleteFailed: (detail: string) => `Couldn't delete: ${detail}`,
       openIn: "Open in",
       resumeConfirmTitle: "Resume a session with no recorded model?",
       resumeConfirmBody:
@@ -332,6 +349,9 @@ export const en = {
         `${token} is managed by the app and can't be passed here.`,
       unbalancedQuote: "Unclosed quote in arguments.",
       failedToStart: "Failed to start the session",
+      remote: "With remote",
+      remoteHint:
+        "Starts through claude-r (HAPI) so you can continue this session from your phone at main.yuanjp.shop. Resume and fork stay remote.",
       create: "Create",
       starting: "Starting…",
     },

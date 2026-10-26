@@ -1,3 +1,5 @@
+import type { TrashResult } from "./session-trash";
+import type { ProductsData } from "./products";
 import type {
   Session,
   Account,
@@ -60,6 +62,8 @@ export const IPC = {
   clipboardProbe: "clipboard:probe",
   renameSession: "session:rename",
   setSessionPinned: "session:setPinned",
+  readProducts: "products:read",
+  trashSession: "session:trash",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
   updateGetState: "update:getState",
@@ -316,6 +320,12 @@ export interface IpcApi {
   /** Persist (or clear) the durable pin mark for a session id, then return the fresh overview with
    *  pinnedAtMs stamped. Applied in overviewNow(), so overview() and refresh() carry it too. */
   setSessionPinned(id: string, pinned: boolean): Promise<OverviewData>;
+  /** The workbench's product cards + session→product records for the sidebar's product tags; null
+   *  when no cards dir is configured/present (rows then render untagged). */
+  readProducts(): Promise<ProductsData | null>;
+  /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
+   *  Refused for a live session. The row disappears on the next overview poll. */
+  trashSession(id: string): Promise<TrashResult>;
   /** Every saved launch-args preset, keyed by agent (the New-session preset picker). */
   getLaunchPresets(): Promise<LaunchPresets>;
   /** Replace the whole presets object — the renderer owns list edits and ships the result back. */

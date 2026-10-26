@@ -6,6 +6,7 @@ import {
   buildResumeCommand,
   buildForkCommand,
   toSpawnForm,
+  asRemote,
   type ClaudeCommand,
 } from "./command";
 import { createDataBufferer, type DataBufferer } from "./data-bufferer";
@@ -41,6 +42,9 @@ export interface SpawnRequest {
   /** Validated user launch args (already tokenized + denylist-checked in the IPC layer), appended
    *  after the app-managed argv. Omitted/empty means today's exact spawn. */
   extraArgs?: string[];
+  /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
+   *  Claude only; ignored for other agents. */
+  remote?: boolean;
   cols: number;
   rows: number;
 }
@@ -57,6 +61,9 @@ export interface ResumeSpawn {
   /** Validated user launch args (already tokenized + denylist-checked in the IPC layer), appended
    *  after the app-managed argv. Omitted/empty means today's exact spawn. */
   extraArgs?: string[];
+  /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
+   *  Claude only; ignored for other agents. */
+  remote?: boolean;
   cols: number;
   rows: number;
 }
@@ -76,6 +83,9 @@ export interface ForkSpawn {
   /** Validated user launch args (already tokenized + denylist-checked in the IPC layer), appended
    *  after the app-managed argv. Omitted/empty means today's exact spawn. */
   extraArgs?: string[];
+  /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
+   *  Claude only; ignored for other agents. */
+  remote?: boolean;
   cols: number;
   rows: number;
 }
@@ -141,6 +151,9 @@ export interface TerminalManagerDeps {
   /** Validates a session's cwd before spawn. Injected in tests; defaults to a real statSync isDirectory
    *  check — a node:fs call, not the native pty addon, so it is safe here and tests inject a fake. */
   statDir?: (cwd: string) => boolean;
+  /** Fork feature: the command remote sessions start through (see command.ts asRemote). Defaults to
+   *  `claude-r`; a thunk so a settings/env change applies to the next spawn. */
+  remoteCommand?: () => string;
 }
 
 export interface TerminalManager {
@@ -286,16 +299,31 @@ export function createTerminalManager(
     deps.onSpawned(id, pty.pid, { model, agent, cwd, claimedRollout });
   }
 
+  // Remote Claude sessions swap their program for the remote command before the platform launch form.
+  // Gated on the agent, not the program name: the claude program may be a launcher (rec.exe).
+  const remote = (
+    cmd: ClaudeCommand,
+    on: boolean | undefined,
+    agent: AgentId,
+  ): ClaudeCommand =>
+    on && agent === "claude"
+      ? asRemote(cmd, deps.remoteCommand?.() ?? "claude-r")
+      : cmd;
+
   function spawn(req: SpawnRequest): void {
     start(
       req.id,
       toSpawnForm(
-        buildSpawnCommand({
-          agent: req.agent,
-          id: req.id,
-          model: req.model,
-          extraArgs: req.extraArgs,
-        }),
+        remote(
+          buildSpawnCommand({
+            agent: req.agent,
+            id: req.id,
+            model: req.model,
+            extraArgs: req.extraArgs,
+          }),
+          req.remote,
+          req.agent,
+        ),
         platform,
         platform === "win32" ? undefined : posixShellDeps(),
       ),
@@ -315,11 +343,15 @@ export function createTerminalManager(
     start(
       req.id,
       toSpawnForm(
-        buildResumeCommand({
-          agent: req.agent,
-          id: req.id,
-          extraArgs: req.extraArgs,
-        }),
+        remote(
+          buildResumeCommand({
+            agent: req.agent,
+            id: req.id,
+            extraArgs: req.extraArgs,
+          }),
+          req.remote,
+          req.agent,
+        ),
         platform,
         platform === "win32" ? undefined : posixShellDeps(),
       ),
@@ -342,11 +374,15 @@ export function createTerminalManager(
     start(
       req.id,
       toSpawnForm(
-        buildForkCommand({
-          sourceId: req.sourceId,
-          newId: req.id,
-          extraArgs: req.extraArgs,
-        }),
+        remote(
+          buildForkCommand({
+            sourceId: req.sourceId,
+            newId: req.id,
+            extraArgs: req.extraArgs,
+          }),
+          req.remote,
+          "claude",
+        ),
         platform,
         platform === "win32" ? undefined : posixShellDeps(),
       ),
