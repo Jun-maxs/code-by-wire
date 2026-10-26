@@ -57,6 +57,7 @@ export const IPC = {
   saveDiagnosticReport: "session:saveDiagnosticReport",
   clipboardWriteText: "clipboard:writeText",
   clipboardReadText: "clipboard:readText",
+  clipboardProbe: "clipboard:probe",
   renameSession: "session:rename",
   setSessionPinned: "session:setPinned",
   setProjectPlacement: "project:setPlacement",
@@ -84,6 +85,13 @@ export const IPC = {
   /** PUSH: main -> renderer on every update-state transition. */
   updateState: "update:state",
 } as const;
+
+/** What the clipboard holds besides text: an image (a screenshot), or files copied in the file
+ *  manager (Windows Explorer puts no text on the clipboard for those). */
+export interface ClipboardProbe {
+  hasImage: boolean;
+  files: string[];
+}
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
  *  live statusLine data, so the account is added later — this is what the store returns,
@@ -275,6 +283,9 @@ export interface IpcApi {
    *  reason as the write path: no focused-secure-context requirement). `type: "selection"` reads
    *  the Linux X11 selection clipboard (Shift+Insert); only ever requested on Linux. */
   clipboardReadText(type?: "selection"): Promise<string>;
+  /** What the clipboard holds when it has no text (a screenshot, Explorer-copied files), so a
+   *  terminal paste can hand the CLI its image key or the file paths. */
+  clipboardProbe(): Promise<ClipboardProbe>;
   /** Persist a display-name override for a session id (null or a value that trims to empty clears it,
    *  reverting to the derived/live name), then return the fresh overview with the override applied.
    *  Both overview() and refresh() also carry the override, since it is applied in overviewNow(). */

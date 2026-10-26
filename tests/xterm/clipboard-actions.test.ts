@@ -12,6 +12,9 @@ function fakeDeps(opts?: {
   bracketed?: boolean;
   readRejects?: boolean;
   writeRejects?: boolean;
+  probe?: { hasImage: boolean; files: string[] };
+  os?: "mac" | "windows" | "linux";
+  mouseTracking?: string;
 }) {
   let selection = opts?.selection ?? "";
   const pastes: string[] = [];
@@ -28,7 +31,10 @@ function fakeDeps(opts?: {
       pastes.push(data);
     },
     focus,
-    modes: { bracketedPasteMode: opts?.bracketed ?? false },
+    modes: {
+      bracketedPasteMode: opts?.bracketed ?? false,
+      mouseTrackingMode: opts?.mouseTracking ?? "none",
+    },
   };
   const readText = vi.fn(() =>
     opts?.readRejects
@@ -45,7 +51,12 @@ function fakeDeps(opts?: {
     writePty: (data) => {
       ptyWrites.push(data);
     },
-    clipboard: { readText, writeText },
+    clipboard: {
+      readText,
+      writeText,
+      ...(opts?.probe ? { probe: () => Promise.resolve(opts.probe!) } : {}),
+    },
+    os: opts?.os,
   };
   return {
     deps,
@@ -203,5 +214,71 @@ describe("attachClipboardContextMenu — Windows right-click copyPaste", () => {
     detach();
     expect(contextMenu(el).defaultPrevented).toBe(false);
     expect(f.writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe("text-less clipboard: screenshots and copied files", () => {
+  it("an image on Windows sends Claude Code's Alt+V, not ^V", async () => {
+    const f = fakeDeps({ os: "windows", probe: { hasImage: true, files: [] } });
+    await runClipboardAction("paste", f.deps);
+    expect(f.ptyWrites).toEqual(["\x1bv"]);
+  });
+
+  it("an image elsewhere sends ^V", async () => {
+    const f = fakeDeps({ os: "linux", probe: { hasImage: true, files: [] } });
+    await runClipboardAction("paste-no-fallback", f.deps);
+    expect(f.ptyWrites).toEqual(["\x16"]);
+  });
+
+  it("Explorer-copied files paste as quoted paths", async () => {
+    const f = fakeDeps({
+      os: "windows",
+      probe: { hasImage: false, files: ["C:\\My Pics\\a.png"] },
+    });
+    await runClipboardAction("paste", f.deps);
+    expect(f.pastes).toEqual(["'C:\\My Pics\\a.png'"]);
+    expect(f.ptyWrites).toEqual([]);
+  });
+
+  it("nothing to probe keeps the ^V fallback for Ctrl+V", async () => {
+    const f = fakeDeps({
+      os: "windows",
+      probe: { hasImage: false, files: [] },
+    });
+    await runClipboardAction("paste", f.deps);
+    expect(f.ptyWrites).toEqual(["\x16"]);
+  });
+});
+
+describe("right-click while the app tracks the mouse", () => {
+  function contextMenu(el: HTMLElement): MouseEvent {
+    const e = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(e);
+    return e;
+  }
+
+  it("leaves text to the app (no double paste)", async () => {
+    const f = fakeDeps({ clipboardText: "hello", mouseTracking: "any" });
+    const el = document.createElement("div");
+    attachClipboardContextMenu(el, "windows", f.deps);
+    expect(contextMenu(el).defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(f.readText).toHaveBeenCalled());
+    expect(f.pastes).toEqual([]);
+    expect(f.focus).not.toHaveBeenCalled();
+  });
+
+  it("still pastes a screenshot the app can't read", async () => {
+    const f = fakeDeps({
+      os: "windows",
+      mouseTracking: "any",
+      probe: { hasImage: true, files: [] },
+    });
+    const el = document.createElement("div");
+    attachClipboardContextMenu(el, "windows", f.deps);
+    contextMenu(el);
+    await vi.waitFor(() => expect(f.ptyWrites).toEqual(["\x1bv"]));
   });
 });

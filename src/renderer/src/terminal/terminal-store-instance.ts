@@ -12,5 +12,6 @@ export const terminalStore = createTerminalStore({
   clipboard: {
     readText: (type) => window.api.clipboardReadText(type),
     writeText: (text) => window.api.clipboardWriteText(text),
+    probe: () => window.api.clipboardProbe(),
   },
 });

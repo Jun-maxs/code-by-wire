@@ -17,7 +17,9 @@ import {
   type OpenInTarget,
   type UpdateState,
   type DbInfo,
+  type ClipboardProbe,
 } from "@shared/ipc";
+import { probeClipboard } from "./clipboard-probe";
 import { normalizeLocale, type Locale } from "@shared/locale";
 import type { Session } from "@shared/types";
 import type { Provider } from "./provider/types";
@@ -768,6 +770,10 @@ export function registerIpc({
         ? "selection"
         : undefined,
     ),
+  );
+  ipcMain.handle(
+    IPC.clipboardProbe,
+    (): ClipboardProbe => probeClipboard(clipboard, process.platform),
   );
   ipcMain.handle(IPC.updateGetState, (): UpdateState => upd.getState());
   ipcMain.handle(IPC.updateCheck, (): Promise<UpdateState> => upd.check());

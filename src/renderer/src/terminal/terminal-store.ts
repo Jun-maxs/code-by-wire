@@ -202,6 +202,7 @@ export function createTerminalStore({
         // Reads handle.id so the ^V image-paste fallback follows a /clear rename too.
         writePty: (data) => api.write(handle.id, data),
         clipboard,
+        os,
       };
       // Windows right-click copyPaste on the persistent wrapper (it survives attach/detach
       // moves between workspace containers, so the listener attaches exactly once).

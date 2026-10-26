@@ -104,10 +104,9 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
         window.api.getPathForFile(f),
       );
       if (!paths.length) return;
-      window.api.terminal.write(
-        handle.id,
-        `${paths.map((p) => quotePathForShell(p)).join(" ")} `,
-      );
+      // Through xterm's paste (bracketed when the CLI asks for it), not a raw write: Claude Code
+      // only turns a dropped image path into an attachment when it arrives as a paste.
+      handle.term.paste(`${paths.map((p) => quotePathForShell(p)).join(" ")} `);
       handle.term.focus();
     };
     container.addEventListener("dragenter", onDragOver);

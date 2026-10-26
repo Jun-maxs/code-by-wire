@@ -254,8 +254,9 @@ export function useTerminalSession({
         window.api.getPathForFile(f),
       );
       if (!paths.length) return;
-      api.write(
-        sessionId,
+      // Through xterm's paste, as in TerminalView: a CLI attaches a dropped image only when its
+      // path arrives as a paste.
+      term.paste(
         `${paths.map((p) => quotePathForShell(p, shellNameRef.current)).join(" ")} `,
       );
       term.focus();
@@ -352,7 +353,9 @@ export function useTerminalSession({
       clipboard: {
         readText: (type) => window.api.clipboardReadText(type),
         writeText: (text) => window.api.clipboardWriteText(text),
+        probe: () => window.api.clipboardProbe(),
       },
+      os,
     };
     term.attachCustomKeyEventHandler((e) => {
       // Mid-IME (CJK/dead-key): swallow the whole composition window. xterm's CompositionHelper
