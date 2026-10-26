@@ -5,6 +5,7 @@ import { AGENT_IDS, AGENTS, type AgentId } from "@shared/agents";
 import { isUpdatePending } from "@shared/update";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { AppearanceCard } from "./AppearanceCard";
+import { HudCard } from "./HudCard";
 import { CliCard } from "./CliCard";
 import { CodexCliCard } from "./CodexCliCard";
 import { StatuslineCard } from "./StatuslineCard";
@@ -117,6 +118,7 @@ export function SettingsView({
                 lede={t.settings.appearance.lede}
               />
               <AppearanceCard />
+              <HudCard />
             </>
           )}
           {section === "databases" && <DatabasesSection />}
@@ -143,7 +145,8 @@ function SystemSection({
         title={t.settings.system.title}
         lede={t.settings.system.lede}
       />
-      {AGENT_IDS.map((id) => (
+      {/* Pi has no CLI health card yet; it would otherwise fall through to Codex's. */}
+      {AGENT_IDS.filter((id) => id !== "pi").map((id) => (
         <div key={id} className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <AgentIcon agent={id} size={15} />

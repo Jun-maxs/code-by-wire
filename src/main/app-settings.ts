@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
 import type { Locale } from "../shared/locale";
+import type { HudSettings } from "../shared/ipc";
 
 /** code-by-wire's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
 export interface AppSettings {
@@ -21,6 +22,16 @@ export interface AppSettings {
    *  normalizeLocale over it, so a persisted alias ("zh-CN") or garbage still reads as a
    *  supported locale. */
   appLocale?: Locale;
+  /** The HUD overlay. Missing means on, on the primary display; callers read `hudSettings(read())`. */
+  hud?: Partial<HudSettings>;
+}
+
+/** The HUD preferences with their defaults filled in. */
+export function hudSettings(s: AppSettings): HudSettings {
+  return {
+    enabled: s.hud?.enabled ?? true,
+    display: typeof s.hud?.display === "string" ? s.hud.display : null,
+  };
 }
 
 export interface AppSettingsStore {
@@ -30,6 +41,7 @@ export interface AppSettingsStore {
   setAppTheme(theme: "dark" | "light"): void;
   setTerminalTheme(theme: "dark" | "light"): void;
   setAppLocale(locale: Locale): void;
+  setHud(hud: HudSettings): void;
 }
 
 export interface AppSettingsDeps {
@@ -74,6 +86,9 @@ export function createAppSettingsStore(
     },
     setAppLocale(locale) {
       write({ ...read(), appLocale: locale });
+    },
+    setHud(hud) {
+      write({ ...read(), hud });
     },
   };
 }

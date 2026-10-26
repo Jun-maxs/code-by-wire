@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  ipcMain,
   nativeTheme,
   net,
   powerSaveBlocker,
@@ -52,7 +53,7 @@ import { readModelDefaults } from "./settings/model-defaults";
 import { readSessionWindowMs } from "./settings/session-window";
 import type { ModelDefaults } from "@shared/models";
 import { resolveClaudeDir } from "./claude-config";
-import { createAppSettingsStore } from "./app-settings";
+import { createAppSettingsStore, hudSettings } from "./app-settings";
 import { createCaffeinate } from "./caffeinate";
 import { createSessionTitleStore } from "./session-titles";
 import { createSessionPinStore } from "./session-pins";
@@ -86,7 +87,7 @@ import {
 import type { StatisticsQuery as HudStatisticsQuery } from "@shared/hud-protocol";
 import { adoptReclaude } from "./reclaude";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
-import { IPC } from "@shared/ipc";
+import { IPC, type HudSettings, type HudSettingsView } from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
 
 // Pin the whole app to the sRGB color profile. Without this, the packaged build inherits the
@@ -691,7 +692,26 @@ app
       },
       showMain,
     });
-    hud.start();
+    // Settings → Appearance turns the HUD off or moves it to another display; applied at once.
+    const applyHud = () => {
+      const h = hudSettings(appSettings.read());
+      if (h.enabled) hud.start(h.display);
+      else hud.stop();
+    };
+    const hudView = (): HudSettingsView => ({
+      settings: hudSettings(appSettings.read()),
+      displays: hud.displays(),
+    });
+    ipcMain.handle(IPC.hudSettingsGet, hudView);
+    ipcMain.handle(IPC.hudSettingsSet, (_e, next: HudSettings) => {
+      appSettings.setHud({
+        enabled: next.enabled === true,
+        display: typeof next.display === "string" ? next.display : null,
+      });
+      applyHud();
+      return hudView();
+    });
+    applyHud();
     // Closing the last app window quits on Windows/Linux: the overlay goes first, or its window
     // would keep "window-all-closed" from ever firing.
     app.on("browser-window-created", (_e, w) => {

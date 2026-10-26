@@ -33,6 +33,15 @@ export const zh: Translations = {
       dark: "深色",
       light: "浅色",
     },
+    hud: {
+      title: "悬浮条",
+      enabled: "显示悬浮条",
+      enabledDesc: "屏幕顶部的图标条与光晕；前台是全屏程序时自动隐藏",
+      display: "显示器",
+      displayDesc: "悬浮条放在哪块屏幕上",
+      primary: "主屏",
+      screen: (n: number) => `屏幕 ${n}`,
+    },
     system: {
       title: "系统",
       lede: "驱动本应用的底层机件，保持绿灯。",

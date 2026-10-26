@@ -249,18 +249,28 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     deps.load(win, { screen: o.screenId, label: `hud-${d.id}` });
   };
 
+  /** The display id the user picked; `null`, or a display that isn't attached, means the primary. */
+  let wanted: string | null = null;
+  const target = (): Display =>
+    screen.getAllDisplays().find((d) => screenIdOf(d) === wanted) ??
+    screen.getPrimaryDisplay();
+
+  /** Follow display changes: resize on the same display, or move to the target when it changed
+   *  (the picked display was plugged in or out). */
   const relayout = () => {
-    for (const o of overlays.values()) {
-      const d = screen.getAllDisplays().find((x) => x.id === o.display.id);
-      if (!d) {
+    const t = target();
+    for (const o of [...overlays.values()]) {
+      if (o.display.id !== t.id) {
+        overlays.delete(o.screenId);
         o.win.destroy();
         continue;
       }
-      o.display = d;
-      o.canvas = canvasFor(d);
+      o.display = t;
+      o.canvas = canvasFor(t);
       o.win.setBounds(o.canvas);
       send(o, "hud:geometry", geometry(o));
     }
+    if (!overlays.size) open(t);
     for (const o of overlays.values()) send(o, "hud:monitors", monitors());
   };
 
@@ -280,15 +290,29 @@ export function createHudOverlay(deps: HudOverlayDeps) {
   };
 
   return {
-    /** Show the HUD along the top of the primary display. */
-    start() {
-      if (overlays.size) return;
-      open(screen.getPrimaryDisplay());
+    /** Show the HUD along the top of a display: `display` by id, or the primary for `null`. A
+     *  running HUD moves there. */
+    start(display: string | null = null) {
+      wanted = display;
+      if (overlays.size) {
+        relayout();
+        return;
+      }
+      open(target());
       screen.on("display-metrics-changed", relayout);
+      screen.on("display-added", relayout);
       screen.on("display-removed", relayout);
       timer = setInterval(poll, POINTER_POLL_MS);
       unwatch = watchFullscreen(setFullscreen);
     },
+    /** The displays attached now, for the Settings picker. */
+    displays: () =>
+      monitors().map((m) => ({
+        id: m.screenId,
+        primary: m.primary,
+        width: m.bounds.width,
+        height: m.bounds.height,
+      })),
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
@@ -296,6 +320,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       unwatch = null;
       fullscreen = false;
       screen.off("display-metrics-changed", relayout);
+      screen.off("display-added", relayout);
       screen.off("display-removed", relayout);
       for (const o of overlays.values()) o.win.destroy();
       overlays.clear();

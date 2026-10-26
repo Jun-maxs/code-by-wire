@@ -49,6 +49,16 @@ export const en = {
       dark: "Dark",
       light: "Light",
     },
+    hud: {
+      title: "HUD",
+      enabled: "Show the HUD",
+      enabledDesc:
+        "The strip and glow along the top of the screen; hidden while a full-screen app is in front",
+      display: "Display",
+      displayDesc: "Which screen the HUD sits on",
+      primary: "Primary",
+      screen: (n: number) => `Screen ${n}`,
+    },
     system: {
       title: "System",
       lede: "The machinery feeding this app. Keep it green.",

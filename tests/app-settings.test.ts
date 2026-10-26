@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createAppSettingsStore } from "../src/main/app-settings";
+import { createAppSettingsStore, hudSettings } from "../src/main/app-settings";
 
 describe("createAppSettingsStore", () => {
   const dirs: string[] = [];
@@ -155,5 +155,31 @@ describe("appLocale preference", () => {
     store.setAppLocale("zh");
     expect(store.read().appTheme).toBe("light");
     expect(store.read().appLocale).toBe("zh");
+  });
+});
+
+describe("hud preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  it("defaults to on, on the primary display", () => {
+    expect(hudSettings({})).toEqual({ enabled: true, display: null });
+  });
+  it("persists the switch and the display and reads them back", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(dir);
+    createAppSettingsStore({ dir }).setHud({ enabled: false, display: "42" });
+    expect(hudSettings(createAppSettingsStore({ dir }).read())).toEqual({
+      enabled: false,
+      display: "42",
+    });
+  });
+  it("reads a malformed display as the primary", () => {
+    expect(hudSettings({ hud: { display: 7 as unknown as string } })).toEqual({
+      enabled: true,
+      display: null,
+    });
   });
 });

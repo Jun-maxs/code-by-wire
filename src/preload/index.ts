@@ -78,6 +78,9 @@ const api: AppApi = {
   repairStatusline: () => ipcRenderer.invoke(IPC.statuslineRepair),
   getCaffeinate: () => ipcRenderer.invoke(IPC.caffeinateGet),
   setCaffeinate: (on) => ipcRenderer.invoke(IPC.caffeinateSet, on),
+  getHudSettings: () => ipcRenderer.invoke(IPC.hudSettingsGet),
+  setHudSettings: (settings) =>
+    ipcRenderer.invoke(IPC.hudSettingsSet, settings),
   readSubagentTranscript: async (id, agentId, sinceMtimeMs) =>
     fromTranscriptWire(
       (await ipcRenderer.invoke(

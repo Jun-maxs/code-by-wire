@@ -80,12 +80,34 @@ export const IPC = {
   statuslineRepair: "statusline:repair",
   caffeinateGet: "caffeinate:get",
   caffeinateSet: "caffeinate:set",
+  hudSettingsGet: "hud:settingsGet",
+  hudSettingsSet: "hud:settingsSet",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
   /** PUSH: main -> renderer on every update-state transition. */
   updateState: "update:state",
   selectSession: "window:selectSession",
 } as const;
+
+/** The HUD overlay's preferences: whether it shows, and on which display (`null` = the primary). */
+export interface HudSettings {
+  enabled: boolean;
+  display: string | null;
+}
+
+/** A display the HUD can sit on, for the Settings picker. */
+export interface HudDisplayOption {
+  id: string;
+  primary: boolean;
+  width: number;
+  height: number;
+}
+
+/** What Settings shows for the HUD: the stored preferences and the displays attached now. */
+export interface HudSettingsView {
+  settings: HudSettings;
+  displays: HudDisplayOption[];
+}
 
 /** What the clipboard holds besides text: an image (a screenshot), or files copied in the file
  *  manager (Windows Explorer puts no text on the clipboard for those). */
@@ -358,6 +380,10 @@ export interface IpcApi {
   /** Turn keep-awake on or off. Resolves to the resulting state — main is the source of truth,
    *  so the footer renders the response rather than assuming the toggle took. */
   setCaffeinate(on: boolean): Promise<boolean>;
+  /** The HUD overlay's preferences and the displays it can use. */
+  getHudSettings(): Promise<HudSettingsView>;
+  /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
+  setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
