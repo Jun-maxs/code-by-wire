@@ -51,6 +51,11 @@ import { createCaffeinate } from "./caffeinate";
 import { createSessionTitleStore } from "./session-titles";
 import { createSessionPinStore } from "./session-pins";
 import { createLaunchArgsStore } from "./launch-args";
+import {
+  createRemoteSessionStore,
+  remoteCommand,
+  type RemoteSessionStore,
+} from "./remote-sessions";
 import type { LaunchArgsStore } from "./launch-args";
 import { createLaunchPresetStore } from "./launch-presets";
 import { createProjectStateStore } from "./project-state";
@@ -93,6 +98,7 @@ function createWindow(
   resolveResumeTarget: (id: string) => ResumeTarget | null,
   agentOf: (id: string) => AgentId,
   launchArgs: LaunchArgsStore,
+  remoteSessions: RemoteSessionStore,
   registerRename: (rename: (from: string, to: string) => void) => void,
   shellEnv: () => NodeJS.ProcessEnv,
   appTheme: "dark" | "light",
@@ -161,6 +167,8 @@ function createWindow(
     resolveResumeTarget,
     agentOf,
     launchArgs,
+    remoteSessions,
+    remoteCommand: () => remoteCommand(),
     posixShell: { isExecutable: isExecutableFile, findOnPath },
   });
   registerRename(rename);
@@ -261,12 +269,17 @@ app
     // correctedPath/shellTermEnv closure above and the setTimeout'd CLI check below.
     // Per-session custom launch args: written by the spawn handler, read back on resume/fork.
     const launchArgs = createLaunchArgsStore({ dir: app.getPath("userData") });
+    // Fork feature: sessions started with remote (claude-r → HAPI), kept remote across Resume/Fork.
+    const remoteSessions = createRemoteSessionStore({
+      dir: app.getPath("userData"),
+    });
     const openWindow = (): void =>
       createWindow(
         managed,
         (id) => services.provider?.resolveResumeTarget(id) ?? null,
         (id) => services.agentOf?.(id) ?? "claude",
         launchArgs,
+        remoteSessions,
         registerRename,
         shellTermEnv,
         appSettings.read().appTheme ?? "dark",
@@ -490,6 +503,7 @@ app
           sessionTitles.rename(from, to);
           sessionPins.rename(from, to);
           launchArgs.rename(from, to);
+          remoteSessions.rename(from, to);
           renameInWindow(from, to);
         },
       });
@@ -516,6 +530,7 @@ app
       managed,
       sessionTitles,
       sessionPins,
+      remoteSessions,
       productsDirs: () => {
         // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
         const cardsDir =

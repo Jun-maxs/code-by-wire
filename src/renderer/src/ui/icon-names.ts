@@ -57,6 +57,7 @@ export type IconName =
   | "scroll-text"
   | "search"
   | "settings"
+  | "smartphone"
   | "sparkles"
   | "square"
   | "square-code"

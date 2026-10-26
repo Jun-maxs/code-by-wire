@@ -226,6 +226,8 @@ export interface Session {
    *  pin store at overview time — never persisted in the SQLite index — so a cache rebuild can't
    *  lose pins. The sidebar's PINNED section orders by this, newest first. */
   pinnedAtMs?: number;
+  /** Fork feature: started with remote (claude-r → HAPI), so it can be continued from the phone. */
+  remote?: boolean;
   currentTask?: string;
   waitingReason?: string;
 }

@@ -339,6 +339,9 @@ export const en = {
         `${token} is managed by the app and can't be passed here.`,
       unbalancedQuote: "Unclosed quote in arguments.",
       failedToStart: "Failed to start the session",
+      remote: "With remote",
+      remoteHint:
+        "Starts through claude-r (HAPI) so you can continue this session from your phone at main.yuanjp.shop. Resume and fork stay remote.",
       create: "Create",
       starting: "Starting…",
     },

@@ -164,6 +164,8 @@ export interface IpcDeps {
   sessionTitles?: SessionTitleStore;
   /** Durable pinned-session marks, stamped onto overview rows as pinnedAtMs. Defaults to no pins. */
   sessionPins?: SessionPinStore;
+  /** Fork feature: sessions started with remote; stamped onto the overview so the sidebar can mark them. */
+  remoteSessions?: { read(): Record<string, true> };
   /** Where the workbench keeps product cards and per-session hook state (sidebar product tags).
    *  Absent → products:read serves null. */
   productsDirs?: () => { cardsDir: string; stateDir: string };
@@ -219,6 +221,7 @@ export function registerIpc({
   managed,
   sessionTitles,
   sessionPins,
+  remoteSessions,
   productsDirs,
   launchPresets,
   projectState,
@@ -393,7 +396,10 @@ export function registerIpc({
       agentOverlaid,
       sessionTitles?.read() ?? {},
     );
-    const pinned = applyPinOverrides(named, sessionPins?.read() ?? {});
+    const remoteIds = remoteSessions?.read() ?? {};
+    const pinned = applyPinOverrides(named, sessionPins?.read() ?? {}).map(
+      (s) => (remoteIds[s.id] ? { ...s, remote: true } : s),
+    );
     // A6 last tier: fill the settings.json default only where no per-session source (capture or
     // transcript scan) answered. Claude-only — the default comes from claude's settings.json, so
     // it must never masquerade as another agent's effort.

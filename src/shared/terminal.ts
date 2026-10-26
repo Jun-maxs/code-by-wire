@@ -73,6 +73,9 @@ export interface SpawnRequest {
   /** Raw custom launch-args string as typed (tokenized + validated in MAIN — the renderer's live
    *  check is UX only, never the enforcement). Omitted/empty means today's exact spawn. */
   extraArgs?: string;
+  /** Fork feature: start "with remote" (claude-r → HAPI) so the session can be continued from the phone.
+   *  Claude only; remembered for the session's Resume and Fork. */
+  remote?: boolean;
   /** Initial terminal size; the renderer's first fit corrects it. */
   cols: number;
   rows: number;

@@ -297,6 +297,9 @@ export const zh: Translations = {
       reservedArg: (token: string) => `${token} 由应用管理，不能在此传入。`,
       unbalancedQuote: "参数中的引号未闭合。",
       failedToStart: "会话启动失败",
+      remote: "带远程",
+      remoteHint:
+        "用 claude-r（HAPI）启动，手机上打开 main.yuanjp.shop 就能接着这个会话用；以后恢复、分叉也照样带远程。",
       create: "创建",
       starting: "启动中…",
     },

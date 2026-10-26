@@ -157,6 +157,14 @@ export function SessionRow({
           >
             {displayTitle}
           </span>
+          {session.remote && (
+            <span
+              className="shrink-0 text-(--ui-text-quaternary)"
+              title={t.shell.newSession.remoteHint}
+            >
+              <Icon name="smartphone" size={11} />
+            </span>
+          )}
           {hasChildren && (
             <span
               className={cx(
