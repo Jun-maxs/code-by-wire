@@ -35,6 +35,7 @@ import type { Caffeinate } from "./caffeinate";
 import type { UsageService } from "./usage/fetch";
 import {
   deriveAccount,
+  applyLearnedWindows,
   overlaySessions,
   freshestBySession,
   CAPTURE_STALE_MS,
@@ -371,7 +372,11 @@ export function registerIpc({
     }
     // Apply user renames AFTER the statusLine overlay so a cbw rename wins over the derived title and
     // Claude's live session_name. Read fresh each call so a just-persisted rename shows immediately.
-    const overlaid = overlaySessions(base.sessions, byId);
+    // Uncaptured sessions borrow the window a capture reported for the same model (1M vs the 200k default).
+    const overlaid = applyLearnedWindows(
+      overlaySessions(base.sessions, byId),
+      byId,
+    );
     // Per-agent overlays (codex telemetry today): after the claude overlay, before renames/pins.
     const agentOverlaid = (sessionOverlays ?? []).reduce(
       (acc, overlay) => overlay(acc),
