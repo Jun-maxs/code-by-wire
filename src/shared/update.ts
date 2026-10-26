@@ -1,5 +1,5 @@
 /** The repo whose GitHub releases electron-updater reads; used to build the release-notes link. */
-const RELEASES_BASE = "https://github.com/luojiahai/code-by-wire/releases/tag";
+const RELEASES_BASE = "https://github.com/Jun-maxs/code-by-wire/releases/tag";
 
 /** A release newer than the running app, including everything needed to keep rendering it while a
  *  re-check is in flight. Named separately so `checking.prior` does not make UpdatePhase recursive. */

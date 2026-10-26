@@ -27,7 +27,7 @@ describe("initialUpdateState", () => {
 describe("releaseNotesUrl", () => {
   it("builds the GitHub tag URL", () => {
     expect(releaseNotesUrl("0.1.17")).toBe(
-      "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+      "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
     );
   });
 });
@@ -73,7 +73,7 @@ describe("nextUpdateState", () => {
         version: "0.1.17",
         releaseDate: "2026-06-24",
         notesUrl:
-          "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+          "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
         checkedAt: 1234,
       },
     });
@@ -192,7 +192,7 @@ describe("isUpdatePending", () => {
         kind: "available",
         version: "0.1.17",
         notesUrl:
-          "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+          "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
         checkedAt: 1234,
       }),
     ).toBe(true);
@@ -215,7 +215,7 @@ describe("isUpdatePending", () => {
           kind: "available",
           version: "0.1.17",
           notesUrl:
-            "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+            "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
           checkedAt: 1234,
         },
       }),
@@ -239,7 +239,7 @@ describe("shouldAutoCheck", () => {
   const available = {
     kind: "available" as const,
     version: "0.1.17",
-    notesUrl: "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+    notesUrl: "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
     checkedAt: 1,
   };
 

@@ -57,7 +57,10 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+# This fork (Pi, relay usage, the HUD overlay) shares upstream's appId, so it installs over and
+# keeps the same data. Updates come from the fork's releases, never upstream's: an upstream build
+# would replace it and drop what the fork adds.
 publish:
   provider: github
-  owner: luojiahai
+  owner: Jun-maxs
   repo: code-by-wire
