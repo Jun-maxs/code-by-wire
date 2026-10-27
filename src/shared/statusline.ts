@@ -125,7 +125,8 @@ export function showRateRow(
 }
 
 /**
- * The app-wide Account. Windows are a pass-through of the usage-API fetch (each through the
+ * The app-wide Account. Windows are a pass-through of the usage-API fetch (or, when the API has
+ * nothing, of the newest capture's rate_limits) (each through the
  * liveWindow guard so a reset elapsing inside the TTL drops rather than shows stale); they exist
  * solely as the per-session merge's fill side — the panel never renders them without first
  * consulting the selected session (see pickWindow). Captures are consulted only as evidence:
@@ -143,19 +144,32 @@ export function deriveAccount(
   apiUsage?: AccountUsage | null,
 ): Account | null {
   let freshest: StatusLineSample | null = null;
-  let sawRateLimits = false;
+  let limited: StatusLineSample | null = null;
   for (const s of samples) {
     if (now - s.capturedMtimeMs > staleMs) continue;
     if (!freshest || s.capturedMtimeMs > freshest.capturedMtimeMs) freshest = s;
-    if (s.rateLimits) sawRateLimits = true;
+    if (
+      s.rateLimits &&
+      (!limited || s.capturedMtimeMs > limited.capturedMtimeMs)
+    )
+      limited = s;
   }
-  if (apiUsage || sawRateLimits) {
+  if (apiUsage || limited) {
+    // Without a usage-API answer (a gateway login such as reclaude never gets one), the newest
+    // capture's windows stand in, so sessions with no capture of their own still show 5h / 7d.
+    const fill = apiUsage ? undefined : (limited?.rateLimits ?? undefined);
     const acc: Account = {
       billingMode: "subscription",
-      fiveHour: liveWindow(apiUsage?.fiveHour, now),
-      sevenDay: liveWindow(apiUsage?.sevenDay, now),
-      sevenDaySonnet: liveWindow(apiUsage?.sevenDaySonnet, now),
-      sevenDayOpus: liveWindow(apiUsage?.sevenDayOpus, now),
+      fiveHour: liveWindow(apiUsage?.fiveHour ?? fill?.fiveHour, now),
+      sevenDay: liveWindow(apiUsage?.sevenDay ?? fill?.sevenDay, now),
+      sevenDaySonnet: liveWindow(
+        apiUsage?.sevenDaySonnet ?? fill?.sevenDaySonnet,
+        now,
+      ),
+      sevenDayOpus: liveWindow(
+        apiUsage?.sevenDayOpus ?? fill?.sevenDayOpus,
+        now,
+      ),
     };
     if (apiUsage?.extraUsage) acc.extraUsage = apiUsage.extraUsage;
     if (freshest?.version) acc.version = freshest.version;

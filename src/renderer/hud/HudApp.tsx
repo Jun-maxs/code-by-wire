@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { FormatProvider } from "@agent-hud/ui/format-context";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import {
@@ -6,12 +7,15 @@ import {
   type PanelServices,
 } from "@agent-hud/hud/PanelContext";
 import type { HUDConfig } from "@agent-hud/hud/model";
-import NativeHUDSurface from "./app/HUDSurface";
-import { useHUD } from "./app/lib/use-hud";
-import { useHUDGeometry } from "./app/lib/use-hud-geometry";
-import { useHUDConfig, type HUDScreenContext } from "./app/lib/use-hud-config";
-import { useBotDirections } from "./app/lib/use-bot-directions";
-import type { NativeMethod } from "./app/lib/types";
+import NativeHUDSurface from "./vendor/app/HUDSurface";
+import { useHUD } from "./vendor/app/lib/use-hud";
+import { useHUDGeometry } from "./vendor/app/lib/use-hud-geometry";
+import {
+  useHUDConfig,
+  type HUDScreenContext,
+} from "./vendor/app/lib/use-hud-config";
+import { useLocalBotDirections } from "./bot-directions";
+import type { NativeMethod } from "./vendor/app/lib/types";
 
 /**
  * The HUD overlay window's page: Agent HUD's App, cut to its `surface=hud` branch. One window per
@@ -32,7 +36,7 @@ export function HudApp() {
     [monitors],
   );
   const { config: stored, ready } = useHUDConfig(screenId, screens, true);
-  const botDirections = useBotDirections(true);
+  const botDirections = useLocalBotDirections(snapshot);
   const measured = geometries[screenId] ?? null;
   const config: HUDConfig = {
     ...stored,
@@ -40,6 +44,20 @@ export function HudApp() {
     notchWidth: 200,
     notchHeight: measured?.menuBarHeight || 24,
   };
+
+  // Where the window sits follows the edge Settings → Display picks (Agent HUD's host planned this
+  // from the same values): main moves the canvas and answers with new geometry.
+  const placement = {
+    mode: config.mode,
+    edge: config.edge,
+    offset: config.offset,
+    panelWidth: config.panelWidth,
+  };
+  const placementKey = JSON.stringify(placement);
+  useEffect(() => {
+    if (!ready || !screenId) return;
+    void invoke("hud_place", placement).catch(() => {});
+  }, [ready, screenId, placementKey]);
 
   // The theme follows the main window's (the snapshot carries its appearance setting).
   const [systemLight, setSystemLight] = useState(
@@ -72,6 +90,8 @@ export function HudApp() {
       }
     },
     selectSession: (session) => void act("open_session", { id: session.id }),
+    openSettingsPage: (page) => void invoke("hud_show_main", { page }),
+    selectProvider: () => void invoke("open_statistics", { tab: "tokens" }),
   };
 
   if (!snapshot || !ready || !screenId) return null;

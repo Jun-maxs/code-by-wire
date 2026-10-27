@@ -85,6 +85,9 @@ export const IPC = {
   caffeinateGet: "caffeinate:get",
   caffeinateSet: "caffeinate:set",
   hudSettingsGet: "hud:settingsGet",
+  claudeAccountsList: "claudeAccounts:list",
+  claudeAccountsUse: "claudeAccounts:use",
+  claudeAccountsBind: "claudeAccounts:bind",
   hudSettingsSet: "hud:settingsSet",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
@@ -97,6 +100,25 @@ export const IPC = {
 export interface HudSettings {
   enabled: boolean;
   display: string | null;
+}
+
+/** One of the user's reclaude organizations (one Claude account each). */
+export interface ClaudeOrg {
+  id: string;
+  name: string;
+  /** "personal" / "team" as reclaude reports it. */
+  kind: string;
+  email: string;
+  /** Bound on this machine (has its own config dir and credentials). */
+  bound: boolean;
+  /** The default binding: new sessions run on it. */
+  current: boolean;
+}
+
+/** The account switcher's state: null `orgs` when reclaude isn't in use; `error` when listing failed. */
+export interface ClaudeAccountsView {
+  orgs: ClaudeOrg[] | null;
+  error?: string;
 }
 
 /** A display the HUD can sit on, for the Settings picker. */
@@ -392,6 +414,12 @@ export interface IpcApi {
   setCaffeinate(on: boolean): Promise<boolean>;
   /** The HUD overlay's preferences and the displays it can use. */
   getHudSettings(): Promise<HudSettingsView>;
+  /** reclaude's organizations (Claude accounts) and which one new sessions use. */
+  listClaudeAccounts(): Promise<ClaudeAccountsView>;
+  /** Make a bound organization the default (`reclaude org use`); answers with the new list. */
+  useClaudeAccount(id: string): Promise<ClaudeAccountsView>;
+  /** Start binding an organization (`reclaude org bind`, authorized in the browser). */
+  bindClaudeAccount(id: string): Promise<void>;
   /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
   setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
 }

@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, screen, type Display } from "electron";
 import type * as Hud from "@shared/hud-native";
 import { logWarn } from "../log-buffer";
 import { watchFullscreen } from "./fullscreen-watch";
+import { canvasFor, DEFAULT_PLACEMENT, type HudPlacement } from "./placement";
 
 /**
  * The HUD overlay: Agent HUD's edge strip, glow and hover panel (vendored under renderer/hud) in a
@@ -12,7 +13,8 @@ import { watchFullscreen } from "./fullscreen-watch";
  *   everywhere else, so the apps beneath stay usable; a cursor poll flips that per position and
  *   sends `hud:pointer`, which drives the strip's hover and the panel's open/close.
  * - Data rides `native_request`, which the page polls (main runs no data timer).
- * - Geometry is the canvas this window covers on its display.
+ * - Geometry is the canvas this window covers on its display: full height, along the edge the page
+ *   reports (`hud_place`, from Settings → Display), placed the way Agent HUD's host planned it.
  * - While a full-screen app (a game) is in front the overlays hide, so they never sit over it.
  */
 
@@ -26,11 +28,10 @@ export interface HudOverlayDeps {
   request(method: string, params: Record<string, unknown>): unknown;
   /** Bring the main window forward, at a session when one is given. */
   showMain(sessionId?: string): void;
+  /** Commands the HUD's other windows (Settings, Statistics) add; see main/hud/windows.ts. */
+  commands?: Record<string, (args: Record<string, unknown>) => unknown>;
 }
 
-/** The overlay window's width: room for the strip beside an open panel (Agent HUD's plan wants at
- *  least 940 points); the rest of a wide display stays out of the window. */
-const CANVAS_WIDTH = 1100;
 const POINTER_POLL_MS = 33;
 
 interface Overlay {
@@ -41,6 +42,7 @@ interface Overlay {
   regions: Rect[];
   pointer: Hud.HudPointer;
   focused: boolean;
+  placement: HudPlacement;
 }
 
 const outside = (screenId: string): Hud.HudPointer => ({
@@ -57,21 +59,16 @@ const outside = (screenId: string): Hud.HudPointer => ({
 const screenIdOf = (d: Display) => String(d.id);
 
 const hudWindows = new WeakSet<BrowserWindow>();
-/** Whether `win` is a HUD overlay rather than an app window. */
+/** Whether `win` is one of the HUD's windows (an overlay, or its Settings/Statistics) rather than an
+ *  app window. */
 export const isHudWindow = (win: BrowserWindow): boolean => hudWindows.has(win);
-/** The app's own windows: every window but the HUD overlays. */
+/** Count `win` among the HUD's windows, so it is never taken for the app's main window. */
+export const markHudWindow = (win: BrowserWindow): void => {
+  hudWindows.add(win);
+};
+/** The app's own windows: every window but the HUD's. */
 export const appWindows = (): BrowserWindow[] =>
   BrowserWindow.getAllWindows().filter((w) => !isHudWindow(w));
-
-function canvasFor(d: Display): Rect {
-  const width = Math.min(d.bounds.width, CANVAS_WIDTH);
-  return {
-    x: Math.round(d.bounds.x + (d.bounds.width - width) / 2),
-    y: d.bounds.y,
-    width,
-    height: d.bounds.height,
-  };
-}
 
 export function createHudOverlay(deps: HudOverlayDeps) {
   const overlays = new Map<string, Overlay>();
@@ -179,15 +176,35 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       }
       return null;
     },
-    hud_show_main: () => deps.showMain(),
-    open_statistics: (_o, args) =>
-      deps.showMain(
-        typeof args.sessionId === "string" ? args.sessionId : undefined,
-      ),
     open_update: () => deps.showMain(),
-    hud_bot_looked: () => null,
+    // The page directs its own Bots (renderer/hud/bot-directions.ts); "looked" goes back to it.
+    hud_bot_looked: (o, args) => {
+      if (o) send(o, "hud:bot-looked", args.keys ?? null);
+      return null;
+    },
     hud_drag_start: () => null,
+    hud_place: (o, args) => {
+      if (!o || o.win.isDestroyed()) return null;
+      o.placement = {
+        ...DEFAULT_PLACEMENT,
+        ...(args as Partial<HudPlacement>),
+      };
+      const canvas = canvasFor(o.display.bounds, o.placement);
+      if (
+        canvas.x !== o.canvas.x ||
+        canvas.y !== o.canvas.y ||
+        canvas.width !== o.canvas.width ||
+        canvas.height !== o.canvas.height
+      ) {
+        o.canvas = canvas;
+        o.win.setBounds(canvas);
+        send(o, "hud:geometry", geometry(o));
+      }
+      return geometry(o);
+    },
   };
+  for (const [name, run] of Object.entries(deps.commands ?? {}))
+    commands[name] = (_o, args) => run(args);
 
   ipcMain.handle(
     "hud:invoke",
@@ -201,7 +218,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
   ipcMain.on("hud:emit", () => {});
 
   const open = (d: Display) => {
-    const canvas = canvasFor(d);
+    const canvas = canvasFor(d.bounds);
     const win = new BrowserWindow({
       ...canvas,
       frame: false,
@@ -220,7 +237,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       title: "Code-by-wire HUD",
       webPreferences: { preload: deps.preload, sandbox: false },
     });
-    hudWindows.add(win);
+    markHudWindow(win);
     win.setAlwaysOnTop(true, "screen-saver");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     win.setIgnoreMouseEvents(true, { forward: true });
@@ -232,6 +249,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       regions: [],
       pointer: outside(screenIdOf(d)),
       focused: false,
+      placement: DEFAULT_PLACEMENT,
     };
     overlays.set(o.screenId, o);
     // The page's own failures land in the app log, where a diagnostic report can find them.
@@ -266,7 +284,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
         continue;
       }
       o.display = t;
-      o.canvas = canvasFor(t);
+      o.canvas = canvasFor(t.bounds, o.placement);
       o.win.setBounds(o.canvas);
       send(o, "hud:geometry", geometry(o));
     }

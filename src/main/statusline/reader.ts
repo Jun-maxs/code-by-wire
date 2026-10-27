@@ -10,6 +10,9 @@ import { logError } from "../log-buffer";
 export interface StatusLineReaderDeps {
   /** Claude config dir; defaults via resolveClaudeDir. Tests inject a temp dir. */
   claudeDir?: string;
+  /** Every config dir to read captures from, asked each pass (reclaude: one per account binding, so
+   *  switching accounts keeps the new one's captures in view). Defaults to `claudeDir` alone. */
+  claudeDirs?: () => string[];
   /** Wall clock (ms) the prune cutoff is measured against; injected so tests are deterministic. */
   now?: () => number;
 }
@@ -138,42 +141,47 @@ function parseSample(
 export function createStatusLineReader(
   deps: StatusLineReaderDeps = {},
 ): StatusLineReader {
-  const dir = statusLineDir(resolveClaudeDir(deps.claudeDir));
+  const own = resolveClaudeDir(deps.claudeDir);
   const now = deps.now ?? ((): number => Date.now());
+  const readDir = (dir: string, out: StatusLineSample[]): void => {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch (err) {
+      // An absent dir (nothing installed / no captures yet) is the normal "no live data" case. A real
+      // read failure (EACCES/EIO) isn't that, and shouldn't masquerade as it silently — surface it.
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        logError(
+          "statusline-capture-read-failed",
+          `statusLine reader: cannot read ${dir}`,
+          err,
+        );
+      }
+      return;
+    }
+    const cutoff = now() - CAPTURE_STALE_MS;
+    for (const name of names) {
+      if (!name.endsWith(".json")) continue;
+      const path = join(dir, name);
+      try {
+        const mtimeMs = statSync(path).mtimeMs;
+        if (mtimeMs < cutoff) {
+          rmSync(path, { force: true }); // stale: drop it instead of re-reading and re-parsing it
+          continue;
+        }
+        const sample = parseSample(readFileSync(path, "utf8"), mtimeMs);
+        if (sample) out.push(sample);
+      } catch {
+        // a file that vanished mid-scan or won't read — skip it, never sink the pass
+      }
+    }
+  };
   return {
     read(): StatusLineSample[] {
-      let names: string[];
-      try {
-        names = readdirSync(dir);
-      } catch (err) {
-        // An absent dir (nothing installed / no captures yet) is the normal "no live data" case. A real
-        // read failure (EACCES/EIO) isn't that, and shouldn't masquerade as it silently — surface it.
-        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-          logError(
-            "statusline-capture-read-failed",
-            `statusLine reader: cannot read ${dir}`,
-            err,
-          );
-        }
-        return [];
-      }
+      const dirs = new Set(deps.claudeDirs?.() ?? []);
+      dirs.add(own);
       const out: StatusLineSample[] = [];
-      const cutoff = now() - CAPTURE_STALE_MS;
-      for (const name of names) {
-        if (!name.endsWith(".json")) continue;
-        const path = join(dir, name);
-        try {
-          const mtimeMs = statSync(path).mtimeMs;
-          if (mtimeMs < cutoff) {
-            rmSync(path, { force: true }); // stale: drop it instead of re-reading and re-parsing it
-            continue;
-          }
-          const sample = parseSample(readFileSync(path, "utf8"), mtimeMs);
-          if (sample) out.push(sample);
-        } catch {
-          // a file that vanished mid-scan or won't read — skip it, never sink the pass
-        }
-      }
+      for (const d of dirs) readDir(statusLineDir(d), out);
       return out;
     },
   };

@@ -12,7 +12,10 @@
       "@tauri-apps/api/event": ["src/renderer/hud/shim/tauri-event.ts"],
       "@tauri-apps/api/webviewWindow": [
         "src/renderer/hud/shim/tauri-webview-window.ts"
-      ]
+      ],
+      "@tauri-apps/api/app": ["src/renderer/hud/shim/tauri-app.ts"],
+      "@tauri-apps/api/window": ["src/renderer/hud/shim/tauri-window.ts"],
+      "sonner": ["src/renderer/hud/shim/sonner.ts"]
     },
     "allowImportingTsExtensions": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"]

@@ -67,8 +67,8 @@ describe("deriveAccount", () => {
     });
     const acc = deriveAccount([s], NOW, STALE, null);
     expect(acc?.billingMode).toBe("subscription");
-    // Account windows come ONLY from the API — the capture's window is per-session now.
-    expect(acc?.sevenDay).toBeUndefined();
+    // No API answer (a gateway login): the newest capture's windows fill the account.
+    expect(acc?.sevenDay).toEqual({ usedPct: 9, resetsAt: NOW + 1 });
   });
 
   it("stays subscription when the freshest sample lacks rate_limits but an older fresh one carries them", () => {

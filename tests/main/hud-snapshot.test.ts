@@ -58,6 +58,38 @@ describe("buildHudSnapshot", () => {
     expect(snap.accounts?.[0].label).toBe("me@example.com");
   });
 
+  it("falls back to the newest Claude row's windows when the usage API has none", () => {
+    const old = session({
+      id: "a",
+      lastActivityMs: NOW - HOUR,
+      rateLimits: { fiveHour: { usedPct: 50, resetsAt: NOW + HOUR } },
+    });
+    const fresh = session({
+      id: "b",
+      rateLimits: { fiveHour: { usedPct: 4, resetsAt: NOW + HOUR } },
+    });
+    const snap = buildHudSnapshot({
+      ...base,
+      sessions: [old, fresh],
+      account: { billingMode: "subscription" },
+    });
+    expect(snap.quotas.map((q) => [q.id, q.usedPercent])).toEqual([
+      ["claude:fiveHour", 4],
+    ]);
+  });
+
+  it("leaves out an agent turned off on Settings → Agents", () => {
+    const snap = buildHudSnapshot({
+      ...base,
+      sessions: [session({ id: "c", agent: "codex" }), session({ id: "a" })],
+      account,
+      disabledAgents: ["claude"],
+    });
+    expect(snap.sessions.map((s) => s.id)).toEqual(["c"]);
+    expect(snap.quotas).toEqual([]);
+    expect(snap.providers.find((p) => p.id === "claude")?.enabled).toBe(false);
+  });
+
   it("reads Codex windows and relay usage off the agent's rows", () => {
     const codex = session({
       id: "c1",

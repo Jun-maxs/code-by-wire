@@ -20,7 +20,15 @@ export interface HudSnapshotInput {
   timeline: Hud.TimelinePoint[];
   now: number;
   language: "zh" | "en";
+  /** The General page's language choice ("system" | "zh-CN" | "en"); `language` is what it resolves to. */
+  languageSetting?: string;
   appearance: "dark" | "light" | "system";
+  /** Whether quota reads as used or remaining (the HUD's General page). Missing means used. */
+  quotaDisplay?: "consumed" | "remaining";
+  /** The OS login item, for the General page's "Launch at login". */
+  launchAtLogin?: { supported: boolean; enabled: boolean };
+  /** Agents turned off on Settings → Agents: listed, but nothing of theirs is shown. */
+  disabledAgents?: string[];
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -43,6 +51,7 @@ function hudState(state: Session["state"]): Hud.SessionState {
 interface WindowSpec {
   key: keyof RateLimitWindows;
   name: string;
+  zh: string;
   short: string;
   seconds: number | null;
   allModels: boolean;
@@ -52,6 +61,7 @@ const WINDOWS: WindowSpec[] = [
   {
     key: "fiveHour",
     name: "Current session",
+    zh: "当前会话",
     short: "5h",
     seconds: 5 * 3600,
     allModels: true,
@@ -59,6 +69,7 @@ const WINDOWS: WindowSpec[] = [
   {
     key: "sevenDay",
     name: "Weekly limit · All models",
+    zh: "每周额度 · 全部模型",
     short: "Weekly",
     seconds: 7 * 86400,
     allModels: true,
@@ -66,6 +77,7 @@ const WINDOWS: WindowSpec[] = [
   {
     key: "sevenDaySonnet",
     name: "Weekly limit · Sonnet",
+    zh: "每周额度 · Sonnet",
     short: "Sonnet",
     seconds: 7 * 86400,
     allModels: false,
@@ -73,6 +85,7 @@ const WINDOWS: WindowSpec[] = [
   {
     key: "sevenDayOpus",
     name: "Weekly limit · Opus",
+    zh: "每周额度 · Opus",
     short: "Opus",
     seconds: 7 * 86400,
     allModels: false,
@@ -84,6 +97,7 @@ function quotasFor(
   windows: RateLimitWindows,
   account: string | null,
   now: number,
+  language: "zh" | "en" = "en",
 ): Hud.Quota[] {
   const out: Hud.Quota[] = [];
   for (const spec of WINDOWS) {
@@ -95,7 +109,7 @@ function quotasFor(
       id: `${vendor}:${spec.key}`,
       accountId: `${vendor}:account`,
       vendor,
-      name: spec.name,
+      name: language === "zh" ? spec.zh : spec.name,
       shortLabel: spec.short,
       allModels: spec.allModels,
       windowDurationSeconds: seconds,
@@ -134,19 +148,69 @@ function hudSession(s: Session): Hud.Session {
     cost: s.costUsd ?? null,
     logPath: null,
     parentId: s.parentSessionId ?? null,
+    liveFacts: liveFacts(s),
+  };
+}
+
+/** What the Bots read about a session (Agent HUD's live facts), from what this app knows: working
+ *  shows as thinking, and a turn that went idle ends "completed" at its last activity. */
+function liveFacts(s: Session): Hud.SessionLiveFacts | undefined {
+  if (s.state === "ended") return undefined;
+  const at = iso(s.lastActivityMs);
+  return {
+    turnId: null,
+    turnStartedAt: null,
+    outcome: s.state === "idle" ? "completed" : null,
+    endedAt: s.state === "idle" ? at : null,
+    limitedUntil: null,
+    observedAt: at,
+    lastEventAt: at,
+    activity:
+      s.state === "working"
+        ? {
+            work: null,
+            openCall: null,
+            toolAt: null,
+            delegating: false,
+            awaitsModel: false,
+            retrying: false,
+            compactingSince: null,
+          }
+        : null,
+    requests: [],
   };
 }
 
 export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
-  const { sessions, account, now } = input;
+  const off = new Set(input.disabledAgents ?? []);
+  const sessions = input.sessions.filter((s) => !off.has(s.agent));
+  const account = off.has("claude") ? null : input.account;
+  const { now } = input;
   const byAgent = (agent: AgentId) => sessions.filter((s) => s.agent === agent);
 
   const quotas: Hud.Quota[] = [];
-  if (account)
-    quotas.push(...quotasFor("claude", account, account.email ?? null, now));
+  // The account's windows come only from the OAuth usage API, which a gateway login (reclaude) never
+  // answers; the statusLine still reports them per session, so the newest Claude row fills the gap.
+  const claudeWindows: RateLimitWindows | undefined =
+    account?.fiveHour || account?.sevenDay
+      ? account
+      : [...byAgent("claude")]
+          .sort((a, b) => b.lastActivityMs - a.lastActivityMs)
+          .find((s) => s.rateLimits)?.rateLimits;
+  if (claudeWindows)
+    quotas.push(
+      ...quotasFor(
+        "claude",
+        claudeWindows,
+        account?.email ?? null,
+        now,
+        input.language,
+      ),
+    );
   // Codex windows are account-wide; every codex row carries the same reading.
   const codexWindows = byAgent("codex").find((s) => s.rateLimits)?.rateLimits;
-  if (codexWindows) quotas.push(...quotasFor("codex", codexWindows, null, now));
+  if (codexWindows)
+    quotas.push(...quotasFor("codex", codexWindows, null, now, input.language));
 
   // A relay's usage is the key's, shared by every session of that agent.
   const billing: Hud.BillingAccount[] = [];
@@ -191,7 +255,7 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
       id: agent,
       name: AGENTS[agent].label,
       detected: rows.length > 0 || ready,
-      enabled: true,
+      enabled: !off.has(agent),
       notice: null,
       sessions: rows.filter((s) => s.state !== "ended").length,
       accountStatus: {
@@ -247,6 +311,15 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
       status: "connected",
       platform: process.platform,
       message: null,
+      system: {
+        platform: process.platform,
+        launchAtLogin: {
+          supported: input.launchAtLogin?.supported ?? false,
+          enabled: input.launchAtLogin?.enabled ?? false,
+          status: input.launchAtLogin?.enabled ? "enabled" : "disabled",
+          notice: null,
+        },
+      },
     },
     totals,
     quotas,
@@ -258,11 +331,11 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
     accounts,
     approvals: [],
     settings: {
-      quotaDisplay: "consumed",
+      quotaDisplay: input.quotaDisplay ?? "consumed",
       appearance: input.appearance,
-      language: input.language,
+      language: input.languageSetting ?? input.language,
       clientHooks: false,
-      launchAtLogin: false,
+      launchAtLogin: input.launchAtLogin?.enabled ?? false,
       animations: true,
       hudVisible: true,
     },

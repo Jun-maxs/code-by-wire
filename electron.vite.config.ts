@@ -42,6 +42,9 @@ const hudAliases = [
     "@tauri-apps/api/webviewWindow",
     `${HUD}/shim/tauri-webview-window.ts`,
   ),
+  exactly("@tauri-apps/api/app", `${HUD}/shim/tauri-app.ts`),
+  exactly("@tauri-apps/api/window", `${HUD}/shim/tauri-window.ts`),
+  exactly("sonner", `${HUD}/shim/sonner.ts`),
 ];
 
 export default defineConfig({

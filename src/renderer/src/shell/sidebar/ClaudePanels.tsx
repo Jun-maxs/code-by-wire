@@ -1,5 +1,6 @@
 import { TOKEN_KINDS } from "../../ui/token-kinds";
 import { PressurePanel } from "../../workspace/panels/PressurePanel";
+import { ClaudeAccountSwitch } from "../../settings/ClaudeAccounts";
 import { SpendPanel } from "../../workspace/panels/SpendPanel";
 import { TokenSpeedPanel } from "../../workspace/panels/TokenSpeedPanel";
 import { DutyPanel } from "../../workspace/panels/DutyPanel";
@@ -24,6 +25,7 @@ export function ClaudePanels({
         contextWindow={session.contextWindow}
         account={account}
         rateLimits={session.rateLimits ?? null}
+        headingRight={<ClaudeAccountSwitch />}
       />
       <SectionDivider />
       <SpendPanel
