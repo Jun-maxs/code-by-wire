@@ -34,6 +34,8 @@ export interface HudPanelSettings {
   appearance?: "system" | "light" | "dark";
   language?: "system" | "zh-CN" | "en";
   quotaDisplay?: "consumed" | "remaining";
+  /** Agents turned off on the HUD's Agents page. */
+  disabledAgents?: string[];
 }
 
 /** The HUD preferences with their defaults filled in. */

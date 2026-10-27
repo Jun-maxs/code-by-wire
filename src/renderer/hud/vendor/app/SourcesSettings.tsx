@@ -256,7 +256,8 @@ export default function SourcesSettings({
               />
             </div>
           </section>
-          {source.id === "codex" && (
+          {/* Code-by-wire reads one Codex home; extra account homes are not offered. */}
+          {false && source.id === "codex" && (
             <CodexAccountHomes
               homes={snapshot.settings.codexHomes ?? []}
               zh={zh}

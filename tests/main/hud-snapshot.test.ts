@@ -78,6 +78,18 @@ describe("buildHudSnapshot", () => {
     ]);
   });
 
+  it("leaves out an agent turned off on Settings → Agents", () => {
+    const snap = buildHudSnapshot({
+      ...base,
+      sessions: [session({ id: "c", agent: "codex" }), session({ id: "a" })],
+      account,
+      disabledAgents: ["claude"],
+    });
+    expect(snap.sessions.map((s) => s.id)).toEqual(["c"]);
+    expect(snap.quotas).toEqual([]);
+    expect(snap.providers.find((p) => p.id === "claude")?.enabled).toBe(false);
+  });
+
   it("reads Codex windows and relay usage off the agent's rows", () => {
     const codex = session({
       id: "c1",

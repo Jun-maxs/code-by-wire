@@ -25,6 +25,8 @@ export interface HudSnapshotInput {
   quotaDisplay?: "consumed" | "remaining";
   /** The OS login item, for the General page's "Launch at login". */
   launchAtLogin?: { supported: boolean; enabled: boolean };
+  /** Agents turned off on Settings → Agents: listed, but nothing of theirs is shown. */
+  disabledAgents?: string[];
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -142,7 +144,10 @@ function hudSession(s: Session): Hud.Session {
 }
 
 export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
-  const { sessions, account, now } = input;
+  const off = new Set(input.disabledAgents ?? []);
+  const sessions = input.sessions.filter((s) => !off.has(s.agent));
+  const account = off.has("claude") ? null : input.account;
+  const { now } = input;
   const byAgent = (agent: AgentId) => sessions.filter((s) => s.agent === agent);
 
   const quotas: Hud.Quota[] = [];
@@ -205,7 +210,7 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
       id: agent,
       name: AGENTS[agent].label,
       detected: rows.length > 0 || ready,
-      enabled: true,
+      enabled: !off.has(agent),
       notice: null,
       sessions: rows.filter((s) => s.state !== "ended").length,
       accountStatus: {

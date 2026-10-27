@@ -656,6 +656,7 @@ app
           appSettings.read().appTheme ??
           "dark",
         quotaDisplay: appSettings.read().hudPanel?.quotaDisplay,
+        disabledAgents: appSettings.read().hudPanel?.disabledAgents,
         launchAtLogin: loginItem(),
       });
     };
@@ -746,6 +747,14 @@ app
           }
           case "set_setting":
             return setHudSetting(params.key, params.value);
+          case "set_provider": {
+            const id = String(params.id);
+            const off = new Set(appSettings.read().hudPanel?.disabledAgents);
+            if (params.enabled === false) off.add(id);
+            else off.delete(id);
+            appSettings.setHudPanel({ disabledAgents: [...off] });
+            return hudSnapshot();
+          }
           case "open_session":
             showMain(typeof params.id === "string" ? params.id : undefined);
             return true;
