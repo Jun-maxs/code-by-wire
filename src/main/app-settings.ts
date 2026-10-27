@@ -24,6 +24,16 @@ export interface AppSettings {
   appLocale?: Locale;
   /** The HUD overlay. Missing means on, on the primary display; callers read `hudSettings(read())`. */
   hud?: Partial<HudSettings>;
+  /** The HUD's own preferences, set in its Settings window (Agent HUD's General page). */
+  hudPanel?: HudPanelSettings;
+}
+
+/** Agent HUD's General page: the HUD windows' appearance and language, and whether quota reads as
+ *  used or remaining. Missing fields follow the app (its theme and language) and "consumed". */
+export interface HudPanelSettings {
+  appearance?: "system" | "light" | "dark";
+  language?: "system" | "zh-CN" | "en";
+  quotaDisplay?: "consumed" | "remaining";
 }
 
 /** The HUD preferences with their defaults filled in. */
@@ -42,6 +52,7 @@ export interface AppSettingsStore {
   setTerminalTheme(theme: "dark" | "light"): void;
   setAppLocale(locale: Locale): void;
   setHud(hud: HudSettings): void;
+  setHudPanel(patch: HudPanelSettings): void;
 }
 
 export interface AppSettingsDeps {
@@ -89,6 +100,10 @@ export function createAppSettingsStore(
     },
     setHud(hud) {
       write({ ...read(), hud });
+    },
+    setHudPanel(patch) {
+      const s = read();
+      write({ ...s, hudPanel: { ...s.hudPanel, ...patch } });
     },
   };
 }

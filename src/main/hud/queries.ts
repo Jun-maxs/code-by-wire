@@ -171,3 +171,106 @@ export function sessionsResponse(
     projects,
   };
 }
+
+/** One assistant call of a session, as the analytics turns table records it. */
+export interface SessionTurnRow {
+  id: string;
+  ts: number;
+  model: string | null;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+/** The SQL that yields a session's SessionTurnRows, oldest first: ? = session id. */
+export const SESSION_TURNS_SQL = `
+  SELECT message_id AS id, ts, model_raw AS model,
+         input_tokens AS input,
+         output_tokens AS output,
+         cache_read_tokens AS cacheRead,
+         cache_creation_tokens AS cacheWrite
+  FROM turns
+  WHERE session_id = ?
+  ORDER BY ts`;
+
+/** Agent HUD keeps the newest 200 turns of a session's detail. */
+const DETAIL_TURNS = 200;
+
+const tokensOf = (r: SessionTurnRow): Hud.StatisticsTokens => ({
+  input: r.input,
+  output: r.output,
+  cacheRead: r.cacheRead,
+  cacheWrite: r.cacheWrite,
+  reasoning: 0,
+});
+
+const add = (a: Hud.StatisticsTokens, b: Hud.StatisticsTokens) => {
+  for (const k of Object.keys(b) as Hud.StatisticsTokenKind[])
+    a[k] = (a[k] ?? 0) + b[k];
+};
+
+const totalOf = (t: Hud.StatisticsTokens) =>
+  t.input + t.output + t.cacheRead + t.cacheWrite + (t.reasoning ?? 0);
+
+/** Cache reads as a share of every prompt; null when nothing was prompted. */
+const hitRate = (t: Hud.StatisticsTokens) => {
+  const prompted = t.input + t.cacheRead + t.cacheWrite;
+  return prompted > 0 ? t.cacheRead / prompted : null;
+};
+
+/** The Statistics window's session page: the session's calls (one turn each — this app's turns
+ *  table records calls, not prompts) with per-model totals. No messages: the main window shows the
+ *  conversation. */
+export function sessionDetailResponse(
+  session: Hud.Session,
+  rows: SessionTurnRow[],
+): Hud.SessionDetail {
+  const usage = zeroTokens();
+  const byModel = new Map<string, Hud.StatisticsTokens>();
+  for (const r of rows) {
+    const t = tokensOf(r);
+    add(usage, t);
+    const key = r.model ?? "unknown";
+    const m = byModel.get(key) ?? zeroTokens();
+    add(m, t);
+    byModel.set(key, m);
+  }
+  const kept = rows.slice(-DETAIL_TURNS);
+  const first = rows.length - kept.length;
+  const last = rows.at(-1);
+  return {
+    session,
+    callCount: rows.length,
+    turnCount: rows.length,
+    cacheHitRate: hitRate(usage),
+    contextTokens: last ? last.input + last.cacheRead + last.cacheWrite : null,
+    startedAt: rows[0] ? new Date(rows[0].ts).toISOString() : null,
+    updatedAt: last ? new Date(last.ts).toISOString() : null,
+    usage: { ...usage, total: totalOf(usage) },
+    models: [...byModel].map(([id, t]) => ({
+      id,
+      name: id,
+      agentId: session.source,
+      tokens: { ...t, total: totalOf(t) },
+      cacheHitRate: hitRate(t),
+    })),
+    turns: kept.map((r, i) => ({
+      id: r.id,
+      index: first + i + 1,
+      timestamp: new Date(r.ts).toISOString(),
+      input: r.input,
+      output: r.output,
+      cache: r.cacheRead + r.cacheWrite,
+      cacheRead: r.cacheRead,
+      cacheWrite: r.cacheWrite,
+      context: r.input + r.cacheRead + r.cacheWrite,
+      model: r.model,
+      message: null,
+      newTokens: r.input + r.output + r.cacheWrite,
+    })),
+    calls: [],
+    messages: [],
+    messagesComplete: true,
+  };
+}

@@ -243,6 +243,7 @@ export function registerIpc({
     setTerminalTheme: () => {},
     setAppLocale: () => {},
     setHud: () => {},
+    setHudPanel: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,

@@ -73,15 +73,19 @@ import {
 } from "./terminal/shell-path";
 import { restoreWindowsPath } from "./terminal/windows-path";
 import { appWindows, createHudOverlay, isHudWindow } from "./hud/overlay";
+import { createHudWindows } from "./hud/windows";
 import {
   buildHudSnapshot,
   hourlyTimeline,
   HOURLY_TOKENS_SQL,
 } from "./hud/snapshot";
 import {
+  SESSION_TURNS_SQL,
+  sessionDetailResponse,
   sessionsResponse,
   statisticsResponse,
   TURN_BUCKETS_SQL,
+  type SessionTurnRow,
   type TurnBucketRow,
 } from "./hud/queries";
 import type { StatisticsQuery as HudStatisticsQuery } from "@shared/hud-protocol";
@@ -609,11 +613,21 @@ app
     // stays current while the main window is minimized and not polling.
     let lastHudSync = Date.now();
     const HOUR = 3_600_000;
-    const hudLanguage = (): "zh" | "en" =>
-      (appSettings.read().appLocale ??
+    // The HUD's General page can set its own language and appearance; unset, they follow the app.
+    const hudLanguage = (): "zh" | "en" => {
+      const set = appSettings.read().hudPanel?.language;
+      if (set === "zh-CN") return "zh";
+      if (set === "en") return "en";
+      return (appSettings.read().appLocale ??
         (app.getLocale().startsWith("zh") ? "zh" : "en")) === "zh"
         ? "zh"
         : "en";
+    };
+    const loginItem = () => ({
+      supported: process.platform !== "linux",
+      enabled:
+        process.platform !== "linux" && app.getLoginItemSettings().openAtLogin,
+    });
     const hudSnapshot = () => {
       const now = Date.now();
       if (now - lastHudSync > 10_000) {
@@ -637,7 +651,12 @@ app
         timeline: hourlyTimeline(rows, now),
         now,
         language: hudLanguage(),
-        appearance: appSettings.read().appTheme ?? "dark",
+        appearance:
+          appSettings.read().hudPanel?.appearance ??
+          appSettings.read().appTheme ??
+          "dark",
+        quotaDisplay: appSettings.read().hudPanel?.quotaDisplay,
+        launchAtLogin: loginItem(),
       });
     };
     const showMain = (sessionId?: string) => {
@@ -649,16 +668,50 @@ app
       w.focus();
       if (sessionId) w.webContents.send(IPC.selectSession, sessionId);
     };
+    const hudPreload = join(__dirname, "../preload/index.js");
+    const loadHud = (win: BrowserWindow, query: Record<string, string>) => {
+      if (process.env.ELECTRON_RENDERER_URL)
+        void win.loadURL(
+          `${process.env.ELECTRON_RENDERER_URL}/hud.html?${new URLSearchParams(query)}`,
+        );
+      else
+        void win.loadFile(join(__dirname, "../renderer/hud.html"), { query });
+    };
+    // Agent HUD's Settings and Statistics windows: the panel's gear and token chart open them.
+    const hudWindows = createHudWindows({ preload: hudPreload, load: loadHud });
+    /** The HUD's General page (Agent HUD's `set_setting`); answers with the new snapshot. */
+    const setHudSetting = (key: unknown, value: unknown) => {
+      switch (key) {
+        case "appearance":
+          if (value === "system" || value === "light" || value === "dark")
+            appSettings.setHudPanel({ appearance: value });
+          break;
+        case "language":
+          if (value === "system" || value === "zh-CN" || value === "en")
+            appSettings.setHudPanel({ language: value });
+          break;
+        case "quotaDisplay":
+          if (value === "consumed" || value === "remaining")
+            appSettings.setHudPanel({ quotaDisplay: value });
+          break;
+        case "launchAtLogin":
+          if (loginItem().supported)
+            app.setLoginItemSettings({ openAtLogin: value === true });
+          break;
+        case "hudVisible":
+          appSettings.setHud({
+            ...hudSettings(appSettings.read()),
+            enabled: value === true,
+          });
+          applyHud();
+          break;
+      }
+      return hudSnapshot();
+    };
     const hud = createHudOverlay({
-      preload: join(__dirname, "../preload/index.js"),
-      load: (win, query) => {
-        if (process.env.ELECTRON_RENDERER_URL)
-          void win.loadURL(
-            `${process.env.ELECTRON_RENDERER_URL}/hud.html?${new URLSearchParams(query)}`,
-          );
-        else
-          void win.loadFile(join(__dirname, "../renderer/hud.html"), { query });
-      },
+      preload: hudPreload,
+      load: loadHud,
+      commands: hudWindows.commands,
       request: (method, params) => {
         const now = Date.now();
         switch (method) {
@@ -683,6 +736,16 @@ app
               now,
             );
           }
+          case "session_detail": {
+            const id = typeof params.id === "string" ? params.id : "";
+            const session = hudSnapshot().sessions.find((x) => x.id === id);
+            if (!session) throw new Error(`Session not found: ${id}`);
+            const rows = (analyticsDb?.prepare(SESSION_TURNS_SQL).all(id) ??
+              []) as SessionTurnRow[];
+            return sessionDetailResponse(session, rows);
+          }
+          case "set_setting":
+            return setHudSetting(params.key, params.value);
           case "open_session":
             showMain(typeof params.id === "string" ? params.id : undefined);
             return true;
@@ -717,14 +780,18 @@ app
     app.on("browser-window-created", (_e, w) => {
       if (isHudWindow(w)) return;
       w.on("closed", () => {
-        if (process.platform !== "darwin" && appWindows().length === 0)
+        if (process.platform !== "darwin" && appWindows().length === 0) {
           hud.stop();
+          hudWindows.closeAll();
+        }
       });
     });
     for (const w of appWindows())
       w.on("closed", () => {
-        if (process.platform !== "darwin" && appWindows().length === 0)
+        if (process.platform !== "darwin" && appWindows().length === 0) {
           hud.stop();
+          hudWindows.closeAll();
+        }
       });
   })
   .catch((err) => {

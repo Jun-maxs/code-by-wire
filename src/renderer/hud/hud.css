@@ -3,4 +3,4 @@
 @import "./vendor/ui/src/global.css";
 @source "./vendor/hud/src";
 @source "./vendor/ui/src";
-@source "./app";
+@source "./vendor/app";

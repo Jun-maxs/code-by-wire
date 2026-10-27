@@ -21,6 +21,10 @@ export interface HudSnapshotInput {
   now: number;
   language: "zh" | "en";
   appearance: "dark" | "light" | "system";
+  /** Whether quota reads as used or remaining (the HUD's General page). Missing means used. */
+  quotaDisplay?: "consumed" | "remaining";
+  /** The OS login item, for the General page's "Launch at login". */
+  launchAtLogin?: { supported: boolean; enabled: boolean };
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -257,6 +261,15 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
       status: "connected",
       platform: process.platform,
       message: null,
+      system: {
+        platform: process.platform,
+        launchAtLogin: {
+          supported: input.launchAtLogin?.supported ?? false,
+          enabled: input.launchAtLogin?.enabled ?? false,
+          status: input.launchAtLogin?.enabled ? "enabled" : "disabled",
+          notice: null,
+        },
+      },
     },
     totals,
     quotas,
@@ -268,11 +281,11 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
     accounts,
     approvals: [],
     settings: {
-      quotaDisplay: "consumed",
+      quotaDisplay: input.quotaDisplay ?? "consumed",
       appearance: input.appearance,
       language: input.language,
       clientHooks: false,
-      launchAtLogin: false,
+      launchAtLogin: input.launchAtLogin?.enabled ?? false,
       animations: true,
       hudVisible: true,
     },
