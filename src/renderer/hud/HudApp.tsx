@@ -14,7 +14,7 @@ import {
   useHUDConfig,
   type HUDScreenContext,
 } from "./vendor/app/lib/use-hud-config";
-import { useBotDirections } from "./vendor/app/lib/use-bot-directions";
+import { useLocalBotDirections } from "./bot-directions";
 import type { NativeMethod } from "./vendor/app/lib/types";
 
 /**
@@ -36,7 +36,7 @@ export function HudApp() {
     [monitors],
   );
   const { config: stored, ready } = useHUDConfig(screenId, screens, true);
-  const botDirections = useBotDirections(true);
+  const botDirections = useLocalBotDirections(snapshot);
   const measured = geometries[screenId] ?? null;
   const config: HUDConfig = {
     ...stored,

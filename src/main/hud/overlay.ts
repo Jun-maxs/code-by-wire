@@ -177,7 +177,11 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       return null;
     },
     open_update: () => deps.showMain(),
-    hud_bot_looked: () => null,
+    // The page directs its own Bots (renderer/hud/bot-directions.ts); "looked" goes back to it.
+    hud_bot_looked: (o, args) => {
+      if (o) send(o, "hud:bot-looked", args.keys ?? null);
+      return null;
+    },
     hud_drag_start: () => null,
     hud_place: (o, args) => {
       if (!o || o.win.isDestroyed()) return null;

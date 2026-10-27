@@ -140,6 +140,36 @@ function hudSession(s: Session): Hud.Session {
     cost: s.costUsd ?? null,
     logPath: null,
     parentId: s.parentSessionId ?? null,
+    liveFacts: liveFacts(s),
+  };
+}
+
+/** What the Bots read about a session (Agent HUD's live facts), from what this app knows: working
+ *  shows as thinking, and a turn that went idle ends "completed" at its last activity. */
+function liveFacts(s: Session): Hud.SessionLiveFacts | undefined {
+  if (s.state === "ended") return undefined;
+  const at = iso(s.lastActivityMs);
+  return {
+    turnId: null,
+    turnStartedAt: null,
+    outcome: s.state === "idle" ? "completed" : null,
+    endedAt: s.state === "idle" ? at : null,
+    limitedUntil: null,
+    observedAt: at,
+    lastEventAt: at,
+    activity:
+      s.state === "working"
+        ? {
+            work: null,
+            openCall: null,
+            toolAt: null,
+            delegating: false,
+            awaitsModel: false,
+            retrying: false,
+            compactingSince: null,
+          }
+        : null,
+    requests: [],
   };
 }
 
