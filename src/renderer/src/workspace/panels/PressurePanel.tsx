@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { ContextBreakdown } from "@shared/transcript";
 import type {
   Account,
@@ -77,6 +77,7 @@ export function PressurePanel({
   rateLimits,
   windowRowsWhenFetchedOnly,
   relayUsage,
+  headingRight,
 }: {
   live: ContextBreakdown | null;
   context: ContextBreakdown | null;
@@ -91,6 +92,8 @@ export function PressurePanel({
   windowRowsWhenFetchedOnly?: boolean;
   /** The agent's API key usage on a relay, when it reaches its models through one. */
   relayUsage?: RelayUsage | null;
+  /** Beside the heading: Claude's account switcher. */
+  headingRight?: ReactNode;
 }) {
   const { t } = useI18n();
   const view = useMemo(
@@ -130,7 +133,11 @@ export function PressurePanel({
 
   return (
     <PanelSection>
-      <PanelHeading icon="gauge" info={t.dock.pressure.info}>
+      <PanelHeading
+        icon="gauge"
+        info={t.dock.pressure.info}
+        right={headingRight}
+      >
         {t.dock.pressure.heading}
       </PanelHeading>
       {view ? (

@@ -6,6 +6,7 @@ import { isUpdatePending } from "@shared/update";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { AppearanceCard } from "./AppearanceCard";
 import { HudCard } from "./HudCard";
+import { ClaudeAccountsCard } from "./ClaudeAccounts";
 import { CliCard } from "./CliCard";
 import { CodexCliCard } from "./CodexCliCard";
 import { StatuslineCard } from "./StatuslineCard";
@@ -119,6 +120,7 @@ export function SettingsView({
               />
               <AppearanceCard />
               <HudCard />
+              <ClaudeAccountsCard />
             </>
           )}
           {section === "databases" && <DatabasesSection />}

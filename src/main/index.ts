@@ -89,9 +89,21 @@ import {
   type TurnBucketRow,
 } from "./hud/queries";
 import type { StatisticsQuery as HudStatisticsQuery } from "@shared/hud-protocol";
-import { adoptReclaude } from "./reclaude";
+import { adoptReclaude, detectReclaude } from "./reclaude";
+import {
+  bindOrg,
+  listOrgs,
+  reclaudeCli,
+  reclaudeConfigDirs,
+  useOrg,
+} from "./reclaude-accounts";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
-import { IPC, type HudSettings, type HudSettingsView } from "@shared/ipc";
+import {
+  IPC,
+  type ClaudeAccountsView,
+  type HudSettings,
+  type HudSettingsView,
+} from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
 
 // Pin the whole app to the sRGB color profile. Without this, the packaged build inherits the
@@ -380,7 +392,13 @@ app
         );
       }
     }
-    const statusLine = createStatusLineReader({ claudeDir });
+    // With reclaude, every account binding's captures are read: switching accounts (below) moves new
+    // sessions to another config dir, and their windows must show without a relaunch.
+    const recCli = reclaudeCli(process.env.CBW_CLAUDE_LAUNCHER);
+    const statusLine = createStatusLineReader({
+      claudeDir,
+      claudeDirs: recCli ? () => reclaudeConfigDirs() : undefined,
+    });
     // Codex has no login-shell recovery yet: resolveCodexDir reads CODEX_HOME/well-known-dir
     // directly, unlike claudeDir's recovered-config-dir path above.
     const codexDir = resolveCodexDir();
@@ -478,9 +496,61 @@ app
     }, 0);
     let emailCache: string | null | undefined;
     const accountEmail = (): string | null => {
-      if (emailCache === undefined) emailCache = readAccountEmail(claudeDir);
+      // CLAUDE_CONFIG_DIR follows an account switch; claudeDir is the one the app started with.
+      if (emailCache === undefined)
+        emailCache = readAccountEmail(
+          process.env.CLAUDE_CONFIG_DIR ?? claudeDir,
+        );
       return emailCache;
     };
+    // The account switcher (Settings and the Pressure panel): reclaude's organizations, one Claude
+    // account each. Switching makes another the default; the app then points CLAUDE_CONFIG_DIR at it
+    // (sessions started after inherit it, and rec.exe launches them on that account) and wraps its
+    // statusLine. Transcripts are shared by every binding, so no session is lost.
+    const claudeAccountsView = async (): Promise<ClaudeAccountsView> => {
+      if (!recCli) return { orgs: null };
+      try {
+        return { orgs: await listOrgs(recCli) };
+      } catch (err) {
+        return { orgs: [], error: (err as Error).message };
+      }
+    };
+    const orgId = (id: unknown): string | null =>
+      typeof id === "string" && /^\d+$/.test(id) ? id : null;
+    ipcMain.handle(IPC.claudeAccountsList, claudeAccountsView);
+    ipcMain.handle(IPC.claudeAccountsUse, async (_e, raw: unknown) => {
+      const id = orgId(raw);
+      if (!recCli || !id) return claudeAccountsView();
+      try {
+        await useOrg(recCli, id);
+      } catch (err) {
+        return {
+          ...(await claudeAccountsView()),
+          error: (err as Error).message,
+        };
+      }
+      const found = detectReclaude();
+      if (found) {
+        process.env.CLAUDE_CONFIG_DIR = found.configDir;
+        if (appSettings.read().statuslineEnabled ?? true) {
+          try {
+            createSettingsManager({ claudeDir: found.configDir }).install();
+          } catch (err) {
+            logError(
+              "statusline-install-failed",
+              "statusLine install failed for the switched account",
+              err,
+            );
+          }
+        }
+      }
+      emailCache = undefined;
+      return claudeAccountsView();
+    });
+    ipcMain.handle(IPC.claudeAccountsBind, (_e, raw: unknown) => {
+      const id = orgId(raw);
+      if (recCli && id) bindOrg(recCli, id);
+    });
     // Account usage via the OAuth usage API: constructed once; refreshes are spawned inside
     // renderer polls only (window closed → polls stop → refreshes stop). net.fetch rides
     // Chromium's stack (system proxy, OS certs). The cache file is OURS — never another tool's.

@@ -79,6 +79,9 @@ const api: AppApi = {
   getCaffeinate: () => ipcRenderer.invoke(IPC.caffeinateGet),
   setCaffeinate: (on) => ipcRenderer.invoke(IPC.caffeinateSet, on),
   getHudSettings: () => ipcRenderer.invoke(IPC.hudSettingsGet),
+  listClaudeAccounts: () => ipcRenderer.invoke(IPC.claudeAccountsList),
+  useClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsUse, id),
+  bindClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsBind, id),
   setHudSettings: (settings) =>
     ipcRenderer.invoke(IPC.hudSettingsSet, settings),
   readSubagentTranscript: async (id, agentId, sinceMtimeMs) =>
