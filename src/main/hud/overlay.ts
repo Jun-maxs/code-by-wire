@@ -97,6 +97,16 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     }));
   };
 
+  /** Windows displays have no notch and no menu bar, so the page's own fallback (a notch as tall as
+   *  the menu bar) draws nothing. Notch mode gets a stand-in at the top centre instead, sized like
+   *  the page's `notchWidth`/`notchHeight` defaults (HudApp). */
+  const standInNotch = (o: Overlay): Rect => ({
+    x: o.display.bounds.x + (o.display.bounds.width - 200) / 2 - o.canvas.x,
+    y: o.display.bounds.y - o.canvas.y,
+    width: 200,
+    height: 24,
+  });
+
   const geometry = (o: Overlay): Hud.HudGeometry => ({
     screenId: o.screenId,
     monitorIndex: screen
@@ -109,7 +119,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     hasNotch: false,
     notch: null,
     canvas: o.canvas,
-    notchInViewport: null,
+    notchInViewport: standInNotch(o),
     placementConstrained: false,
   });
 
