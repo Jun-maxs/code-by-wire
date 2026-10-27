@@ -3,6 +3,7 @@ import {
   statisticsResponse,
   type TurnBucketRow,
 } from "../../src/main/hud/queries";
+import type { StatisticsQuery } from "../../src/shared/hud-protocol";
 
 const HOUR = 3_600_000;
 const NOW = Date.parse("2026-10-27T10:30:00Z");
@@ -19,11 +20,12 @@ const row = (over: Partial<TurnBucketRow>): TurnBucketRow => ({
   ...over,
 });
 
-const query = {
+const query: StatisticsQuery = {
   from: new Date((hour - 2) * HOUR).toISOString(),
   to: new Date(NOW).toISOString(),
-  bucketMinutes: 60 as const,
-  tokenKinds: ["input" as const, "output" as const],
+  bucketMinutes: 60,
+  tokenKinds: ["input", "output"],
+  timeZone: "UTC",
 };
 const agents = [
   { id: "claude", name: "Claude Code" },

@@ -131,7 +131,7 @@ export function themeFor(snapshot: Snapshot, light: boolean): Theme {
     : {
         light,
         zh,
-        ground: "#282828",
+        ground: "#000", // Code-by-wire: pure black (was #282828)
         text: "#f5f5f7",
         secondary: "#98989d",
         tertiary: "#6e6e73",

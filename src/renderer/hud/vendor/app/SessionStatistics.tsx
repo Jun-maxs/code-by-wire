@@ -416,7 +416,7 @@ export default function SessionStatistics({
                   borderRadius: 6,
                   padding: "0 8px",
                   border: `1px solid ${theme.border}`,
-                  background: theme.light ? "#fff" : "#1c1c1e",
+                  background: theme.light ? "#fff" : "#161616", // Code-by-wire: on black (was #1c1c1e)
                 }}
               >
                 <Search size={12} color={theme.secondary} />

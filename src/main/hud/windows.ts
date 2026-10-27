@@ -47,6 +47,10 @@ export function createHudWindows(deps: HudWindowsDeps) {
       minHeight: 480,
       title,
       autoHideMenuBar: true,
+      // Black like the page (the owner's pick): no grey system title bar, its buttons kept.
+      backgroundColor: "#000000",
+      titleBarStyle: "hidden",
+      titleBarOverlay: { color: "#000000", symbolColor: "#f5f5f7", height: 36 },
       show: false,
       webPreferences: { preload: deps.preload, sandbox: false },
     });

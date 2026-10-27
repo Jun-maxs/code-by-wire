@@ -219,7 +219,7 @@ export function statisticsResponse(
   // Monday-first 7 × 24 cells in local time.
   const heat = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
   const heatModels = Array.from({ length: 7 }, () =>
-    Array.from({ length: 24 }, () => ({})),
+    Array.from({ length: 24 }, (): Record<string, number> => ({})),
   );
   for (const r of hours) {
     const at = new Date(r.bucket * HOUR);

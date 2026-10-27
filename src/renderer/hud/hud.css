@@ -4,3 +4,51 @@
 @source "./vendor/hud/src";
 @source "./vendor/ui/src";
 @source "./vendor/app";
+
+/* Code-by-wire: the Settings and Statistics windows in pure black, like the HUD itself (the owner's
+   pick, 2026-10-27) — Agent HUD's dark grey (#282828) read as dull. Scoped to those windows: the
+   overlay's document carries .native-hud-document. */
+:root[data-theme="dark"]:not(.native-hud-document),
+:root:not(.native-hud-document) [data-theme="dark"] {
+  --background: #000;
+  --sidebar: #000;
+  --popover: #161616;
+  --card: #ffffff0b;
+  --panel: #ffffff0b;
+  --settings-card: #ffffff0b;
+  --settings-card-border: #ffffff14;
+  --border: #ffffff1a;
+}
+
+/* The sidebar's product row: a long name shrinks with an ellipsis instead of pushing the menu
+   button past the sidebar's edge. */
+.sidebar-product > div {
+  min-width: 0;
+}
+.sidebar-product strong,
+.sidebar-product span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-product > [data-slot="button"] {
+  flex-shrink: 0;
+}
+
+/* The windows draw their own title bar (main/hud/windows.ts hides the system one and keeps its
+   buttons, top right): Agent HUD's drag regions move the window, and the Statistics toolbar leaves
+   room for the buttons. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] [role="tablist"] {
+  -webkit-app-region: no-drag;
+}
+.statistics-toolbar {
+  padding-right: 150px;
+}
+/* The sidebar is 174px wide: the product row drops its icon (the window already shows it) so the
+   name fits beside the menu button. */
+.sidebar-product > img {
+  display: none;
+}
