@@ -44,6 +44,11 @@ const api: AppApi = {
   assignSessionTopic: (id, key) =>
     ipcRenderer.invoke(IPC.assignSessionTopic, id, key),
   generateCard: (key) => ipcRenderer.invoke(IPC.generateCard, key),
+  readBoard: () => ipcRenderer.invoke(IPC.readBoard),
+  saveBoard: (doc) => ipcRenderer.invoke(IPC.saveBoard, doc),
+  runBoardInsight: (prompt, trigger) =>
+    ipcRenderer.invoke(IPC.runBoardInsight, prompt, trigger),
+  boardInsightState: () => ipcRenderer.invoke(IPC.boardInsightState),
   trashSession: (id) => ipcRenderer.invoke(IPC.trashSession, id),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>

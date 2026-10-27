@@ -261,6 +261,7 @@ export const en = {
   shell: {
     sidebar: {
       newSession: "New session",
+      board: "Board",
       stats: "Stats",
       updatePendingTitle: "Update pending — see Settings › About",
       updatePendingSrOnly: "(update pending)",

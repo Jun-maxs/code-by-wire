@@ -58,6 +58,7 @@ import { createAppSettingsStore, hudSettings } from "./app-settings";
 import { createCaffeinate } from "./caffeinate";
 import { createSessionTitleStore } from "./session-titles";
 import { createSessionPinStore } from "./session-pins";
+import { createBoardStore } from "./board-store";
 import { createLaunchArgsStore } from "./launch-args";
 import {
   createRemoteSessionStore,
@@ -498,6 +499,7 @@ app
     const launchPresets = createLaunchPresetStore({
       dir: app.getPath("userData"),
     });
+    const board = createBoardStore({ dir: app.getPath("userData") });
     const projectState = createProjectStateStore({
       dir: app.getPath("userData"),
     });
@@ -681,6 +683,7 @@ app
       sessionTitles,
       sessionPins,
       remoteSessions,
+      board,
       productsDirs: () => {
         // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
         const cardsDir =

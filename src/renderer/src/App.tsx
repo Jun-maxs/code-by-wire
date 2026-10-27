@@ -32,6 +32,9 @@ import { OVERVIEW_ID } from "./stats/sentinel";
 import { useStatsPump } from "./stats/use-stats-pump";
 import { SettingsView, type SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
+import { BOARD_ID } from "./board/sentinel";
+import { BoardView } from "./board/BoardView";
+import { useBoardAutoInsight } from "./board/use-board";
 import { useUpdate } from "./ui/use-update";
 import { Pane, PaneMain, PaneShell } from "./shell/pane-shell";
 import { TitlebarControls } from "./shell/TitlebarControls";
@@ -255,7 +258,7 @@ export function App() {
     agent: AgentId,
     extraArgs = "",
     remote = false,
-  ): Promise<void> {
+  ): Promise<string> {
     const gate = spawnGateFor(cliStatus, agent);
     if (!gate.canSpawn)
       throw new Error(gate.reason ?? t.settings.cli.unavailableReason);
@@ -276,6 +279,7 @@ export function App() {
       });
       setDrafts((ds) => [draft, ...ds]);
       setSelectedId(id);
+      return id;
     } catch (e) {
       terminalStore.dispose(id); // spawn failed → nothing will ever feed this handle; don't leak it
       throw e; // surfaced by the dialog's catch
@@ -442,11 +446,12 @@ export function App() {
   const isOverview = selectedId === OVERVIEW_ID;
   const isSettings = selectedId === SETTINGS_ID;
   const isNewSession = selectedId === NEW_SESSION_ID;
+  const isBoard = selectedId === BOARD_ID;
   // All three pinned views (Overview, Settings, New session) are non-session selections: the
   // per-session lookup and the auto-select effect must treat them as valid, never as a
   // stale/missing session to re-home — otherwise a background sync that changes the id list while
   // the inline New session view is open would yank the user back to a session mid-form.
-  const isPinned = isOverview || isSettings || isNewSession;
+  const isPinned = isOverview || isSettings || isNewSession || isBoard;
   const selected =
     !isPinned && selectedId !== null
       ? (all.find((s) => s.id === selectedId) ?? null)
@@ -509,10 +514,23 @@ export function App() {
     >
       <NewSessionView
         key={quickAddPrefill?.nonce ?? 0}
-        onCreate={createSession}
+        onCreate={async (...args) => {
+          await createSession(...args);
+        }}
         canSpawnFor={(a) => spawnGateFor(cliStatus, a).canSpawn}
         initialCwd={quickAddPrefill?.cwd}
         initialError={quickAddPrefill?.error}
+      />
+    </MiddleNonSession>
+  ) : isBoard ? (
+    <MiddleNonSession
+      title={t.shell.sidebar.board}
+      leftEdgeExposed={leftEdgeExposed}
+    >
+      <BoardView
+        sessions={all}
+        onOpenSession={setSelectedId}
+        onNewSession={(cwd) => createSession(cwd, "default", "claude")}
       />
     </MiddleNonSession>
   ) : isOverview ? (
@@ -557,6 +575,7 @@ export function App() {
 
   return (
     <ProductsProvider>
+      <BoardAutoInsight sessions={all} />
       <div className="app-bg flex h-screen flex-col text-fg">
         <PaneShell className="min-h-0 flex-1">
           <Pane
@@ -695,6 +714,13 @@ function MiddleNonSession({
       <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
+}
+
+/** The board's daily AI insight, run app-wide so it fires even when the board never opens. Rendered
+ *  inside ProductsProvider so the prompt can name topics. */
+function BoardAutoInsight({ sessions }: { sessions: Session[] }) {
+  useBoardAutoInsight(sessions);
+  return null;
 }
 
 /** The detail pane before a session is selected, or when none exist. */

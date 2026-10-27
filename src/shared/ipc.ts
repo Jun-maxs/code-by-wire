@@ -1,5 +1,6 @@
 import type { TrashResult } from "./session-trash";
 import type { CardRun, ProductsData, TopicInput } from "./products";
+import type { BoardDoc, Insight, InsightRunState } from "./board";
 import type {
   Session,
   Account,
@@ -68,6 +69,10 @@ export const IPC = {
   deleteTopic: "products:topic-delete",
   assignSessionTopic: "products:assign",
   generateCard: "products:generate",
+  readBoard: "board:read",
+  saveBoard: "board:save",
+  runBoardInsight: "board:insight-run",
+  boardInsightState: "board:insight-state",
   trashSession: "session:trash",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
@@ -360,6 +365,16 @@ export interface IpcApi {
   assignSessionTopic(id: string, key: string): Promise<ProductsData | null>;
   /** Start writing the topic's card in the background; progress rides readProducts().runs. */
   generateCard(key: string): Promise<CardRun>;
+  /** The work board document (tasks, ideas, habits, insights). */
+  readBoard(): Promise<BoardDoc>;
+  /** Replace the whole board document; returns it as stored (sanitized). */
+  saveBoard(doc: BoardDoc): Promise<BoardDoc>;
+  /** Start the AI insight run on a renderer-built prompt; the result lands in the board's insights. */
+  runBoardInsight(
+    prompt: string,
+    trigger: Insight["trigger"],
+  ): Promise<InsightRunState>;
+  boardInsightState(): Promise<InsightRunState>;
   /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
    *  Refused for a live session. The row disappears on the next overview poll. */
   trashSession(id: string): Promise<TrashResult>;

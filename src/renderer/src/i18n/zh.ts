@@ -230,6 +230,7 @@ export const zh: Translations = {
   shell: {
     sidebar: {
       newSession: "新建会话",
+      board: "看板",
       stats: "统计",
       updatePendingTitle: "有更新待处理 — 详见设置 › 关于",
       updatePendingSrOnly: "（更新待处理）",

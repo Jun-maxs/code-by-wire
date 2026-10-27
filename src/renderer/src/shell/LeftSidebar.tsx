@@ -36,6 +36,7 @@ import {
 import { SessionRow } from "./SessionRow";
 import { PinnedSessionRow } from "./PinnedSessionRow";
 import { OVERVIEW_ID } from "../stats/sentinel";
+import { BOARD_ID } from "../board/sentinel";
 import { SETTINGS_ID } from "../settings/sentinel";
 import { SidebarPanelLabel } from "./SidebarPanelLabel";
 import { OverlayScroll } from "../ui/OverlayScroll";
@@ -509,6 +510,24 @@ export function LeftSidebar({
           >
             <Icon name="rocket" size={16} className="shrink-0 opacity-70" />
             {t.shell.sidebar.newSession}
+          </button>
+          <button
+            type="button"
+            onClick={() => onRoute(BOARD_ID)}
+            aria-pressed={route === BOARD_ID}
+            className={cx(
+              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+              route === BOARD_ID
+                ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+            )}
+          >
+            <Icon
+              name="square-kanban"
+              size={16}
+              className="shrink-0 opacity-70"
+            />
+            {t.shell.sidebar.board}
           </button>
           <button
             type="button"

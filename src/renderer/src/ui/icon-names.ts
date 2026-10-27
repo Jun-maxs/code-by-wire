@@ -72,4 +72,13 @@ export type IconName =
   | "triangle-alert"
   | "worktree"
   | "x"
+  | "calendar-days"
+  | "flag"
+  | "grip-vertical"
+  | "house"
+  | "lightbulb"
+  | "link"
+  | "repeat"
+  | "square-kanban"
+  | "unlink"
   | "zap";

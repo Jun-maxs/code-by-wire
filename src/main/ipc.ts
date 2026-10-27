@@ -53,6 +53,8 @@ import { applyTitleOverrides } from "@shared/title-override";
 import { applyPinOverrides } from "@shared/pin-override";
 import type { SessionTitleStore } from "./session-titles";
 import type { SessionPinStore } from "./session-pins";
+import type { BoardStore } from "./board-store";
+import { emptyBoard, type Insight } from "@shared/board";
 import { remapPlacements, type ProjectStateStore } from "./project-state";
 import type { LaunchPresetStore } from "./launch-presets";
 import { emptyLaunchPresets, type LaunchPresets } from "@shared/extra-args";
@@ -171,6 +173,8 @@ export interface IpcDeps {
   /** Where the workbench keeps product cards and per-session hook state (sidebar product tags).
    *  Absent → products:read serves null. */
   productsDirs?: () => { cardsDir: string; stateDir: string };
+  /** The work board document + its AI insight runner. Absent → an empty, unsaved board. */
+  board?: BoardStore;
   /** Durable launch-args presets for the New-session picker. Defaults to no presets. */
   launchPresets?: LaunchPresetStore;
   /** Durable project-group placements, keyed by the sidebar's canonical project key. */
@@ -225,6 +229,7 @@ export function registerIpc({
   sessionPins,
   remoteSessions,
   productsDirs,
+  board,
   launchPresets,
   projectState,
   updater,
@@ -657,6 +662,27 @@ export function registerIpc({
     }
   };
   ipcMain.handle(IPC.readProducts, productsNow);
+  ipcMain.handle(IPC.readBoard, () => board?.read() ?? emptyBoard());
+  ipcMain.handle(IPC.saveBoard, (_e, doc: unknown) =>
+    board ? board.save(doc) : emptyBoard(),
+  );
+  ipcMain.handle(
+    IPC.runBoardInsight,
+    (_e, prompt: string, trigger: Insight["trigger"]) =>
+      board?.runInsight(
+        String(prompt),
+        trigger === "auto" ? "auto" : "manual",
+      ) ?? {
+        running: false,
+        startedAt: null,
+        error: "no board store",
+      },
+  );
+  ipcMain.handle(
+    IPC.boardInsightState,
+    () =>
+      board?.insightState() ?? { running: false, startedAt: null, error: null },
+  );
   ipcMain.handle(IPC.readProductCard, (_e, key: string): string | null => {
     const dirs = productsDirs?.();
     return dirs ? readCard(dirs.cardsDir, key) : null;

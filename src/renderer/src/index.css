@@ -810,3 +810,22 @@ summary,
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+/* Work board (fork feature): the task/insight sheets slide in from the right over a fading scrim. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[sheet-in"],
+  [class*="animate-[fade-in"] {
+    animation: none !important;
+  }
+}
