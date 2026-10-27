@@ -142,8 +142,18 @@ export function buildHudSnapshot(input: HudSnapshotInput): Hud.Snapshot {
   const byAgent = (agent: AgentId) => sessions.filter((s) => s.agent === agent);
 
   const quotas: Hud.Quota[] = [];
-  if (account)
-    quotas.push(...quotasFor("claude", account, account.email ?? null, now));
+  // The account's windows come only from the OAuth usage API, which a gateway login (reclaude) never
+  // answers; the statusLine still reports them per session, so the newest Claude row fills the gap.
+  const claudeWindows: RateLimitWindows | undefined =
+    account?.fiveHour || account?.sevenDay
+      ? account
+      : [...byAgent("claude")]
+          .sort((a, b) => b.lastActivityMs - a.lastActivityMs)
+          .find((s) => s.rateLimits)?.rateLimits;
+  if (claudeWindows)
+    quotas.push(
+      ...quotasFor("claude", claudeWindows, account?.email ?? null, now),
+    );
   // Codex windows are account-wide; every codex row carries the same reading.
   const codexWindows = byAgent("codex").find((s) => s.rateLimits)?.rateLimits;
   if (codexWindows) quotas.push(...quotasFor("codex", codexWindows, null, now));
