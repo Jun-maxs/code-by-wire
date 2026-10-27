@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyText,
   colorForProduct,
+  keywordLabel,
+  keywordPattern,
   parseProductCard,
   productForSession,
   type ProductsData,
@@ -136,5 +138,23 @@ describe("colorForProduct", () => {
   it("is stable per key and uses an explicit color when given", () => {
     expect(colorForProduct("ciyu")).toBe(colorForProduct("ciyu"));
     expect(colorForProduct("ciyu", "#123456")).toBe("#123456");
+  });
+});
+
+describe("keywordLabel / keywordPattern", () => {
+  const originals = ["cet\\.yuanai\\.best", "\\bhapi\\b", "均哥\\s*ultra"];
+  it("shows patterns as plain words", () => {
+    expect(originals.map(keywordLabel)).toEqual([
+      "cet.yuanai.best",
+      "hapi",
+      "均哥 ultra",
+    ]);
+  });
+  it("keeps an unchanged word's original pattern and escapes new ones", () => {
+    expect(
+      originals.map((p) => keywordPattern(keywordLabel(p), originals)),
+    ).toEqual(originals);
+    expect(keywordPattern("c++ 项目", originals)).toBe("c\\+\\+\\s*项目");
+    expect(new RegExp(keywordPattern("a.b", [])).test("axb")).toBe(false);
   });
 });

@@ -66,7 +66,7 @@ export const en = {
       color: "Color",
       keywords: "Keywords",
       keywordsHint:
-        "One per line. A session mentioning any of them lands here (URLs, product names, folder names; regex allowed).",
+        "One per line. A session mentioning any of them lands here (URLs, product names, folder names; case does not matter).",
       repos: "Folders",
       reposHint:
         "Optional, one per line. Generate reads their git log and status.",
