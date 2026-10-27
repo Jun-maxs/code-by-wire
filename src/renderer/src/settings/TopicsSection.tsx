@@ -1,6 +1,8 @@
 import { useContext, useEffect, useState } from "react";
 import {
   TOPIC_KEY_RE,
+  keywordLabel,
+  keywordPattern,
   type CardRun,
   type ProductInfo,
   type TopicInput,
@@ -197,9 +199,10 @@ function TopicRow({
               {topic.keywords.map((k) => (
                 <span
                   key={k}
-                  className="rounded-sm border border-ink-800 px-1.5 py-px font-mono text-[0.7rem] text-fg-muted"
+                  title={k}
+                  className="rounded-sm border border-ink-800 px-1.5 py-px text-[0.7rem] text-fg-muted"
                 >
-                  {k}
+                  {keywordLabel(k)}
                 </span>
               ))}
             </div>
@@ -339,7 +342,9 @@ function TopicForm({
   const [color, setColor] = useState(
     topic?.color ?? COLORS[taken.length % COLORS.length],
   );
-  const [keywords, setKeywords] = useState(topic?.keywords.join("\n") ?? "");
+  const [keywords, setKeywords] = useState(
+    topic?.keywords.map(keywordLabel).join("\n") ?? "",
+  );
   const [repos, setRepos] = useState(topic?.repos.join("\n") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -356,7 +361,9 @@ function TopicForm({
       key: effectiveKey,
       name: name.trim() || effectiveKey,
       color,
-      keywords: lines(keywords),
+      keywords: lines(keywords).map((k) =>
+        keywordPattern(k, topic?.keywords ?? []),
+      ),
       repos: lines(repos),
     };
     if (!TOPIC_KEY_RE.test(input.key))
@@ -446,7 +453,7 @@ function TopicForm({
           {t.settings.topics.keywords}
         </span>
         <textarea
-          className={cx(field, "min-h-[4.5rem] font-mono text-[0.75rem]")}
+          className={cx(field, "min-h-[4.5rem] text-[0.75rem]")}
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
         />

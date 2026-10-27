@@ -116,6 +116,24 @@ export function parseProductCard(
   };
 }
 
+/** A trigger pattern as people read it: `cet\.yuanai\.best` → `cet.yuanai.best`,
+ *  `均哥\s*ultra` → `均哥 ultra`, `\bhapi\b` → `hapi`. */
+export function keywordLabel(pattern: string): string {
+  return pattern
+    .replace(/\\b/g, "")
+    .replace(/\\s[*+?]?/g, " ")
+    .replace(/\\(.)/g, "$1")
+    .trim();
+}
+
+/** Plain words back into a pattern. A label left as it was keeps its original pattern (so word
+ *  boundaries and hand-written regexes survive an edit); new words match literally, any spacing. */
+export function keywordPattern(label: string, originals: string[]): string {
+  const same = originals.find((p) => keywordLabel(p) === label);
+  if (same !== undefined) return same;
+  return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+}
+
 function compile(source: string): RegExp | null {
   try {
     return new RegExp(source, "i");
