@@ -556,19 +556,19 @@ export function App() {
   );
 
   return (
-    <div className="app-bg flex h-screen flex-col text-fg">
-      <PaneShell className="min-h-0 flex-1">
-        <Pane
-          id={CBW_LEFT_PANE_ID}
-          side="left"
-          width={LEFT_DEFAULT_WIDTH}
-          minWidth={LEFT_MIN_WIDTH}
-          maxWidth={LEFT_MAX_WIDTH}
-          resizable
-          hoverReveal
-          forceCollapsed={narrow}
-        >
-          <ProductsProvider>
+    <ProductsProvider>
+      <div className="app-bg flex h-screen flex-col text-fg">
+        <PaneShell className="min-h-0 flex-1">
+          <Pane
+            id={CBW_LEFT_PANE_ID}
+            side="left"
+            width={LEFT_DEFAULT_WIDTH}
+            minWidth={LEFT_MIN_WIDTH}
+            maxWidth={LEFT_MAX_WIDTH}
+            resizable
+            hoverReveal
+            forceCollapsed={narrow}
+          >
             <LeftSidebar
               sessions={all}
               homeDir={homeDir}
@@ -591,74 +591,74 @@ export function App() {
               route={route}
               onRoute={setSelectedId}
             />
-          </ProductsProvider>
-        </Pane>
-        <PaneMain>{middle}</PaneMain>
-        <Pane
-          id={CBW_TERMINAL_PANE_ID}
-          side="right"
-          width="42vw"
-          minWidth="22vw"
-          maxWidth="80vw"
-          height="38vh"
-          minHeight="8rem"
-          maxHeight="80vh"
-          resizable
-          divider
-          disabled={!terminalOpen}
-          bottomRow={terminalAsRow}
-        >
-          {/* Seam ownership: in column mode the pane's divider hairline draws the left seam (no
+          </Pane>
+          <PaneMain>{middle}</PaneMain>
+          <Pane
+            id={CBW_TERMINAL_PANE_ID}
+            side="right"
+            width="42vw"
+            minWidth="22vw"
+            maxWidth="80vw"
+            height="38vh"
+            minHeight="8rem"
+            maxHeight="80vh"
+            resizable
+            divider
+            disabled={!terminalOpen}
+            bottomRow={terminalAsRow}
+          >
+            {/* Seam ownership: in column mode the pane's divider hairline draws the left seam (no
               border here). In row mode the sidebar pane has no divider — this border-l continues
               the metrics sidebar's own border-l down the shared seam; the reaching sash above it
               is the (invisible) drag layer only. */}
-          <div
-            className={cx(
-              "relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background)",
-              terminalAsRow && "border-l border-(--ui-stroke-secondary)",
-            )}
-          >
-            {/* As a full-height column the terminal reaches the top of the window, so it must clear
+            <div
+              className={cx(
+                "relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background)",
+                terminalAsRow && "border-l border-(--ui-stroke-secondary)",
+              )}
+            >
+              {/* As a full-height column the terminal reaches the top of the window, so it must clear
                 the titlebar band (the fixed sidebar-toggle clusters float there) — the same
                 --titlebar-height drag strip every other rail column reserves (see RightSidebar). As a
                 bottom row it sits beneath the already-cleared metrics column, so it needs no strip
                 (hermes' pt-(--titlebar-height) vs pt-0 on terminalAsRow). */}
-            {!terminalAsRow && (
-              <div
-                className="drag-region shrink-0 select-none"
-                style={{ height: "var(--titlebar-height)" }}
+              {!terminalAsRow && (
+                <div
+                  className="drag-region shrink-0 select-none"
+                  style={{ height: "var(--titlebar-height)" }}
+                />
+              )}
+              <TerminalPaneChrome />
+            </div>
+          </Pane>
+          <Pane
+            id={CBW_RIGHT_PANE_ID}
+            side="right"
+            width={RIGHT_DEFAULT_WIDTH}
+            minWidth={RIGHT_MIN_WIDTH}
+            maxWidth={RIGHT_MAX_WIDTH}
+            resizable
+            hoverReveal
+            disabled={!hasSession}
+            forceCollapsed={narrow}
+          >
+            {selected && (
+              <RightSidebar
+                session={selected}
+                metrics={metrics}
+                account={account}
               />
             )}
-            <TerminalPaneChrome />
-          </div>
-        </Pane>
-        <Pane
-          id={CBW_RIGHT_PANE_ID}
-          side="right"
-          width={RIGHT_DEFAULT_WIDTH}
-          minWidth={RIGHT_MIN_WIDTH}
-          maxWidth={RIGHT_MAX_WIDTH}
-          resizable
-          hoverReveal
-          disabled={!hasSession}
-          forceCollapsed={narrow}
-        >
-          {selected && (
-            <RightSidebar
-              session={selected}
-              metrics={metrics}
-              account={account}
-            />
-          )}
-        </Pane>
-      </PaneShell>
-      <PersistentTerminal />
-      {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
+          </Pane>
+        </PaneShell>
+        <PersistentTerminal />
+        {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
           (drag unions, then no-drag subtracts), so the clusters' no-drag must come after
           the sidebars'/header's full-width drag strips or the strips swallow their clicks. */}
-      <TitlebarControls hasSession={hasSession} />
-      <AppFooter version={__APP_VERSION__} />
-    </div>
+        <TitlebarControls hasSession={hasSession} />
+        <AppFooter version={__APP_VERSION__} />
+      </div>
+    </ProductsProvider>
   );
 }
 

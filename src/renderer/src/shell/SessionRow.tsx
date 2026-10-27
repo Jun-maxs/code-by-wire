@@ -141,20 +141,21 @@ export function SessionRow({
           <span className="grid size-3.5 shrink-0 place-items-center">
             <Lamp state={session.state} management={session.management} />
           </span>
-          {product && (
-            <span
-              aria-hidden
-              className="size-1.5 shrink-0 rounded-full"
-              style={{ background: product.color }}
-            />
-          )}
           <span
             className={cx(
               "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
               selected && "text-fg",
             )}
-            title={displayTitle}
+            title={product ? `${product.name} · ${displayTitle}` : displayTitle}
           >
+            {/* Fork feature: the topic's name leads the title, in its color, so parallel
+             *  sessions on different products read apart at a glance. */}
+            {product && (
+              <span className="font-medium" style={{ color: product.color }}>
+                {shortTopicName(product.name)}
+                <span className="text-(--ui-text-quaternary)"> · </span>
+              </span>
+            )}
             {displayTitle}
           </span>
           {session.remote && (
@@ -267,4 +268,9 @@ export function SessionRow({
       </div>
     </ProductHoverCard>
   );
+}
+
+/** A card title like "均哥Ultra（桌面整理）" shortened to its first name for the row prefix. */
+function shortTopicName(name: string): string {
+  return name.replace(/\s*[（(].*$/, "").slice(0, 10);
 }

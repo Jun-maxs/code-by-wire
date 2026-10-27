@@ -12,6 +12,7 @@ import { CodexCliCard } from "./CodexCliCard";
 import { StatuslineCard } from "./StatuslineCard";
 import { AnalyticsDbCard } from "./AnalyticsDbCard";
 import { IndexDbCard } from "./IndexDbCard";
+import { TopicsSection } from "./TopicsSection";
 import { AgentIcon } from "../ui/agent-icons";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
@@ -21,11 +22,17 @@ import { footerView } from "../ui/rail-footer";
 import { PageHeader, Card } from "../shell/page-primitives";
 import { useI18n } from "../i18n";
 
-export type SettingsSection = "system" | "appearance" | "databases" | "about";
+export type SettingsSection =
+  | "system"
+  | "appearance"
+  | "topics"
+  | "databases"
+  | "about";
 
 const NAV: { key: SettingsSection; icon: IconName }[] = [
   { key: "system", icon: "monitor" },
   { key: "appearance", icon: "palette" },
+  { key: "topics", icon: "tag" },
   { key: "databases", icon: "database" },
   { key: "about", icon: "info" },
 ];
@@ -123,6 +130,7 @@ export function SettingsView({
               <ClaudeAccountsCard />
             </>
           )}
+          {section === "topics" && <TopicsSection />}
           {section === "databases" && <DatabasesSection />}
           {section === "about" && <AboutSection update={update} />}
         </div>

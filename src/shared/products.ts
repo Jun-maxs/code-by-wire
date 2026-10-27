@@ -27,6 +27,36 @@ export interface ProductInfo {
   loose: string[];
   /** 等你决定 lines. */
   decide: string[];
+  /** Whether a card file exists. A topic with only trigger words still tags sessions; its card is
+   *  generated later from Settings → Topics. */
+  hasCard: boolean;
+  /** The trigger words (regex sources) that pull a session into this topic. */
+  keywords: string[];
+  /** Folders the card generator reads (git log, status) for this topic. */
+  repos: string[];
+  /** Card file mtime (ms since epoch), null without a card. */
+  updatedAt: number | null;
+}
+
+/** What Settings → Topics saves for one topic. `key` names the card file, so it is ascii. */
+export interface TopicInput {
+  key: string;
+  name: string;
+  color: string;
+  keywords: string[];
+  repos: string[];
+}
+
+export const TOPIC_KEY_RE = /^[a-z0-9_-]{1,40}$/;
+
+/** One card generation run started from Settings (in-memory in main; lost on restart). */
+export interface CardRun {
+  key: string;
+  startedAt: number;
+  /** null while running. */
+  ok: boolean | null;
+  /** The generator's log lines for this topic (last few), shown under the topic. */
+  message: string;
 }
 
 export interface ProductsData {
@@ -34,6 +64,10 @@ export interface ProductsData {
   /** Session id → product key, as recorded by the workbench hook (may name keys without a card). */
   bySession: Record<string, string>;
   triggers: ProductTrigger[];
+  /** Session id → the workbench's short task title (rewritten as the task changes). */
+  titles: Record<string, string>;
+  /** Card generation runs by topic key. */
+  runs: Record<string, CardRun>;
 }
 
 const EMPTY_LINES = new Set(["无", "无。", "-", "（无）"]);
@@ -64,7 +98,7 @@ export function parseProductCard(
   key: string,
   md: string,
   color?: string,
-): ProductInfo {
+): Omit<ProductInfo, "hasCard" | "keywords" | "repos" | "updatedAt"> {
   const title = /^#\s+(.+)$/m.exec(md);
   const sec = sections(md);
   const where = (sec.get("资料与位置") ?? []).join("\n");
@@ -108,12 +142,14 @@ export function classifyText(
 }
 
 /** The product a session belongs to: the hook's record first (it saw the actual prompts), else the
- *  title classified by the triggers. Only keys that have a card count — the rest render untagged. */
+ *  title classified by the triggers. Keys that are neither a card nor a trigger render untagged; an
+ *  explicit empty record (the user cleared it) stays untagged. */
 export function productForSession(
   data: ProductsData,
   session: { id: string; title: string },
 ): string | null {
   const recorded = data.bySession[session.id];
+  if (recorded === "") return null;
   if (recorded && data.products[recorded]) return recorded;
   const guessed = classifyText(data.triggers, session.title);
   return guessed && data.products[guessed] ? guessed : null;

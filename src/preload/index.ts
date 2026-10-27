@@ -38,6 +38,12 @@ const api: AppApi = {
   setSessionPinned: (id, pinned) =>
     ipcRenderer.invoke(IPC.setSessionPinned, id, pinned),
   readProducts: () => ipcRenderer.invoke(IPC.readProducts),
+  readProductCard: (key) => ipcRenderer.invoke(IPC.readProductCard, key),
+  saveTopic: (topic) => ipcRenderer.invoke(IPC.saveTopic, topic),
+  deleteTopic: (key) => ipcRenderer.invoke(IPC.deleteTopic, key),
+  assignSessionTopic: (id, key) =>
+    ipcRenderer.invoke(IPC.assignSessionTopic, id, key),
+  generateCard: (key) => ipcRenderer.invoke(IPC.generateCard, key),
   trashSession: (id) => ipcRenderer.invoke(IPC.trashSession, id),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>

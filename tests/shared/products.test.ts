@@ -93,14 +93,23 @@ describe("classifyText", () => {
   });
 });
 
+const EXTRA = {
+  hasCard: true,
+  keywords: [],
+  repos: [],
+  updatedAt: null,
+};
+
 describe("productForSession", () => {
   const data: ProductsData = {
     products: {
-      ciyu: parseProductCard("ciyu", CARD),
-      shiyu: parseProductCard("shiyu", "# 时屿\n"),
+      ciyu: { ...parseProductCard("ciyu", CARD), ...EXTRA },
+      shiyu: { ...parseProductCard("shiyu", "# 时屿\n"), ...EXTRA },
     },
-    bySession: { "s-known": "shiyu" },
+    bySession: { "s-known": "shiyu", "s-cleared": "" },
     triggers: TRIGGERS,
+    titles: {},
+    runs: {},
   };
   it("prefers what the workbench hook recorded for the session", () => {
     expect(productForSession(data, { id: "s-known", title: "词屿发音" })).toBe(
@@ -112,9 +121,14 @@ describe("productForSession", () => {
       productForSession(data, { id: "s-2", title: "cet.yuanai.best 发音卡" }),
     ).toBe("ciyu");
   });
-  it("drops a recorded key that has no card", () => {
+  it("drops a recorded key that is no topic", () => {
     const d = { ...data, bySession: { s: "cockpit" } };
     expect(productForSession(d, { id: "s", title: "无关" })).toBeNull();
+  });
+  it("keeps a session the user cleared untagged even when its title matches", () => {
+    expect(
+      productForSession(data, { id: "s-cleared", title: "cet.yuanai.best" }),
+    ).toBeNull();
   });
 });
 

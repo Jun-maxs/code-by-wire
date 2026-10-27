@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import { cx } from "../ui/atoms";
@@ -7,6 +7,11 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useI18n } from "../i18n";
 import { MENU_WIDTH, type SessionMenuController } from "./use-session-menu";
 import { DiagnosticReportModal } from "./DiagnosticReportModal";
+import {
+  ProductsContext,
+  ProductsRefreshContext,
+  useSessionProduct,
+} from "../products/products-context";
 
 /** The portaled dropdown body shared by every session-menu trigger: seven always-rendered action rows
  *  (only `disabled`/`title` vary — the design's "never hide an action, dim the unavailable ones with a
@@ -50,6 +55,24 @@ export function SessionMenuDropdown({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const canDelete = session.state === "ended";
+  // Fork feature: put the session under a topic by hand (wins over the workbench's guesses).
+  const products = useContext(ProductsContext);
+  const refreshProducts = useContext(ProductsRefreshContext);
+  const currentTopic = useSessionProduct(session);
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const assignTopic = (key: string): void => {
+    closeMenu();
+    setTopicsOpen(false);
+    void window.api
+      .assignSessionTopic(session.id, key)
+      .then(refreshProducts)
+      .catch(() => undefined);
+  };
+  const topics = products
+    ? Object.values(products.products).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      )
+    : [];
   const confirmDelete = (): void => {
     setDeleteConfirm(false);
     void window.api.trashSession(session.id).then((r) => {
@@ -100,6 +123,57 @@ export function SessionMenuDropdown({
                 label={t.shell.sessionMenu.rename}
                 onClick={openEdit}
               />
+              {topics.length > 0 && (
+                <>
+                  <MenuItem
+                    icon="tag"
+                    label={
+                      currentTopic
+                        ? `${t.shell.sessionMenu.topic} · ${currentTopic.name}`
+                        : t.shell.sessionMenu.topic
+                    }
+                    onClick={() => setTopicsOpen((v) => !v)}
+                  />
+                  {topicsOpen && (
+                    <div className="ml-6 flex max-h-48 flex-col overflow-y-auto border-l border-(--ui-stroke-tertiary) pl-1">
+                      {topics.map((p) => (
+                        <button
+                          key={p.key}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={currentTopic?.key === p.key}
+                          onClick={() => assignTopic(p.key)}
+                          className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[0.75rem] text-(--ui-text-secondary) hover:bg-(--ui-row-hover-background) hover:text-fg"
+                        >
+                          <span
+                            aria-hidden
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ background: p.color }}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {p.name}
+                          </span>
+                          {currentTopic?.key === p.key && (
+                            <Icon name="check" size={12} />
+                          )}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={!currentTopic}
+                        onClick={() => assignTopic("")}
+                        className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[0.75rem] text-(--ui-text-tertiary) hover:bg-(--ui-row-hover-background) hover:text-fg"
+                      >
+                        <span className="size-1.5 shrink-0" />
+                        <span className="flex-1">
+                          {t.shell.sessionMenu.noTopic}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
 
               {resume.error && (
                 <p role="alert" className="px-2 py-1 text-xs text-danger">
