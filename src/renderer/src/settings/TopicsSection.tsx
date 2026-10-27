@@ -432,7 +432,11 @@ function TopicForm({
           {t.settings.topics.color}
         </span>
         <div className="flex gap-1.5">
-          {COLORS.map((c) => (
+          {/* A color set elsewhere (sources.json) stays pickable rather than looking unset. */}
+          {(topic?.color && !COLORS.includes(topic.color)
+            ? [topic.color, ...COLORS]
+            : COLORS
+          ).map((c) => (
             <button
               key={c}
               type="button"
@@ -454,6 +458,7 @@ function TopicForm({
         </span>
         <textarea
           className={cx(field, "min-h-[4.5rem] text-[0.75rem]")}
+          rows={Math.min(10, Math.max(3, keywords.split("\n").length + 1))}
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
         />
