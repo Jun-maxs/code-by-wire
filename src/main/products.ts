@@ -200,9 +200,15 @@ function readSessionProducts(stateDir: string): Record<string, string> {
   return out;
 }
 
-// Same ranking as the workbench's wbcore.session_products: manual > prompt > scan, last one wins
+// Same ranking as the workbench's wbcore.session_products: manual > llm (haiku read the last few
+// prompts) > prompt (keyword guess) > scan, last one wins
 // within a rank.
-const RANK: Record<string, number> = { scan: 0, prompt: 1, manual: 2 };
+const RANK: Record<string, number> = {
+  scan: 0,
+  prompt: 1,
+  llm: 2,
+  manual: 3,
+};
 
 function readRecordedProducts(path: string): Record<string, string> {
   const best: Record<string, { key: string; rank: number }> = {};
