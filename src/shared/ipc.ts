@@ -1,5 +1,5 @@
 import type { TrashResult } from "./session-trash";
-import type { ProductsData } from "./products";
+import type { CardRun, ProductsData, TopicInput } from "./products";
 import type {
   Session,
   Account,
@@ -63,6 +63,11 @@ export const IPC = {
   renameSession: "session:rename",
   setSessionPinned: "session:setPinned",
   readProducts: "products:read",
+  readProductCard: "products:card",
+  saveTopic: "products:topic-save",
+  deleteTopic: "products:topic-delete",
+  assignSessionTopic: "products:assign",
+  generateCard: "products:generate",
   trashSession: "session:trash",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
@@ -300,6 +305,16 @@ export interface IpcApi {
   /** The workbench's product cards + session→product records for the sidebar's product tags; null
    *  when no cards dir is configured/present (rows then render untagged). */
   readProducts(): Promise<ProductsData | null>;
+  /** One topic's card markdown; null without a card. */
+  readProductCard(key: string): Promise<string | null>;
+  /** Create or update a topic (name, color, trigger words, folders); returns the fresh data. */
+  saveTopic(topic: TopicInput): Promise<ProductsData | null>;
+  /** Remove a topic (its card moves to the workbench's cards/.trash). */
+  deleteTopic(key: string): Promise<ProductsData | null>;
+  /** Put a session under a topic by hand ("" = no topic). */
+  assignSessionTopic(id: string, key: string): Promise<ProductsData | null>;
+  /** Start writing the topic's card in the background; progress rides readProducts().runs. */
+  generateCard(key: string): Promise<CardRun>;
   /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
    *  Refused for a live session. The row disappears on the next overview poll. */
   trashSession(id: string): Promise<TrashResult>;

@@ -1,6 +1,15 @@
+import { join } from "node:path";
 import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
-import type { ProductsData } from "@shared/products";
-import { readProducts } from "./products";
+import type { CardRun, ProductsData, TopicInput } from "@shared/products";
+import {
+  assignSession,
+  deleteTopic,
+  generateCard,
+  readCard,
+  readProducts,
+  readTaskTitles,
+  saveTopic,
+} from "./products";
 import {
   app,
   BrowserWindow,
@@ -392,10 +401,15 @@ export function registerIpc({
       (acc, overlay) => overlay(acc),
       overlaid,
     );
-    const named = applyTitleOverrides(
-      agentOverlaid,
-      sessionTitles?.read() ?? {},
-    );
+    // Fork feature: the workbench's task titles sit under the user's renames.
+    const dirs = productsDirs?.();
+    const tasked = dirs
+      ? applyTitleOverrides(
+          agentOverlaid,
+          readTaskTitles(join(dirs.stateDir, "..")),
+        )
+      : agentOverlaid;
+    const named = applyTitleOverrides(tasked, sessionTitles?.read() ?? {});
     const remoteIds = remoteSessions?.read() ?? {};
     const pinned = applyPinOverrides(named, sessionPins?.read() ?? {}).map(
       (s) => (remoteIds[s.id] ? { ...s, remote: true } : s),
@@ -633,7 +647,7 @@ export function registerIpc({
       return result;
     },
   );
-  ipcMain.handle(IPC.readProducts, (): ProductsData | null => {
+  const productsNow = (): ProductsData | null => {
     const dirs = productsDirs?.();
     if (!dirs) return null;
     try {
@@ -646,6 +660,31 @@ export function registerIpc({
       );
       return null;
     }
+  };
+  ipcMain.handle(IPC.readProducts, productsNow);
+  ipcMain.handle(IPC.readProductCard, (_e, key: string): string | null => {
+    const dirs = productsDirs?.();
+    return dirs ? readCard(dirs.cardsDir, key) : null;
+  });
+  ipcMain.handle(IPC.saveTopic, (_e, topic: TopicInput) => {
+    const dirs = productsDirs?.();
+    if (dirs) saveTopic(dirs.cardsDir, topic);
+    return productsNow();
+  });
+  ipcMain.handle(IPC.deleteTopic, (_e, key: string) => {
+    const dirs = productsDirs?.();
+    if (dirs) deleteTopic(dirs.cardsDir, key);
+    return productsNow();
+  });
+  ipcMain.handle(IPC.assignSessionTopic, (_e, id: string, key: string) => {
+    const dirs = productsDirs?.();
+    if (dirs) assignSession(join(dirs.stateDir, ".."), id, key);
+    return productsNow();
+  });
+  ipcMain.handle(IPC.generateCard, (_e, key: string): CardRun => {
+    const dirs = productsDirs?.();
+    if (!dirs) throw new Error("no workbench cards dir");
+    return generateCard(dirs.cardsDir, key);
   });
   ipcMain.handle(
     IPC.launchPresetsGet,

@@ -19,7 +19,18 @@ function mk(over: Partial<Session>): Session {
 }
 
 function product(key: string, name: string): ProductInfo {
-  return { key, name, color: "#123456", domains: [], loose: [], decide: [] };
+  return {
+    key,
+    name,
+    color: "#123456",
+    domains: [],
+    loose: [],
+    decide: [],
+    hasCard: true,
+    keywords: [],
+    repos: [],
+    updatedAt: null,
+  };
 }
 
 const CIYU = product("ciyu", "词屿");

@@ -8,6 +8,11 @@ import {
 /** The workbench's product data, provided by ProductsProvider (null until loaded or when no cards). */
 export const ProductsContext = createContext<ProductsData | null>(null);
 
+/** Reload the product data, or install data an edit just returned. */
+export const ProductsRefreshContext = createContext<
+  (next?: ProductsData | null) => void
+>(() => undefined);
+
 /** The product a session belongs to, or null (no cards, or no match). */
 export function useSessionProduct(session: {
   id: string;
