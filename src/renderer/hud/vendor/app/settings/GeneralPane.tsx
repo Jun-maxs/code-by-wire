@@ -123,8 +123,8 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
           <ToggleRow
             title={t("Launch at login", "登录时启动")}
             subtitle={t(
-              "Keep an eye on usage whenever you start your Mac.",
-              "登录 Mac 后，自动开始监测用量。",
+              "Keep an eye on usage whenever you sign in.",
+              "登录系统后自动启动 Code-by-wire，开始监测用量。",
             )}
             checked={
               system?.launchAtLogin.enabled ?? snapshot.settings.launchAtLogin

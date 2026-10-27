@@ -251,23 +251,42 @@ export function DisplayPane({
               }
             />
           </Row>
-          <p
-            style={{
-              ...secondary,
-              margin: 0,
-              padding: "0 16px 12px",
-              fontSize: 11,
-            }}
-            title={t(
-              "Dragging is supported by the native HUD on this machine. This preview does not drag.",
-              "拖动仅适用于本机的原生 HUD，此预览不支持拖动。",
-            )}
-          >
-            {t(
-              "Drag the visible HUD directly. Dragging the notch switches to Dynamic.",
-              "直接拖动可见的 HUD。拖动刘海会切换为「动态」。",
-            )}
-          </p>
+          {/* Code-by-wire: the HUD does not drag; its edge and place along it are picked here. */}
+          {config.mode !== "notch" && (
+            <>
+              <Divider />
+              <Row
+                title={t("Edge", "停靠边")}
+                subtitle={t(
+                  "The screen edge the HUD sits on.",
+                  "HUD 贴在屏幕的哪条边上。",
+                )}
+              >
+                <Segments
+                  label={t("Edge", "停靠边")}
+                  value={config.edge}
+                  options={[
+                    ["top", t("Top", "上")],
+                    ["bottom", t("Bottom", "下")],
+                    ["left", t("Left", "左")],
+                    ["right", t("Right", "右")],
+                  ]}
+                  change={(value) =>
+                    update({ edge: value as HUDConfig["edge"] })
+                  }
+                />
+              </Row>
+              <Divider />
+              {slider(
+                "offset",
+                t("Place along the edge", "沿边位置"),
+                0,
+                1,
+                0.05,
+                percent,
+              )}
+            </>
+          )}
           <Divider />
           <Row
             title={t("HUD appearance", "HUD 外观")}
@@ -707,15 +726,7 @@ export function DisplayPane({
           )}
         </Section>
         <Section title={t("Hover behavior", "悬停交互")}>
-          {toggle(
-            "requiresOptionToOpen",
-            t("Press Option to open", "按 Option 才展开"),
-            t(
-              "Hovering alone leaves it closed; press Option while hovering to open the panel.",
-              "指针经过不展开，悬停时按一下 Option 打开面板。",
-            ),
-          )}
-          <Divider />
+          {/* Code-by-wire: no "press Option to open" — main reads the cursor, not the keys. */}
           {toggle(
             "openImmediatelyAtTop",
             t("Open immediately at the top edge", "鼠标触顶立即展开"),
@@ -743,19 +754,7 @@ export function DisplayPane({
             (value) => `${Math.round(value)} ms`,
           )}
         </Section>
-        <Section title={t("Menu bar", "菜单栏")}>
-          <ToggleRow
-            title={t("Show menu bar icon", "显示菜单栏图标")}
-            subtitle={t(
-              "Quick access to usage, refresh and settings.",
-              "快速查看用量、刷新与打开设置。",
-            )}
-            checked={snapshot.settings.showMenuBarIcon !== false}
-            change={(value) => {
-              void action("set_setting", { key: "showMenuBarIcon", value });
-            }}
-          />
-        </Section>
+        {/* Code-by-wire has no menu bar / tray icon. */}
       </div>
     </TooltipProvider>
   );

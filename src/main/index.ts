@@ -651,6 +651,7 @@ app
         timeline: hourlyTimeline(rows, now),
         now,
         language: hudLanguage(),
+        languageSetting: appSettings.read().hudPanel?.language ?? "system",
         appearance:
           appSettings.read().hudPanel?.appearance ??
           appSettings.read().appTheme ??
@@ -723,18 +724,22 @@ app
             return sessionsResponse(params, hudSnapshot().sessions, now);
           case "statistics": {
             const q = params as unknown as HudStatisticsQuery;
-            const rows = (analyticsDb
-              ?.prepare(TURN_BUCKETS_SQL)
-              .all(
+            const buckets = (bucketMs: number, from: number, to: number) =>
+              (analyticsDb?.prepare(TURN_BUCKETS_SQL).all(bucketMs, from, to) ??
+                []) as TurnBucketRow[];
+            return statisticsResponse(
+              q,
+              buckets(
                 q.bucketMinutes * 60_000,
                 Date.parse(q.from),
                 Date.parse(q.to),
-              ) ?? []) as TurnBucketRow[];
-            return statisticsResponse(
-              q,
-              rows,
+              ),
               AGENT_IDS.map((id) => ({ id, name: AGENTS[id].label })),
               now,
+              {
+                hours: buckets(HOUR, now - 7 * 24 * HOUR, now + HOUR),
+                days: buckets(24 * HOUR, now - 31 * 24 * HOUR, now + HOUR),
+              },
             );
           }
           case "session_detail": {
