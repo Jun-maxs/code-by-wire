@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ClaudeAccountsView, ClaudeOrg } from "@shared/ipc";
 import { Card } from "../shell/page-primitives";
 import { Icon } from "../ui/icons";
@@ -108,34 +109,56 @@ export function ClaudeAccountsCard() {
  *  when the 5h / 7d window runs low. */
 export function ClaudeAccountSwitch() {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
+  // Where the popover sits: under the button, right-aligned to it. It is portaled to <body> because
+  // the sidebar clips what overflows it.
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!at) return;
     const close = (e: MouseEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!pop.current?.contains(target) && !button.current?.contains(target))
+        setAt(null);
     };
+    const away = () => setAt(null);
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
+    window.addEventListener("resize", away);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", away);
+    };
+  }, [at]);
+  const toggle = () => {
+    if (at) return setAt(null);
+    const r = button.current?.getBoundingClientRect();
+    if (r) setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
   return (
-    <div ref={box} className="relative">
+    <>
       <button
+        ref={button}
         type="button"
-        aria-expanded={open}
+        aria-expanded={at !== null}
         title={t.settings.accounts.switch}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-secondary)"
       >
         <Icon name="circle-user" size={12} />
         {t.settings.accounts.switch}
       </button>
-      {open && (
-        // Remounted on each open, so the list is read fresh every time.
-        <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-md border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) shadow-(--shadow-md)">
-          <AccountList compact />
-        </div>
-      )}
-    </div>
+      {at &&
+        createPortal(
+          // Remounted on each open, so the list is read fresh every time.
+          <div
+            ref={pop}
+            style={{ top: at.top, right: at.right }}
+            className="fixed z-50 w-80 max-w-[calc(100vw-16px)] rounded-md border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) shadow-(--shadow-md)"
+          >
+            <AccountList compact />
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
