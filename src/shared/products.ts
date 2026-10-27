@@ -134,6 +134,11 @@ export function keywordPattern(label: string, originals: string[]): string {
   return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
 }
 
+/** A card title like "均哥Ultra（桌面整理）" cut to its first name, for tight spots (sidebar, menus). */
+export function shortTopicName(name: string): string {
+  return name.replace(/\s*[（(].*$/, "").slice(0, 10) || name.slice(0, 10);
+}
+
 function compile(source: string): RegExp | null {
   try {
     return new RegExp(source, "i");

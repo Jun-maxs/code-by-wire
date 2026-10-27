@@ -1,4 +1,5 @@
-import { useContext, useState } from "react";
+import { useContext, useLayoutEffect, useState } from "react";
+import { shortTopicName } from "@shared/products";
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import { cx } from "../ui/atoms";
@@ -68,6 +69,15 @@ export function SessionMenuDropdown({
       .then(refreshProducts)
       .catch(() => undefined);
   };
+  // Keep the whole menu inside the window: a row low in the list (or the topic list opening)
+  // would otherwise push its bottom rows off-screen.
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!open || !pos || !el) return setTop(null);
+    const fit = window.innerHeight - el.offsetHeight - 8;
+    setTop(Math.max(8, Math.min(pos.top, fit)));
+  }, [open, pos, topicsOpen, menuRef]);
   const topics = products
     ? Object.values(products.products).sort((a, b) =>
         a.name.localeCompare(b.name),
@@ -92,7 +102,7 @@ export function SessionMenuDropdown({
               style={{
                 position: "fixed",
                 left: pos.left,
-                top: pos.top,
+                top: top ?? pos.top,
                 width: MENU_WIDTH,
               }}
               className="z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1.5 shadow-(--shadow-md) backdrop-blur-xl"
@@ -129,7 +139,7 @@ export function SessionMenuDropdown({
                     icon="tag"
                     label={
                       currentTopic
-                        ? `${t.shell.sessionMenu.topic} · ${currentTopic.name}`
+                        ? `${t.shell.sessionMenu.topic} · ${shortTopicName(currentTopic.name)}`
                         : t.shell.sessionMenu.topic
                     }
                     onClick={() => setTopicsOpen((v) => !v)}
@@ -143,6 +153,7 @@ export function SessionMenuDropdown({
                           role="menuitemradio"
                           aria-checked={currentTopic?.key === p.key}
                           onClick={() => assignTopic(p.key)}
+                          title={p.name}
                           className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[0.75rem] text-(--ui-text-secondary) hover:bg-(--ui-row-hover-background) hover:text-fg"
                         >
                           <span
@@ -151,7 +162,7 @@ export function SessionMenuDropdown({
                             style={{ background: p.color }}
                           />
                           <span className="min-w-0 flex-1 truncate">
-                            {p.name}
+                            {shortTopicName(p.name)}
                           </span>
                           {currentTopic?.key === p.key && (
                             <Icon name="check" size={12} />

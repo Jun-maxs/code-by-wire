@@ -9,6 +9,7 @@ import { SessionMenuDropdown } from "./SessionMenuDropdown";
 import { useSessionProduct } from "../products/products-context";
 import { isUnsentSession } from "./session-list-model";
 import { ProductHoverCard } from "../products/ProductHoverCard";
+import { shortTopicName } from "@shared/products";
 
 /**
  * The hermes single-line sidebar row: a 26px-tall strip with a state `Lamp` and the title. A
@@ -268,9 +269,4 @@ export function SessionRow({
       </div>
     </ProductHoverCard>
   );
-}
-
-/** A card title like "均哥Ultra（桌面整理）" shortened to its first name for the row prefix. */
-function shortTopicName(name: string): string {
-  return name.replace(/\s*[（(].*$/, "").slice(0, 10);
 }
