@@ -112,6 +112,9 @@ import {
 } from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
 
+/** Fork: a screenshot run — main window off-screen and unfocused, no HUD overlay. */
+const OFFSCREEN = process.env.CBW_OFFSCREEN === "1";
+
 // Pin the whole app to the sRGB color profile. Without this, the packaged build inherits the
 // display's profile (Display P3 on modern Macs) and Chromium stretches our sRGB-authored palette
 // toward that wider gamut, oversaturating colors like the Claude Code mascot orange. Dev already
@@ -159,6 +162,11 @@ function createWindow(
   const win = new BrowserWindow({
     width: 1100,
     height: 720,
+    // Fork: CBW_OFFSCREEN=1 (screenshots over CDP) parks the window off every display, unfocused and
+    // off the taskbar, so a check never takes the owner's screen.
+    ...(OFFSCREEN
+      ? { x: -4000, y: 0, show: false, skipTaskbar: true }
+      : {}),
     backgroundColor: WINDOW_BACKGROUND[appTheme],
     ...(isMac
       ? {
@@ -172,6 +180,7 @@ function createWindow(
     },
   });
   if (isMac) win.setSheetOffset(HEADER_HEIGHT_PX);
+  if (OFFSCREEN) win.showInactive();
 
   // No in-app browser, anywhere: this app has no setWindowOpenHandler by default, so anything that
   // would otherwise spawn a new window (a stray target="_blank", a future window.open()) falls
@@ -880,7 +889,7 @@ app
     // Settings → Appearance turns the HUD off or moves it to another display; applied at once.
     const applyHud = () => {
       const h = hudSettings(appSettings.read());
-      if (h.enabled) hud.start(h.display);
+      if (h.enabled && !OFFSCREEN) hud.start(h.display);
       else hud.stop();
     };
     const hudView = (): HudSettingsView => ({
