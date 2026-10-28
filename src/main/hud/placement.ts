@@ -39,3 +39,30 @@ export function canvasFor(
     edge === "left" ? 0 : edge === "right" ? bounds.width - width : across;
   return { x: bounds.x + x, y: bounds.y, width, height };
 }
+
+/** Where a strip dropped at `cursor` lands: the display edge nearest the cursor, slid along it so the
+ *  strip's middle sits under the cursor. `runs` are the strip's lengths on a horizontal and on a
+ *  vertical edge, so the offset keeps the whole strip on screen. */
+export function dropPlacement(
+  bounds: Hud.HudRect,
+  cursor: { x: number; y: number },
+  base: HudPlacement,
+  runs: { horizontal: number; vertical: number },
+): HudPlacement {
+  const x = Math.min(Math.max(cursor.x - bounds.x, 0), bounds.width);
+  const y = Math.min(Math.max(cursor.y - bounds.y, 0), bounds.height);
+  const distance: Record<HudPlacement["edge"], number> = {
+    top: y,
+    bottom: bounds.height - y,
+    left: x,
+    right: bounds.width - x,
+  };
+  const edges = Object.keys(distance) as HudPlacement["edge"][];
+  const edge = edges.reduce((a, b) => (distance[b] < distance[a] ? b : a));
+  const along = edge === "top" || edge === "bottom";
+  const run = along ? runs.horizontal : runs.vertical;
+  const span = (along ? bounds.width : bounds.height) - run;
+  const at = (along ? x : y) - run / 2;
+  const offset = span > 0 ? Math.min(1, Math.max(0, at / span)) : 0.5;
+  return { ...base, edge, offset: Math.round(offset * 1000) / 1000 };
+}

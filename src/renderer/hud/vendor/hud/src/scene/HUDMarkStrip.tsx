@@ -1,4 +1,6 @@
 import type { CSSProperties, MutableRefObject } from "react";
+import { useContext } from "react";
+import { RemoteStatusContext } from "../../../../remote-status";
 import { BotMark } from "../BotMark";
 import HUDGlow, { type GlowAlert } from "../HUDGlow";
 import { botState, facingFromEdge, isAttention } from "../bots/bot-state";
@@ -244,6 +246,7 @@ export function HUDMarkStrip({
                 }),
           }}
         >
+          <RemoteDot edge={edge} light={light} />
           {vendors.map((vendor, index) => (
             <button
               key={vendor.key}
@@ -446,5 +449,45 @@ export function HUDMarkStrip({
         </div>
       )}
     </>
+  );
+}
+
+/** Code-by-wire: a small lamp in the strip's corner saying whether the phone can reach this PC (the
+ *  HAPI runner is up). Absent when HAPI isn't set up here. Takes no layout space. */
+function RemoteDot({ edge, light }: { edge: HUDEdge; light: boolean }) {
+  const status = useContext(RemoteStatusContext);
+  if (!status?.installed) return null;
+  const zh = navigator.language.startsWith("zh");
+  const host = status.hub?.replace(/^https?:\/\//, "") ?? "";
+  const title = status.online
+    ? `${zh ? "手机遥控在线" : "Phone remote online"}${host ? ` · ${host}` : ""}`
+    : zh
+      ? "手机遥控离线（runner 没在跑）"
+      : "Phone remote offline (runner not running)";
+  const corner =
+    edge === "bottom"
+      ? { bottom: 3, right: 3 }
+      : edge === "left"
+        ? { bottom: 3, left: 3 }
+        : { top: 3, right: 3 };
+  return (
+    <span
+      role="img"
+      aria-label={title}
+      title={title}
+      style={{
+        position: "absolute",
+        ...corner,
+        zIndex: 2,
+        width: 6,
+        height: 6,
+        borderRadius: 999,
+        pointerEvents: "auto",
+        background: status.online ? "#46c57a" : "transparent",
+        boxShadow: status.online
+          ? `0 0 0 1.5px ${light ? "#fff" : "#000"}, 0 0 6px #46c57a99`
+          : `inset 0 0 0 1.5px ${light ? "#0006" : "#fff6"}`,
+      }}
+    />
   );
 }
