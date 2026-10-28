@@ -2,7 +2,13 @@ import { BrowserWindow, ipcMain, screen, type Display } from "electron";
 import type * as Hud from "@shared/hud-native";
 import { logWarn } from "../log-buffer";
 import { watchFullscreen } from "./fullscreen-watch";
-import { canvasFor, DEFAULT_PLACEMENT, type HudPlacement } from "./placement";
+import {
+  canvasFor,
+  DEFAULT_PLACEMENT,
+  dropPlacement,
+  type HudPlacement,
+} from "./placement";
+import { remoteStatus } from "./remote-status";
 
 /**
  * The HUD overlay: Agent HUD's edge strip, glow and hover panel (vendored under renderer/hud) in a
@@ -33,6 +39,18 @@ export interface HudOverlayDeps {
 }
 
 const POINTER_POLL_MS = 33;
+/** A drag whose release never reached the page (capture lost) ends on its own after this long. */
+const DRAG_TIMEOUT_MS = 30_000;
+
+/** A strip being dragged: the host follows the cursor and snaps it to the nearest edge (as Agent
+ *  HUD's Tauri host did); the page reports the release (`hud_drag_end`). */
+interface Drag {
+  screenId: string;
+  mode: HudPlacement["mode"];
+  runs: { horizontal: number; vertical: number };
+  preview: HudPlacement | null;
+  startedAt: number;
+}
 
 interface Overlay {
   screenId: string;
@@ -75,6 +93,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
   let timer: NodeJS.Timeout | null = null;
   let unwatch: (() => void) | null = null;
   let fullscreen = false;
+  let drag: Drag | null = null;
 
   const send = (o: Overlay, event: string, payload: unknown) => {
     if (!o.win.isDestroyed())
@@ -127,6 +146,10 @@ export function createHudOverlay(deps: HudOverlayDeps) {
   const poll = () => {
     const cursor = screen.getCursorScreenPoint();
     if (fullscreen) return;
+    if (drag) {
+      followDrag(cursor);
+      return;
+    }
     for (const o of overlays.values()) {
       const point = { x: cursor.x - o.canvas.x, y: cursor.y - o.canvas.y };
       const inside = o.regions.some(
@@ -148,6 +171,72 @@ export function createHudOverlay(deps: HudOverlayDeps) {
         send(o, "hud:pointer", o.pointer);
       }
     }
+  };
+
+  /** Move the canvas with the dragged strip and tell the page where it would land. */
+  const followDrag = (cursor: Electron.Point) => {
+    const o = drag ? overlays.get(drag.screenId) : undefined;
+    if (!drag || !o || o.win.isDestroyed()) {
+      drag = null;
+      return;
+    }
+    if (Date.now() - drag.startedAt > DRAG_TIMEOUT_MS) {
+      endDrag(o, true);
+      return;
+    }
+    const next = dropPlacement(
+      o.display.bounds,
+      cursor,
+      { ...o.placement, mode: drag.mode === "notch" ? "logos" : drag.mode },
+      drag.runs,
+    );
+    const p = drag.preview;
+    if (p && p.edge === next.edge && Math.abs(p.offset - next.offset) < 0.002)
+      return;
+    drag.preview = next;
+    const canvas = canvasFor(o.display.bounds, next);
+    if (
+      canvas.x !== o.canvas.x ||
+      canvas.y !== o.canvas.y ||
+      canvas.width !== o.canvas.width
+    ) {
+      o.canvas = canvas;
+      o.win.setBounds(canvas);
+      send(o, "hud:geometry", geometry(o));
+    }
+    send(o, "hud:drag-preview", {
+      screenId: o.screenId,
+      mode: next.mode,
+      edge: next.edge,
+      offset: next.offset,
+      monitorIndex: screen
+        .getAllDisplays()
+        .findIndex((d) => d.id === o.display.id),
+    });
+  };
+
+  const endDrag = (o: Overlay, cancelled: boolean) => {
+    const d = drag;
+    drag = null;
+    if (!d || o.win.isDestroyed()) return;
+    const dropped = !cancelled && d.preview !== null;
+    if (dropped && d.preview) {
+      // The page keeps its placement in its own storage; it commits the drop there.
+      o.placement = d.preview;
+      send(o, "hud:drag-commit", {
+        mode: d.preview.mode,
+        edge: d.preview.edge,
+        offset: d.preview.offset,
+      });
+    } else {
+      o.canvas = canvasFor(o.display.bounds, o.placement);
+      o.win.setBounds(o.canvas);
+      send(o, "hud:geometry", geometry(o));
+    }
+    send(o, "hud:drag-end", { screenId: o.screenId, cancelled: !dropped });
+    o.pointer = outside(o.screenId);
+    o.win.setIgnoreMouseEvents(!o.focused, { forward: true });
+    poll();
   };
 
   const overlayOf = (sender: Electron.WebContents) =>
@@ -192,7 +281,29 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       if (o) send(o, "hud:bot-looked", args.keys ?? null);
       return null;
     },
-    hud_drag_start: () => null,
+    hud_drag_start: (o, args) => {
+      if (!o || o.win.isDestroyed() || fullscreen) return null;
+      const runs = args.runs as Partial<Drag["runs"]> | undefined;
+      drag = {
+        screenId: o.screenId,
+        mode: (args.mode as HudPlacement["mode"]) ?? o.placement.mode,
+        runs: {
+          horizontal: Number(runs?.horizontal) || 160,
+          vertical: Number(runs?.vertical) || 160,
+        },
+        preview: null,
+        startedAt: Date.now(),
+      };
+      // Keep the mouse while dragging: the page holds the pointer capture and reports the release.
+      o.win.setIgnoreMouseEvents(false);
+      return null;
+    },
+    hud_drag_end: (o, args) => {
+      if (o && drag?.screenId === o.screenId)
+        endDrag(o, args.cancelled === true);
+      return null;
+    },
+    hud_remote_status: () => remoteStatus(),
     hud_place: (o, args) => {
       if (!o || o.win.isDestroyed()) return null;
       o.placement = {
@@ -245,7 +356,13 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       alwaysOnTop: true,
       show: false,
       title: "Code-by-wire HUD",
-      webPreferences: { preload: deps.preload, sandbox: false },
+      // Never throttled: an always-on-top overlay that isn't focused, or comes back after a
+      // full-screen app, otherwise keeps its last frame with timers and animations paused.
+      webPreferences: {
+        preload: deps.preload,
+        sandbox: false,
+        backgroundThrottling: false,
+      },
     });
     markHudWindow(win);
     win.setAlwaysOnTop(true, "screen-saver");
@@ -267,9 +384,15 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       if (e.level === "error" || e.level === "warning")
         logWarn("hud-page", `HUD page ${e.level}: ${e.message}`);
     });
-    win.webContents.on("render-process-gone", (_e, d) =>
-      logWarn("hud-page", `HUD page gone: ${d.reason}`),
-    );
+    // A page that crashed or hung leaves a frozen strip on screen; bring it back.
+    win.webContents.on("render-process-gone", (_e, d) => {
+      logWarn("hud-page", `HUD page gone: ${d.reason}`);
+      if (!win.isDestroyed()) win.webContents.reload();
+    });
+    win.on("unresponsive", () => {
+      logWarn("hud-page", "HUD page unresponsive; restarting it");
+      if (!win.isDestroyed()) win.webContents.forcefullyCrashRenderer();
+    });
     win.once("ready-to-show", () => {
       if (!fullscreen) win.showInactive();
     });
@@ -313,7 +436,10 @@ export function createHudOverlay(deps: HudOverlayDeps) {
         o.pointer = outside(o.screenId);
         o.win.setIgnoreMouseEvents(true, { forward: true });
         send(o, "hud:pointer", o.pointer);
-      } else o.win.showInactive();
+      } else {
+        o.win.showInactive();
+        o.win.webContents.invalidate();
+      }
     }
   };
 

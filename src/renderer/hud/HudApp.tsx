@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { FormatProvider } from "@agent-hud/ui/format-context";
 import { snapshotLanguage } from "@agent-hud/ui/format";
 import {
@@ -16,6 +17,7 @@ import {
 } from "./vendor/app/lib/use-hud-config";
 import { useLocalBotDirections } from "./bot-directions";
 import type { NativeMethod } from "./vendor/app/lib/types";
+import { RemoteStatusContext, useRemoteStatus } from "./remote-status";
 
 /**
  * The HUD overlay window's page: Agent HUD's App, cut to its `surface=hud` branch. One window per
@@ -35,7 +37,12 @@ export function HudApp() {
       })),
     [monitors],
   );
-  const { config: stored, ready } = useHUDConfig(screenId, screens, true);
+  const {
+    config: stored,
+    ready,
+    update,
+  } = useHUDConfig(screenId, screens, true);
+  const remote = useRemoteStatus();
   const botDirections = useLocalBotDirections(snapshot);
   const measured = geometries[screenId] ?? null;
   const config: HUDConfig = {
@@ -58,6 +65,36 @@ export function HudApp() {
     if (!ready || !screenId) return;
     void invoke("hud_place", placement).catch(() => {});
   }, [ready, screenId, placementKey]);
+
+  // Dragging the strip: main follows the cursor and snaps it to an edge; the page holds the pointer
+  // capture, so it reports the release (or Escape), and saves the drop main hands back.
+  useEffect(() => {
+    const release = () => void invoke("hud_drag_end", {}).catch(() => {});
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape")
+        void invoke("hud_drag_end", { cancelled: true }).catch(() => {});
+    };
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    window.addEventListener("keydown", key);
+    const commit = listen<{
+      mode: HUDConfig["mode"];
+      edge: HUDConfig["edge"];
+      offset: number;
+    }>("hud:drag-commit", ({ payload }) => {
+      try {
+        update(payload);
+      } catch (error) {
+        console.error("HUD drop was not saved", error);
+      }
+    });
+    return () => {
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+      window.removeEventListener("keydown", key);
+      void commit.then((unlisten) => unlisten());
+    };
+  }, [update]);
 
   // The theme follows the main window's (the snapshot carries its appearance setting).
   const [systemLight, setSystemLight] = useState(
@@ -101,16 +138,18 @@ export function HudApp() {
       quotaDisplay={snapshot.settings.quotaDisplay}
     >
       <PanelServicesProvider value={panelServices}>
-        <NativeHUDSurface
-          screenId={screenId}
-          snapshot={snapshot}
-          config={config}
-          geometry={measured}
-          monitors={monitors}
-          botDirections={botDirections}
-          glowHidden={false}
-          action={action}
-        />
+        <RemoteStatusContext.Provider value={remote}>
+          <NativeHUDSurface
+            screenId={screenId}
+            snapshot={snapshot}
+            config={config}
+            geometry={measured}
+            monitors={monitors}
+            botDirections={botDirections}
+            glowHidden={false}
+            action={action}
+          />
+        </RemoteStatusContext.Provider>
       </PanelServicesProvider>
     </FormatProvider>
   );
