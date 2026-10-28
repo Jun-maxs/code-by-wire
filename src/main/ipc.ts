@@ -54,6 +54,7 @@ import { applyPinOverrides } from "@shared/pin-override";
 import type { SessionTitleStore } from "./session-titles";
 import type { SessionPinStore } from "./session-pins";
 import type { BoardStore } from "./board-store";
+import { checkSkill, listSkills, updateSkill } from "./skills";
 import { emptyBoard, normalizeAi, type Insight } from "@shared/board";
 import { remapPlacements, type ProjectStateStore } from "./project-state";
 import type { LaunchPresetStore } from "./launch-presets";
@@ -682,6 +683,13 @@ export function registerIpc({
     IPC.boardInsightState,
     () =>
       board?.insightState() ?? { running: false, startedAt: null, error: null },
+  );
+  ipcMain.handle(IPC.listSkills, () => listSkills());
+  ipcMain.handle(IPC.checkSkill, (_e, name: string) =>
+    checkSkill(String(name)),
+  );
+  ipcMain.handle(IPC.updateSkill, (_e, name: string) =>
+    updateSkill(String(name)),
   );
   ipcMain.handle(IPC.testBoardAi, (_e, ai: unknown) =>
     board

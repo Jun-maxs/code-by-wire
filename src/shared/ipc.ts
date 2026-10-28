@@ -1,5 +1,6 @@
 import type { TrashResult } from "./session-trash";
 import type { CardRun, ProductsData, TopicInput } from "./products";
+import type { SkillCheck, SkillsData } from "./skills";
 import type {
   AiTestResult,
   BoardAi,
@@ -80,6 +81,9 @@ export const IPC = {
   runBoardInsight: "board:insight-run",
   boardInsightState: "board:insight-state",
   testBoardAi: "board:ai-test",
+  listSkills: "skills:list",
+  checkSkill: "skills:check",
+  updateSkill: "skills:update",
   trashSession: "session:trash",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
@@ -384,6 +388,12 @@ export interface IpcApi {
   boardInsightState(): Promise<InsightRunState>;
   /** Send a tiny prompt through an AI setting (saved or not) to check it answers. */
   testBoardAi(ai: BoardAi): Promise<AiTestResult>;
+  /** Skills installed on this machine (every folder merged by name) and Claude Code plugins. */
+  listSkills(): Promise<SkillsData>;
+  /** Check one skill against its upstream (git, its own updater, or the upstream SKILL.md). */
+  checkSkill(name: string): Promise<SkillCheck>;
+  /** git pull / run its updater in every copy, then check again. */
+  updateSkill(name: string): Promise<SkillCheck>;
   /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
    *  Refused for a live session. The row disappears on the next overview poll. */
   trashSession(id: string): Promise<TrashResult>;

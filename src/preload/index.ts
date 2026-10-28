@@ -50,6 +50,9 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.runBoardInsight, prompt, trigger),
   boardInsightState: () => ipcRenderer.invoke(IPC.boardInsightState),
   testBoardAi: (ai) => ipcRenderer.invoke(IPC.testBoardAi, ai),
+  listSkills: () => ipcRenderer.invoke(IPC.listSkills),
+  checkSkill: (name) => ipcRenderer.invoke(IPC.checkSkill, name),
+  updateSkill: (name) => ipcRenderer.invoke(IPC.updateSkill, name),
   trashSession: (id) => ipcRenderer.invoke(IPC.trashSession, id),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>
