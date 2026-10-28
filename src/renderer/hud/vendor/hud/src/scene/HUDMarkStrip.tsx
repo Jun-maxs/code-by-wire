@@ -22,6 +22,9 @@ import { useMarkLevelText } from "../ground";
 
 const horizontal = (edge: HUDEdge) => edge === "top" || edge === "bottom";
 
+/** How far the edge glow fades out past each end of the marks. */
+const GLOW_FADE = 16;
+
 export function HUDMarkStrip({
   id,
   config,
@@ -120,18 +123,20 @@ export function HUDMarkStrip({
           aria-hidden="true"
           style={{
             position: "absolute",
-            inset: 0,
+            // Code-by-wire: the lip fades out past the marks' ends instead of stopping in a hard
+            // edge, which read as a coloured block on a light desktop.
+            inset: horizontal(edge)
+              ? `-${backdropReach}px -${GLOW_FADE}px`
+              : `-${GLOW_FADE}px -${backdropReach}px`,
             pointerEvents: "none",
-            clipPath: horizontal(edge)
-              ? `inset(-${backdropReach}px 0 -${backdropReach}px 0)`
-              : `inset(0 -${backdropReach}px 0 -${backdropReach}px)`,
+            maskImage: `linear-gradient(${horizontal(edge) ? "to right" : "to bottom"}, transparent, #000 ${GLOW_FADE * 2}px, #000 calc(100% - ${GLOW_FADE * 2}px), transparent)`,
           }}
         >
           <div
             style={{
               position: "absolute",
-              left: 0,
-              top: 0,
+              left: horizontal(edge) ? GLOW_FADE : backdropReach,
+              top: horizontal(edge) ? backdropReach : GLOW_FADE,
               transformOrigin: "0 0",
               transform: backdropTransform,
             }}
@@ -246,7 +251,7 @@ export function HUDMarkStrip({
                 }),
           }}
         >
-          <RemoteDot edge={edge} light={light} />
+          <RemoteDot edge={edge} light={light} gap={metrics.gap} />
           {vendors.map((vendor, index) => (
             <button
               key={vendor.key}
@@ -292,6 +297,12 @@ export function HUDMarkStrip({
                   display: "inline-grid",
                   placeItems: "center",
                   position: "relative",
+                  // Code-by-wire: logos float on the desktop with no ground; a faint dark rim keeps a
+                  // white mark readable on a light wallpaper and vanishes on a dark one.
+                  filter:
+                    config.mode === "logos"
+                      ? "drop-shadow(0 0 0.6px rgba(0,0,0,0.6)) drop-shadow(0 1px 2px rgba(0,0,0,0.22))"
+                      : undefined,
                 }}
               >
                 {config.mode === "simple" && config.showsRings && (
@@ -454,7 +465,15 @@ export function HUDMarkStrip({
 
 /** Code-by-wire: a small lamp in the strip's corner saying whether the phone can reach this PC (the
  *  HAPI runner is up). Absent when HAPI isn't set up here. Takes no layout space. */
-function RemoteDot({ edge, light }: { edge: HUDEdge; light: boolean }) {
+function RemoteDot({
+  edge,
+  light,
+  gap,
+}: {
+  edge: HUDEdge;
+  light: boolean;
+  gap: number;
+}) {
   const status = useContext(RemoteStatusContext);
   if (!status?.installed) return null;
   const zh = navigator.language.startsWith("zh");
@@ -464,12 +483,10 @@ function RemoteDot({ edge, light }: { edge: HUDEdge; light: boolean }) {
     : zh
       ? "手机遥控离线（runner 没在跑）"
       : "Phone remote offline (runner not running)";
-  const corner =
-    edge === "bottom"
-      ? { bottom: 3, right: 3 }
-      : edge === "left"
-        ? { bottom: 3, left: 3 }
-        : { top: 3, right: 3 };
+  // Past the last mark, on the strip's axis, so it never sits on a logo.
+  const place: CSSProperties = horizontal(edge)
+    ? { left: `calc(100% + ${Math.max(4, gap / 2)}px)`, top: "50%", transform: "translateY(-50%)" }
+    : { top: `calc(100% + ${Math.max(4, gap / 2)}px)`, left: "50%", transform: "translateX(-50%)" };
   return (
     <span
       role="img"
@@ -477,16 +494,16 @@ function RemoteDot({ edge, light }: { edge: HUDEdge; light: boolean }) {
       title={title}
       style={{
         position: "absolute",
-        ...corner,
+        ...place,
         zIndex: 2,
-        width: 6,
-        height: 6,
+        width: 7,
+        height: 7,
         borderRadius: 999,
-        pointerEvents: "auto",
-        background: status.online ? "#46c57a" : "transparent",
+        pointerEvents: "none",
+        background: status.online ? "#46c57a" : light ? "#ffffffcc" : "#000000aa",
         boxShadow: status.online
-          ? `0 0 0 1.5px ${light ? "#fff" : "#000"}, 0 0 6px #46c57a99`
-          : `inset 0 0 0 1.5px ${light ? "#0006" : "#fff6"}`,
+          ? "0 0 0 1.5px rgba(0,0,0,0.45), 0 0 6px #46c57a"
+          : `inset 0 0 0 1.5px ${light ? "#0007" : "#fff8"}`,
       }}
     />
   );
