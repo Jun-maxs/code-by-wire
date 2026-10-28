@@ -55,12 +55,12 @@ export function SessionFilterMenu({
               type="radio"
               name="session-grouping"
               value={grouping}
-              checked={(preferences.grouping ?? "folder") === grouping}
+              checked={(preferences.grouping ?? "product") === grouping}
               onChange={() =>
                 onChange({
                   showAgentIcons: preferences.showAgentIcons,
                   agent: preferences.agent,
-                  ...(grouping === "product" ? { grouping } : {}),
+                  ...(grouping === "folder" ? { grouping } : {}),
                 })
               }
             />

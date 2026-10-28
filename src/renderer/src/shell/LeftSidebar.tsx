@@ -137,8 +137,9 @@ export function LeftSidebar({
   // differs. filterGroups applies search + preferences together and retains ancestor context.
   // Fork feature: group by product card instead of folder when chosen (and cards are present).
   const products = useContext(ProductsContext);
+  const byProduct = preferences.grouping !== "folder" && !!products;
   const groups = filterGroups(
-    preferences.grouping === "product" && products
+    byProduct && products
       ? groupSessionsByProduct(
           sessions,
           (s) => {
@@ -320,6 +321,7 @@ export function LeftSidebar({
     return (
       <div key={node.session.id}>
         <SessionRow
+          hideProduct={byProduct}
           session={node.session}
           selected={node.session.id === selectedId}
           onSelect={() => onSelect(node.session.id)}
@@ -616,18 +618,15 @@ export function LeftSidebar({
 
         <OverlayScroll className="min-h-0 flex-1" contentClassName="pb-2">
           <div>
-            <div className="sticky top-0 z-10 flex items-center bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
-              <SidebarPanelLabel className="pl-2">
-                {t.shell.sidebar.pinnedLabel}
-              </SidebarPanelLabel>
-            </div>
-            {pinned.length === 0 ? (
-              <div className="px-2.5">
-                <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
-                  {t.shell.sidebar.noPinnedSessions}
-                </p>
+            {/* Fork: an empty Pinned section is hidden rather than spending two rows saying so. */}
+            {pinned.length > 0 && (
+              <div className="sticky top-0 z-10 flex items-center bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
+                <SidebarPanelLabel className="pl-2">
+                  {t.shell.sidebar.pinnedLabel}
+                </SidebarPanelLabel>
               </div>
-            ) : (
+            )}
+            {pinned.length === 0 ? null : (
               <div className="flex flex-col gap-px px-2.5">
                 {pinned.map((s) => (
                   <PinnedSessionRow
@@ -709,14 +708,12 @@ export function LeftSidebar({
             </div>
             <div className="px-2.5">
               <div className="flex flex-col gap-px">
-                {pinnedProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
-                    {t.shell.sidebar.noPinnedProjects}
-                  </p>
-                ) : (
-                  pinnedProjects.map((g) => renderProjectGroup(g, "pinned"))
+                {pinnedProjects.length > 0 && (
+                  <>
+                    {pinnedProjects.map((g) => renderProjectGroup(g, "pinned"))}
+                    <div className="mx-2 my-1 border-t border-sidebar-border" />
+                  </>
                 )}
-                <div className="mx-2 my-1 border-t border-sidebar-border" />
                 {groups.length === 0 ? (
                   <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
                     {agentFilterActive && sessions.length > 0

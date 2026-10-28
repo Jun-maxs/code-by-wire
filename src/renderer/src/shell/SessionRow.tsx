@@ -39,6 +39,7 @@ export function SessionRow({
   activeDescendantCount = 0,
   childrenExpanded = false,
   onToggleChildren,
+  hideProduct = false,
 }: {
   session: Session;
   selected: boolean;
@@ -55,6 +56,8 @@ export function SessionRow({
   activeDescendantCount?: number;
   childrenExpanded?: boolean;
   onToggleChildren?: () => void;
+  /** The sidebar already groups by topic, so the title needn't repeat the topic's name. */
+  hideProduct?: boolean;
 }) {
   const { t } = useI18n();
   const menu = useSessionMenu(session, canSpawn, {
@@ -151,7 +154,7 @@ export function SessionRow({
           >
             {/* Fork feature: the topic's name leads the title, in its color, so parallel
              *  sessions on different products read apart at a glance. */}
-            {product && (
+            {product && !hideProduct && (
               <span className="font-medium" style={{ color: product.color }}>
                 {shortTopicName(product.name)}
                 <span className="text-(--ui-text-quaternary)"> · </span>

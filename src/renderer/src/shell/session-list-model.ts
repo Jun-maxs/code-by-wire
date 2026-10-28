@@ -1,4 +1,4 @@
-import type { ProductInfo } from "@shared/products";
+import { shortTopicName, type ProductInfo } from "@shared/products";
 import type { Session } from "@shared/types";
 import { tNow } from "../i18n";
 import type { SessionsListPreferences } from "./session-list-preferences";
@@ -425,7 +425,7 @@ export function groupSessionsByProduct(
     if (bucket) bucket.sessions.push(s);
     else
       buckets.set(key, {
-        label: product?.name ?? otherLabel,
+        label: product ? shortTopicName(product.name) : otherLabel,
         color: product?.color,
         sessions: [s],
       });
@@ -439,8 +439,10 @@ export function groupSessionsByProduct(
     }))
     .sort(
       (a, b) =>
+        // Sessions with no topic are the leftovers; they never push a real topic down.
+        Number(a.key === "product:-") - Number(b.key === "product:-") ||
         Math.max(...b.sessions.map((s) => s.lastActivityMs)) -
-        Math.max(...a.sessions.map((s) => s.lastActivityMs)),
+          Math.max(...a.sessions.map((s) => s.lastActivityMs)),
     );
 }
 

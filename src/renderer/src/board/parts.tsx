@@ -6,7 +6,9 @@ import type {
   TaskRisk,
   TaskStatus,
 } from "@shared/board";
-import type { ProductInfo } from "@shared/products";
+import { shortTopicName, type ProductInfo } from "@shared/products";
+
+export { shortTopicName };
 import { cx } from "../ui/atoms";
 
 /** Status hues reuse the app's session-state colors: live teal, waiting amber, ok green, idle gray. */
@@ -88,11 +90,6 @@ export function Chip({
 export function TopicChip({ topic }: { topic: ProductInfo | undefined }) {
   if (!topic) return null;
   return <Chip color={topic.color}>{shortTopicName(topic.name)}</Chip>;
-}
-
-/** "驾驶舱（Code-by-wire/工作台）" → "驾驶舱": the gloss in brackets is for Settings, not chips. */
-export function shortTopicName(name: string): string {
-  return name.replace(/\s*[（(].*$/, "").trim() || name;
 }
 
 /** A thin progress rule. */
