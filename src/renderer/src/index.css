@@ -451,6 +451,9 @@ body {
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Fork change: CJK fonts ship no italic, and a synthetic slant reads badly; Latin text with a real
+     italic face still gets it. */
+  font-synthesis-style: none;
 }
 
 /* Reuses --color-working (the app's teal accent, also driving the "working" status glyph and both

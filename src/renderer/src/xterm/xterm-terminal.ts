@@ -3,6 +3,7 @@
  *  the WebGL/DOM renderer, and theming. Interaction with the backing process is out of
  *  scope of this class (vscode xtermTerminal.ts:112-115) — pty/IPC wiring stays with the
  *  consumers (terminal-store/TerminalView, use-terminal-session). */
+import { stripItalic } from "./strip-italic";
 import { Terminal, type ITerminalOptions, type ITheme } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import type { SerializeAddon } from "@xterm/addon-serialize";
@@ -66,6 +67,10 @@ export class XtermTerminal {
       // nothing. Route it through the same opener as everything else instead.
       linkHandler: open ? { activate: (_event, uri) => open(uri) } : null,
     });
+    // No synthetic italics (fork change): CJK glyphs slanted by the renderer are hard to read.
+    const write = this.raw.write.bind(this.raw);
+    this.raw.write = (data, callback) =>
+      write(typeof data === "string" ? stripItalic(data) : data, callback);
     // Live re-theme: the instance is long-lived, so a later Settings change must reassign
     // its theme (vscode: onDidColorThemeChange → _updateTheme).
     this.disposables.push(
