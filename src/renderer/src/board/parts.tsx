@@ -118,7 +118,11 @@ export function Progress({
       )}
     >
       <div
-        className={cx("h-full rounded-full", STATUS_BG[status])}
+        // Progress is a quantity, not a state: neutral like the board's other bars (DESIGN.md).
+        className={cx(
+          "h-full rounded-full",
+          status === "done" ? "bg-fg/30" : "bg-fg/60",
+        )}
         style={{ width: `${Math.round(value * 100)}%` }}
       />
     </div>
@@ -210,11 +214,11 @@ export function Ring({
 /** Button skins shared across the board. */
 export const btn = {
   ghost:
-    "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
+    "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
   outline:
-    "inline-flex h-7 items-center gap-1.5 rounded-md border border-(--ui-stroke-tertiary) px-2.5 text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
+    "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-(--ui-stroke-tertiary) px-2.5 text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
   primary:
-    "inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-body font-medium text-ink-950 transition-colors duration-100 hover:bg-primary-bright disabled:opacity-50",
+    "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-2.5 text-body font-medium text-ink-950 transition-colors duration-100 hover:bg-primary-bright disabled:opacity-50",
 };
 
 export const input =

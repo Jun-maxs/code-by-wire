@@ -153,8 +153,10 @@ export function NewSessionView({
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-ink-950 text-fg">
-      <div className="w-full max-w-[420px]">
+    // Centered when it fits; on a short window it scrolls with breathing room instead of clipping
+    // under the title bar (my-auto rather than items-center).
+    <div className="flex h-full w-full justify-center overflow-y-auto bg-ink-950 text-fg">
+      <div className="my-auto w-full max-w-[420px] py-8">
         <PageHeader
           title={t.shell.sidebar.newSession}
           lede={

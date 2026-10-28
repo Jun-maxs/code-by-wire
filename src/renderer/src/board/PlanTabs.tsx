@@ -56,7 +56,15 @@ export function ScheduleTab({ query }: { query: string }) {
   };
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(220px,280px)_minmax(0,1fr)] gap-3 px-5 pb-4">
+    <div
+      className={cx(
+        "grid h-full min-h-0 gap-3 px-5 pb-4",
+        // An empty "unscheduled" column only needs to be a drop target.
+        unscheduled.length
+          ? "grid-cols-[minmax(220px,280px)_minmax(0,1fr)]"
+          : "grid-cols-[180px_minmax(0,1fr)]",
+      )}
+    >
       <Panel
         title={s.unscheduled}
         lede={s.unscheduledHint}
@@ -94,7 +102,8 @@ export function ScheduleTab({ query }: { query: string }) {
               }}
               onDrop={(e) => plan(e, d.date)}
               className={cx(
-                "grid grid-cols-[72px_120px_minmax(0,1fr)] items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors duration-100",
+                "grid grid-cols-[96px_minmax(0,1fr)] items-start gap-3 rounded-lg border px-3 transition-colors duration-100",
+                tasks.length ? "py-2.5" : "py-1.5",
                 over === d.date
                   ? "border-(--ui-stroke-primary) bg-ink-925"
                   : "border-ink-800 bg-ink-925",
@@ -113,25 +122,28 @@ export function ScheduleTab({ query }: { query: string }) {
                 <p className="text-meta text-fg-faint">
                   {isToday ? s.today : s.weekday[date.getDay()]}
                 </p>
-              </div>
-              <div className="pt-1">
-                <div className="h-1.5 overflow-hidden rounded-full bg-(--ui-bg-tertiary)">
-                  <div
-                    className={cx(
-                      "h-full rounded-full",
-                      ratio > 1.001 ? "bg-danger" : "bg-fg/70",
-                    )}
-                    style={{ width: `${Math.min(100, ratio * 100)}%` }}
-                  />
-                </div>
-                <p
-                  className={cx(
-                    "mt-1 font-mono text-meta tabular-nums",
-                    ratio > 1.001 ? "text-danger" : "text-fg-faint",
-                  )}
-                >
-                  {fmtH(d.hours)} / {fmtH(doc.capacityH)}
-                </p>
+                {d.hours > 0 && (
+                  <>
+                    {/* The day's load sits under its date, so the task chips get the row's width. */}
+                    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-(--ui-bg-tertiary)">
+                      <div
+                        className={cx(
+                          "h-full rounded-full",
+                          ratio > 1.001 ? "bg-danger" : "bg-fg/70",
+                        )}
+                        style={{ width: `${Math.min(100, ratio * 100)}%` }}
+                      />
+                    </div>
+                    <p
+                      className={cx(
+                        "mt-1 font-mono text-meta tabular-nums",
+                        ratio > 1.001 ? "text-danger" : "text-fg-faint",
+                      )}
+                    >
+                      {fmtH(d.hours)} / {fmtH(doc.capacityH)}
+                    </p>
+                  </>
+                )}
               </div>
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 {tasks.length === 0 && (
@@ -294,7 +306,7 @@ export function IdeasTab({ query }: { query: string }) {
               <Icon
                 name="lightbulb"
                 size={14}
-                className="mt-0.5 shrink-0 text-accent"
+                className="mt-0.5 shrink-0 text-fg-faint"
               />
               <div className="min-w-0 flex-1">
                 <p className="whitespace-pre-wrap text-body leading-relaxed text-fg">
@@ -361,7 +373,7 @@ export function IdeasTab({ query }: { query: string }) {
               }
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-aux text-fg-faint hover:bg-(--ui-row-hover-background)"
             >
-              <Icon name="check" size={13} className="text-ok" />
+              <Icon name="check" size={13} className="text-fg-faint" />
               <span className="min-w-0 flex-1 truncate">{i.text}</span>
               <span>{s.ideaDone}</span>
             </button>
@@ -537,7 +549,7 @@ export function HabitsTab() {
                           className={cx(
                             "size-5 rounded-[3px] border transition-colors duration-100",
                             on
-                              ? "border-transparent bg-ok"
+                              ? "border-transparent bg-fg/75"
                               : "border-(--ui-stroke-secondary) hover:border-(--ui-stroke-primary)",
                             d === today &&
                               !on &&
@@ -562,7 +574,7 @@ export function HabitsTab() {
                       className={cx(
                         checked ? btn.ghost : btn.outline,
                         "w-full justify-center",
-                        checked && "text-ok",
+                        checked && "text-fg-faint",
                       )}
                     >
                       <Icon name="check" size={13} />

@@ -298,7 +298,7 @@ function Subtasks({
                 ),
               })
             }
-            className="size-3.5 accent-(--color-ok)"
+            className="size-3.5 accent-(--color-fg)"
           />
           <input
             value={st.text}
