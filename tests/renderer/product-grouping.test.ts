@@ -85,11 +85,11 @@ describe("groupSessionsByProduct", () => {
 describe("sessions list grouping preference", () => {
   const storage = (value: unknown): Storage =>
     ({ getItem: () => JSON.stringify(value) }) as unknown as Storage;
-  it("is absent (folder) by default and accepts product", () => {
+  it("is absent (by topic) by default and only stores folder", () => {
     expect(loadSessionsListPreferences(storage({})).grouping).toBeUndefined();
     expect(
-      loadSessionsListPreferences(storage({ grouping: "product" })).grouping,
-    ).toBe("product");
+      loadSessionsListPreferences(storage({ grouping: "folder" })).grouping,
+    ).toBe("folder");
     expect(
       loadSessionsListPreferences(storage({ grouping: "bogus" })).grouping,
     ).toBeUndefined();

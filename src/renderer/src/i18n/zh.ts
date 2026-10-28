@@ -19,7 +19,7 @@ export const zh: Translations = {
       system: "系统",
       appearance: "外观",
       topics: "主题",
-      databases: "数据库",
+      databases: "数据与清理",
       about: "关于",
     },
     topics: {
@@ -163,6 +163,31 @@ export const zh: Translations = {
       edit: "编辑",
       refreshPlaceholder: "秒数（1–60），留空则仅事件触发",
       save: "保存",
+    },
+    cleanup: {
+      title: "自动清理",
+      enabled: "自动清理旧会话",
+      enabledDesc:
+        "已结束、超过下面天数没动过的会话移到回收站；置顶、改过名、挂在看板任务上的不动。",
+      days: "多久没动",
+      daysUnit: (n: number) => `${n} 天`,
+      preview: (n: number, size: string) =>
+        n ? `现在符合条件的有 ${n} 场（${size}）` : "现在没有符合条件的会话",
+      kept: (pinned: number, board: number, renamed: number) =>
+        "保留 " +
+        [
+          pinned && `置顶 ${pinned}`,
+          board && `看板 ${board}`,
+          renamed && `改过名 ${renamed}`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      run: "立即清理",
+      confirm: (n: number) => `确认移走 ${n} 场`,
+      running: "清理中…",
+      lastRun: (when: string, n: number, size: string, failed: number) =>
+        `上次 ${when}：移走 ${n} 场（${size}）` +
+        (failed ? `，${failed} 场失败` : ""),
     },
     databases: {
       title: "数据库",

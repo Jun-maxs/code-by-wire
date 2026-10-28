@@ -1,6 +1,10 @@
 import type { TrashResult } from "./session-trash";
+import type {
+  SessionCleanupSettings,
+  SessionCleanupView,
+} from "./session-cleanup";
 import type { CardRun, ProductsData, TopicInput } from "./products";
-import type { SkillCheck, SkillsData } from "./skills";
+import type { SkillCheck, SkillRemoveResult, SkillsData } from "./skills";
 import type {
   AiTestResult,
   BoardAi,
@@ -84,7 +88,12 @@ export const IPC = {
   listSkills: "skills:list",
   checkSkill: "skills:check",
   updateSkill: "skills:update",
+  scanSkillUsage: "skills:scanUsage",
+  removeSkill: "skills:remove",
   trashSession: "session:trash",
+  sessionCleanupGet: "session:cleanupGet",
+  sessionCleanupSet: "session:cleanupSet",
+  sessionCleanupRun: "session:cleanupRun",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
   updateGetState: "update:getState",
@@ -394,9 +403,18 @@ export interface IpcApi {
   checkSkill(name: string): Promise<SkillCheck>;
   /** git pull / run its updater in every copy, then check again. */
   updateSkill(name: string): Promise<SkillCheck>;
+  /** Re-read the transcripts for per-skill usage (incremental), then list again. */
+  scanSkillUsage(): Promise<SkillsData>;
+  /** Uninstall everywhere: links removed, folders to the Recycle Bin. */
+  removeSkill(name: string): Promise<SkillRemoveResult>;
   /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
    *  Refused for a live session. The row disappears on the next overview poll. */
   trashSession(id: string): Promise<TrashResult>;
+  /** Automatic cleanup: the rule, what it would trash now, the last run. */
+  getSessionCleanup(): Promise<SessionCleanupView>;
+  setSessionCleanup(next: SessionCleanupSettings): Promise<SessionCleanupView>;
+  /** Run the cleanup now (ignores the on/off switch); resolves when it's done. */
+  runSessionCleanup(): Promise<SessionCleanupView>;
   /** Every saved launch-args preset, keyed by agent (the New-session preset picker). */
   getLaunchPresets(): Promise<LaunchPresets>;
   /** Replace the whole presets object — the renderer owns list edits and ships the result back. */

@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
 import type { Locale } from "../shared/locale";
 import type { HudSettings } from "../shared/ipc";
+import type {
+  CleanupRun,
+  SessionCleanupSettings,
+} from "../shared/session-cleanup";
 
 /** code-by-wire's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
 export interface AppSettings {
@@ -26,6 +30,10 @@ export interface AppSettings {
   hud?: Partial<HudSettings>;
   /** The HUD's own preferences, set in its Settings window (Agent HUD's General page). */
   hudPanel?: HudPanelSettings;
+  /** Automatic session cleanup; read through cleanupSettings() (missing = off, 30 days). */
+  sessionCleanup?: Partial<SessionCleanupSettings>;
+  /** The last cleanup run, for the Settings card. */
+  lastCleanup?: CleanupRun;
 }
 
 /** Agent HUD's General page: the HUD windows' appearance and language, and whether quota reads as
@@ -55,6 +63,8 @@ export interface AppSettingsStore {
   setAppLocale(locale: Locale): void;
   setHud(hud: HudSettings): void;
   setHudPanel(patch: HudPanelSettings): void;
+  setSessionCleanup(next: SessionCleanupSettings): void;
+  setLastCleanup(run: CleanupRun): void;
 }
 
 export interface AppSettingsDeps {
@@ -106,6 +116,12 @@ export function createAppSettingsStore(
     setHudPanel(patch) {
       const s = read();
       write({ ...s, hudPanel: { ...s.hudPanel, ...patch } });
+    },
+    setSessionCleanup(next) {
+      write({ ...read(), sessionCleanup: next });
+    },
+    setLastCleanup(run) {
+      write({ ...read(), lastCleanup: run });
     },
   };
 }

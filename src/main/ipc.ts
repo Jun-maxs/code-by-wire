@@ -1,5 +1,13 @@
 import { join } from "node:path";
 import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
+import {
+  cleanupSettings,
+  pickCleanup,
+  type CleanupRun,
+  type SessionCleanupSettings,
+  type SessionCleanupView,
+} from "@shared/session-cleanup";
+import { pathBytes } from "./fs-dir";
 import type { CardRun, ProductsData, TopicInput } from "@shared/products";
 import {
   assignSession,
@@ -54,7 +62,13 @@ import { applyPinOverrides } from "@shared/pin-override";
 import type { SessionTitleStore } from "./session-titles";
 import type { SessionPinStore } from "./session-pins";
 import type { BoardStore } from "./board-store";
-import { checkSkill, listSkills, updateSkill } from "./skills";
+import {
+  checkSkill,
+  listSkills,
+  removeSkill,
+  scanSkillUsage,
+  updateSkill,
+} from "./skills";
 import { emptyBoard, normalizeAi, type Insight } from "@shared/board";
 import { remapPlacements, type ProjectStateStore } from "./project-state";
 import type { LaunchPresetStore } from "./launch-presets";
@@ -270,6 +284,8 @@ export function registerIpc({
     setAppLocale: () => {},
     setHud: () => {},
     setHudPanel: () => {},
+    setSessionCleanup: () => {},
+    setLastCleanup: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
@@ -618,36 +634,136 @@ export function registerIpc({
     }
     return overviewNow();
   });
-  ipcMain.handle(
-    IPC.trashSession,
-    async (_e, id: string): Promise<TrashResult> => {
-      const row = overviewNow().sessions.find((s) => s.id === id);
-      const live = row !== undefined && row.state !== "ended";
-      const result = await trashSessionFiles(
-        {
-          resolveTranscriptPath: (sid) => provider.resolveTranscriptPath(sid),
-          trash: (path) => shell.trashItem(path),
-          exists: existsSync,
-        },
-        id,
-        live,
-      );
-      if (result.ok) {
-        try {
-          db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
-          sessionTitles?.set(id, null);
-          sessionPins?.set(id, false);
-        } catch (err) {
-          logError(
-            "session-trash-index",
-            "trashed files but index cleanup failed",
-            err,
-          );
-        }
+  const trashOne = async (id: string): Promise<TrashResult> => {
+    const row = overviewNow().sessions.find((s) => s.id === id);
+    const live = row !== undefined && row.state !== "ended";
+    const result = await trashSessionFiles(
+      {
+        resolveTranscriptPath: (sid) => provider.resolveTranscriptPath(sid),
+        trash: (path) => shell.trashItem(path),
+        exists: existsSync,
+      },
+      id,
+      live,
+    );
+    if (result.ok) {
+      try {
+        db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
+        sessionTitles?.set(id, null);
+        sessionPins?.set(id, false);
+      } catch (err) {
+        logError(
+          "session-trash-index",
+          "trashed files but index cleanup failed",
+          err,
+        );
       }
-      return result;
-    },
-  );
+    }
+    return result;
+  };
+  ipcMain.handle(IPC.trashSession, (_e, id: string) => trashOne(id));
+
+  // Automatic cleanup (fork feature, 2026-10-28): see @shared/session-cleanup. Runs a few minutes
+  // after launch and every six hours while the app is open.
+  let cleanupRunning = false;
+  const cleanupPick = () => {
+    const rule = cleanupSettings(settings.read().sessionCleanup);
+    const onBoard = new Set(
+      (board?.read().tasks ?? []).flatMap((t) => t.sessionIds),
+    );
+    const renamed = new Set(Object.keys(sessionTitles?.read() ?? {}));
+    const pick = pickCleanup(overviewNow().sessions, rule.days, Date.now(), {
+      board: onBoard,
+      renamed,
+    });
+    return { rule, pick };
+  };
+  const transcriptBytes = (id: string): number => {
+    const path = provider.resolveTranscriptPath(id);
+    if (!path) return 0;
+    return pathBytes(path) + pathBytes(path.replace(/\.jsonl$/i, ""));
+  };
+  const cleanupView = (): SessionCleanupView => {
+    const { rule, pick } = cleanupPick();
+    return {
+      settings: rule,
+      preview: {
+        count: pick.ids.length,
+        bytes: pick.ids.reduce((n, id) => n + transcriptBytes(id), 0),
+        kept: pick.kept,
+      },
+      lastRun: settings.read().lastCleanup ?? null,
+      running: cleanupRunning,
+    };
+  };
+  const runCleanup = async (trigger: CleanupRun["trigger"]) => {
+    if (cleanupRunning) return;
+    if (
+      trigger === "auto" &&
+      !cleanupSettings(settings.read().sessionCleanup).enabled
+    )
+      return;
+    cleanupRunning = true;
+    try {
+      // Count before deleting: the Stats store and the Skills page's usage both keep what they
+      // ingested after a transcript is gone, but only what they ingested — so ingest first.
+      for (const agent of ["claude", "codex"] as const)
+        for (let i = 0; i < 100_000; i++) {
+          if (runScanStep(agent, Date.now()).done) break;
+          await new Promise((r) => setImmediate(r));
+        }
+      await scanSkillUsage();
+    } catch (err) {
+      cleanupRunning = false;
+      logError(
+        "session-cleanup-ingest",
+        "pre-cleanup scan failed; skipped",
+        err,
+      );
+      return;
+    }
+    const { pick } = cleanupPick();
+    const run: CleanupRun = {
+      at: Date.now(),
+      trashed: 0,
+      bytes: 0,
+      failed: 0,
+      trigger,
+    };
+    try {
+      for (const id of pick.ids) {
+        const bytes = transcriptBytes(id);
+        const r = await trashOne(id);
+        if (r.ok) {
+          run.trashed++;
+          run.bytes += bytes;
+        } else if (r.reason !== "not-found") run.failed++;
+      }
+    } finally {
+      cleanupRunning = false;
+      if (run.trashed || run.failed || trigger === "manual")
+        settings.setLastCleanup({ ...run, at: Date.now() });
+    }
+  };
+  ipcMain.handle(IPC.sessionCleanupGet, () => cleanupView());
+  ipcMain.handle(IPC.sessionCleanupSet, (_e, next: unknown) => {
+    settings.setSessionCleanup(
+      cleanupSettings(next as Partial<SessionCleanupSettings>),
+    );
+    return cleanupView();
+  });
+  ipcMain.handle(IPC.sessionCleanupRun, async () => {
+    await runCleanup("manual");
+    return cleanupView();
+  });
+  if (appSettings) {
+    const auto = () =>
+      void runCleanup("auto").catch((err: unknown) =>
+        logError("session-cleanup-failed", "automatic cleanup failed", err),
+      );
+    setTimeout(auto, 3 * 60_000).unref?.();
+    setInterval(auto, 6 * 3_600_000).unref?.();
+  }
   const productsNow = (): ProductsData | null => {
     const dirs = productsDirs?.();
     if (!dirs) return null;
@@ -690,6 +806,10 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.updateSkill, (_e, name: string) =>
     updateSkill(String(name)),
+  );
+  ipcMain.handle(IPC.scanSkillUsage, () => scanSkillUsage());
+  ipcMain.handle(IPC.removeSkill, (_e, name: string) =>
+    removeSkill(String(name)),
   );
   ipcMain.handle(IPC.testBoardAi, (_e, ai: unknown) =>
     board

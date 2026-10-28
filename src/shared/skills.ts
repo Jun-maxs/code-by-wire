@@ -25,6 +25,33 @@ export interface SkillInfo {
   source: SkillSource;
   /** Newest SKILL.md mtime across copies, epoch ms. */
   updatedAt: number | null;
+  /** Every entry pointing at it (folders and links), i.e. what removing it deletes. */
+  locations: string[];
+  /** When the oldest copy appeared on disk (folder birth time), epoch ms. */
+  installedAt: number | null;
+  /** The copies' SKILL.md files are not all the same. */
+  copiesDiffer: boolean;
+  /** An installed Claude Code plugin ships a skill of the same name (this copy duplicates it). */
+  alsoInPlugin: string | null;
+}
+
+/** Uses found in the agents' transcripts. */
+export interface SkillUsage {
+  count: number;
+  lastUsedAt: number | null;
+}
+
+/** Unused this long (and installed at least this long ago) reads as idle on the Skills page. */
+export const SKILL_IDLE_DAYS = 30;
+
+export function isIdleSkill(
+  skill: Pick<SkillInfo, "installedAt">,
+  usage: SkillUsage | undefined,
+  now: number,
+): boolean {
+  const cutoff = now - SKILL_IDLE_DAYS * 86_400_000;
+  if (skill.installedAt !== null && skill.installedAt > cutoff) return false;
+  return !usage?.lastUsedAt || usage.lastUsedAt < cutoff;
 }
 
 export interface PluginInfo {
@@ -32,11 +59,29 @@ export interface PluginInfo {
   marketplace: string;
   version: string | null;
   installedAt: number | null;
+  /** Skill folder names the plugin ships. */
+  skills: string[];
 }
 
 export interface SkillsData {
   skills: SkillInfo[];
   plugins: PluginInfo[];
+  usage: Record<string, SkillUsage>;
+  /** When the transcripts were last read for usage; null before the first scan. */
+  usageScannedAt: number | null;
+  usageScanning: boolean;
+  /** The last check per skill, kept across app runs. */
+  checks: Record<string, SkillCheck>;
+}
+
+/** How a copied skill's files compare with upstream (by git blob hash, every file). */
+export interface SkillFileDiff {
+  /** In both, content differs. */
+  changed: string[];
+  /** Upstream has it, the local copy doesn't. */
+  added: string[];
+  /** Only here (local additions, or files upstream removed). */
+  localOnly: string[];
 }
 
 export type SkillCheckStatus =
@@ -56,6 +101,8 @@ export interface SkillCheck {
   canUpdate: boolean;
   /** Where to look upstream, when known. */
   url: string | null;
+  /** File-level comparison for skills checked against an upstream folder. */
+  diff?: SkillFileDiff;
   checkedAt: number;
 }
 
@@ -78,3 +125,7 @@ export function parseSkillFrontMatter(md: string): {
     version: field("version"),
   };
 }
+
+export type SkillRemoveResult =
+  | { ok: true; removed: string[] }
+  | { ok: false; detail: string };

@@ -53,7 +53,12 @@ const api: AppApi = {
   listSkills: () => ipcRenderer.invoke(IPC.listSkills),
   checkSkill: (name) => ipcRenderer.invoke(IPC.checkSkill, name),
   updateSkill: (name) => ipcRenderer.invoke(IPC.updateSkill, name),
+  scanSkillUsage: () => ipcRenderer.invoke(IPC.scanSkillUsage),
+  removeSkill: (name) => ipcRenderer.invoke(IPC.removeSkill, name),
   trashSession: (id) => ipcRenderer.invoke(IPC.trashSession, id),
+  getSessionCleanup: () => ipcRenderer.invoke(IPC.sessionCleanupGet),
+  setSessionCleanup: (next) => ipcRenderer.invoke(IPC.sessionCleanupSet, next),
+  runSessionCleanup: () => ipcRenderer.invoke(IPC.sessionCleanupRun),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>
     ipcRenderer.invoke(IPC.launchPresetsSet, presets),

@@ -34,7 +34,7 @@ export const en = {
       system: "System",
       appearance: "Appearance",
       topics: "Topics",
-      databases: "Databases",
+      databases: "Data & cleanup",
       about: "About",
     },
     topics: {
@@ -187,6 +187,30 @@ export const en = {
       edit: "Edit",
       refreshPlaceholder: "seconds (1–60), empty for events only",
       save: "Save",
+    },
+    cleanup: {
+      title: "Automatic cleanup",
+      enabled: "Clean up old sessions",
+      enabledDesc:
+        "Ended sessions idle this long go to the Recycle Bin. Pinned, renamed and board-attached sessions stay.",
+      days: "Idle for",
+      daysUnit: (n: number) => `${n} d`,
+      preview: (n: number, size: string) =>
+        n ? `${n} sessions match now (${size})` : "Nothing matches now",
+      kept: (pinned: number, board: number, renamed: number) =>
+        [
+          pinned && `${pinned} pinned`,
+          board && `${board} on the board`,
+          renamed && `${renamed} renamed`,
+        ]
+          .filter(Boolean)
+          .join(" · ") + " kept",
+      run: "Clean now",
+      confirm: (n: number) => `Move ${n} to Recycle Bin`,
+      running: "Cleaning…",
+      lastRun: (when: string, n: number, size: string, failed: number) =>
+        `Last run ${when}: ${n} moved (${size})` +
+        (failed ? `, ${failed} failed` : ""),
     },
     databases: {
       title: "Databases",

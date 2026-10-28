@@ -12,6 +12,7 @@ import { CodexCliCard } from "./CodexCliCard";
 import { StatuslineCard } from "./StatuslineCard";
 import { AnalyticsDbCard } from "./AnalyticsDbCard";
 import { IndexDbCard } from "./IndexDbCard";
+import { SessionCleanupCard } from "./SessionCleanupCard";
 import { TopicsSection } from "./TopicsSection";
 import { AgentIcon } from "../ui/agent-icons";
 import { OverlayScroll } from "../ui/OverlayScroll";
@@ -218,9 +219,10 @@ function DatabasesSection() {
   return (
     <>
       <PageHeader
-        title={t.settings.databases.title}
+        title={t.settings.nav.databases}
         lede={t.settings.databases.lede}
       />
+      <SessionCleanupCard />
       <AnalyticsDbCard info={info?.analytics ?? null} />
       <IndexDbCard info={info?.index ?? null} />
     </>
