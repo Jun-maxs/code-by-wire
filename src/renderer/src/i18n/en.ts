@@ -674,6 +674,11 @@ export const en = {
             "Context written into the longer-lived 1-hour cache. 2× input.",
         },
       },
+      cacheHit: {
+        label: "Cache hit rate",
+        description:
+          "How much of the context sent to the model was replayed from cache: cache reads ÷ (fresh input + cache reads + cache writes). Higher is cheaper; it drops when the cache expires after a long pause.",
+      },
     },
     duty: {
       heading: "Duty",

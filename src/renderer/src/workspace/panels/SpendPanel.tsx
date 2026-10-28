@@ -64,6 +64,14 @@ export function SpendPanel({
   const view = useMemo(() => viewUsageByModel(usageByModel), [usageByModel]);
   const { usage } = view;
   const total = view.totalTokens;
+  // Share of the context sent to the model that was replayed from cache rather than re-read:
+  // cache reads over every prompt-side token (fresh input + cache reads + cache writes).
+  const prompted =
+    usage.inputTokens + usage.cacheReadTokens + usage.cacheCreationTokens;
+  const cacheHit =
+    kinds.some((k) => k.key === "cacheRead") && prompted > 0
+      ? usage.cacheReadTokens / prompted
+      : null;
 
   return (
     <PanelSection>
@@ -89,6 +97,12 @@ export function SpendPanel({
             value={t.numbers.tokensShort(KIND_TOKENS[k.key](usage))}
           />
         ))}
+        {cacheHit !== null && (
+          <StatRow
+            label={<KindLabel {...t.dock.spend.cacheHit} />}
+            value={`${(cacheHit * 100).toFixed(1)}%`}
+          />
+        )}
       </div>
     </PanelSection>
   );

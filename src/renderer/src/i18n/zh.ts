@@ -594,6 +594,11 @@ export const zh: Translations = {
           description: "写入更长效的 1 小时缓存的上下文，价格为输入的 2 倍。",
         },
       },
+      cacheHit: {
+        label: "读缓存命中率",
+        description:
+          "送进模型的上下文里，有多少是直接从缓存回放的：缓存读取 ÷（新输入 + 缓存读取 + 缓存写入）。越高越省钱；长时间停顿后缓存过期会让它掉下来。",
+      },
     },
     duty: {
       heading: "占空比",
