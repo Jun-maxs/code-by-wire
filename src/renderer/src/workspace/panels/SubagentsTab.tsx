@@ -61,14 +61,14 @@ function SubagentRow({
           </MetricCell>
           <MetricCell
             width="w-22"
-            tone="text-(--ui-text-secondary)"
+            tone="text-fg-muted"
             unit={t.dock.tokensUnit}
           >
             {t.numbers.tokensShort(agent.tokens)}
           </MetricCell>
           <MetricCell
             width="w-24"
-            tone="text-(--ui-text-secondary)"
+            tone="text-fg-muted"
             unit={
               agent.toolCount === 1
                 ? t.dock.subagents.toolUse
@@ -78,19 +78,19 @@ function SubagentRow({
           >
             {agent.toolCount}
           </MetricCell>
-          <MetricCell width="w-16" tone="text-(--ui-text-secondary)">
+          <MetricCell width="w-16" tone="text-fg-muted">
             {t.time.duration(elapsed)}
           </MetricCell>
         </MetricRack>
       }
     >
       {tag && (
-        <span className="shrink-0 font-mono text-meta text-(--ui-text-tertiary)">
+        <span className="shrink-0 font-mono text-meta text-fg-faint">
           {tag}
         </span>
       )}
       <span
-        className="min-w-0 flex-1 truncate text-aux text-(--ui-text-secondary)"
+        className="min-w-0 flex-1 truncate text-aux text-fg-muted"
         title={primary}
       >
         {primary}

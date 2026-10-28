@@ -39,9 +39,9 @@ function save(list: Prompt[]): void {
 }
 
 const field =
-  "w-full rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-[0.8125rem] text-fg outline-none placeholder:text-(--ui-text-quaternary) focus:border-(--ui-stroke-primary)";
+  "w-full rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)";
 const smallBtn =
-  "inline-flex h-6 items-center gap-1 rounded-sm px-1.5 text-xs text-(--ui-text-tertiary) transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
+  "inline-flex h-6 items-center gap-1 rounded-sm px-1.5 text-aux text-fg-faint transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
 
 /**
  * Right sidebar → Prompts (fork feature, 2026-10-28): a personal prompt library. "Insert" pastes the
@@ -124,7 +124,7 @@ export function PromptsPage({ session }: { session: Session }) {
           onClick={() =>
             setEditing({ id: "", title: "", body: "", usedAt: Date.now() })
           }
-          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-(--ui-stroke-tertiary) px-2 text-xs text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-(--ui-stroke-tertiary) px-2 text-aux text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg"
         >
           <Icon name="plus" size={12} />
           {L.add}
@@ -184,7 +184,7 @@ export function PromptsPage({ session }: { session: Session }) {
       )}
 
       {list.length === 0 && !editing && (
-        <p className="px-1 py-4 text-xs leading-relaxed text-(--ui-text-quaternary)">
+        <p className="px-1 py-4 text-aux leading-relaxed text-fg-dim">
           {L.empty}
         </p>
       )}
@@ -200,10 +200,10 @@ export function PromptsPage({ session }: { session: Session }) {
             className="block w-full text-left"
             title={p.body}
           >
-            <p className="truncate text-[0.8125rem] font-medium text-(--ui-text-secondary) group-hover:text-fg">
+            <p className="truncate text-body font-medium text-fg-muted group-hover:text-fg">
               {p.title}
             </p>
-            <p className="line-clamp-2 text-xs leading-snug text-(--ui-text-quaternary)">
+            <p className="line-clamp-2 text-aux leading-snug text-fg-dim">
               {p.body}
             </p>
           </button>

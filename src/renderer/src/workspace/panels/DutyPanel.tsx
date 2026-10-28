@@ -26,14 +26,16 @@ export function DutyPanel({
         {pct != null ? (
           <span className="font-mono text-title font-medium tabular-nums text-fg">
             {pct}
-            <span className="text-xs text-fg-faint">{t.dock.duty.apiUnit}</span>
+            <span className="text-aux text-fg-faint">
+              {t.dock.duty.apiUnit}
+            </span>
           </span>
         ) : (
           <span className="font-mono text-title font-medium text-fg-faint">
             -
           </span>
         )}
-        <span className="font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+        <span className="font-mono text-aux tabular-nums text-fg-faint">
           {apiDurationMs != null && sessionClockMs != null
             ? `${t.time.duration(apiDurationMs)} / ${t.time.duration(sessionClockMs)}`
             : ""}

@@ -133,21 +133,21 @@ export function ProjectGroupRow({
         title={cwd && quickAddDisabled ? unavailableReason : undefined}
         className="group/project-toggle flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md py-0.5 pl-2 text-left"
       >
-        <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-tertiary)">
+        <span className="grid size-3.5 shrink-0 place-items-center text-fg-faint">
           {group.color ? (
             <span
               aria-hidden
-              className="size-2 rounded-full"
+              className="size-2 rounded-[2px]"
               style={{ background: group.color }}
             />
           ) : (
             <Icon name={collapsed ? "folder" : "folder-open"} size={14} />
           )}
         </span>
-        <span className="min-w-0 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
+        <span className="min-w-0 truncate text-body leading-none text-fg-faint group-hover/project:text-fg">
           {group.label}
         </span>
-        <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-quaternary)">
+        <span className="grid size-3.5 shrink-0 place-items-center text-fg-dim">
           <Icon
             name="chevron-right"
             size={13}
@@ -157,7 +157,7 @@ export function ProjectGroupRow({
         {activeCount > 0 && (
           <span
             title={activeSessionsLabel}
-            className="shrink-0 rounded-full bg-(--ui-control-active-background) px-1.5 text-[0.64rem] tabular-nums text-(--ui-text-tertiary)"
+            className="shrink-0 rounded-full bg-(--ui-control-active-background) px-1.5 text-tiny tabular-nums text-fg-faint"
           >
             {activeSessionsBadge}
           </span>
@@ -190,8 +190,8 @@ export function ProjectGroupRow({
             className={cx(
               "grid size-5 place-items-center rounded-sm",
               !quickAddDisabled && !quickAdding
-                ? "cursor-pointer text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg"
-                : "cursor-not-allowed text-(--ui-text-quaternary)/50",
+                ? "cursor-pointer text-fg-dim hover:bg-(--ui-control-hover-background) hover:text-fg"
+                : "cursor-not-allowed text-fg-dim/50",
             )}
           >
             <Icon name="plus" size={13} />
@@ -207,7 +207,7 @@ export function ProjectGroupRow({
             aria-label={projectActionsLabel}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
-            className="grid size-5 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+            className="grid size-5 cursor-pointer place-items-center rounded-sm text-fg-dim hover:bg-(--ui-control-hover-background) hover:text-fg"
           >
             <Icon name="ellipsis" size={13} />
           </button>
@@ -234,7 +234,7 @@ export function ProjectGroupRow({
                       event.stopPropagation();
                       void setPlacement("ordinary").catch(() => undefined);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Icon name="eye-off" size={12} />
                     {unhideLabel}
@@ -251,7 +251,7 @@ export function ProjectGroupRow({
                           placement === "pinned" ? "ordinary" : "pinned",
                         ).catch(() => undefined);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Icon
                         name={placement === "pinned" ? "pin-off" : "pin"}
@@ -267,7 +267,7 @@ export function ProjectGroupRow({
                         event.stopPropagation();
                         void setPlacement("hidden").catch(() => undefined);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Icon name="eye-off" size={12} />
                       {hideLabel}
@@ -279,10 +279,10 @@ export function ProjectGroupRow({
                   className="mx-1 my-1 border-t border-(--ui-stroke-secondary)"
                 />
                 <div className="px-2 py-1">
-                  <div className="text-[0.6875rem] font-medium text-(--ui-text-quaternary)">
+                  <div className="text-meta font-medium text-fg-dim">
                     {absolutePathLabel}
                   </div>
-                  <div className="mt-0.5 break-all text-xs leading-snug text-fg-muted">
+                  <div className="mt-0.5 break-all text-aux leading-snug text-fg-muted">
                     {cwd}
                   </div>
                 </div>
@@ -294,7 +294,7 @@ export function ProjectGroupRow({
                     void window.api.clipboardWriteText(cwd);
                     setMenuOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg"
+                  className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg"
                 >
                   <Icon name="copy" size={12} />
                   {copyPathLabel}

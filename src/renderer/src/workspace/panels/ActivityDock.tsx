@@ -255,7 +255,7 @@ function DockTabBar({
         onClick={onCollapse}
         aria-label={t.dock.collapseAria}
         title={t.dock.collapseTitle}
-        className="my-auto ml-auto inline-flex size-6 items-center justify-center rounded-sm text-(--ui-text-tertiary) transition-colors hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
+        className="my-auto ml-auto inline-flex size-6 items-center justify-center rounded-sm text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
       >
         <Icon name="chevron-down" size={14} />
       </button>
@@ -290,14 +290,10 @@ function DockTally({
       className="hidden h-8 w-full shrink-0 items-center gap-3 border-t border-(--ui-stroke-tertiary) bg-(--ui-surface-background) pl-3 pr-2 text-left transition-colors hover:bg-(--ui-row-hover-background) lg:flex"
     >
       <SidebarPanelLabel>{t.dock.label}</SidebarPanelLabel>
-      <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] tabular-nums text-(--ui-text-quaternary)">
+      <span className="min-w-0 flex-1 truncate font-mono text-meta tabular-nums text-fg-dim">
         {t.dock.tally(taskCount, stats.total, shellCount, monitorCount)}
       </span>
-      <Icon
-        name="chevron-up"
-        size={14}
-        className="shrink-0 text-(--ui-text-tertiary)"
-      />
+      <Icon name="chevron-up" size={14} className="shrink-0 text-fg-faint" />
     </button>
   );
 }

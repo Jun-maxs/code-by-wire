@@ -54,6 +54,27 @@ export default tseslint.config(
     },
   },
 
+  // Design tokens only (fork, 2026-10-28, DESIGN.md): font sizes come from the --text-* scale.
+  // A one-off (e.g. the footer's pixel wordmark) carries an eslint-disable-next-line with a reason.
+  {
+    files: ["src/renderer/src/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/\\btext-\\[\\d/]",
+          message:
+            "Use a font-size token (text-tiny/meta/aux/body/subhead/title/heading/display), see DESIGN.md.",
+        },
+        {
+          selector: "TemplateElement[value.raw=/\\btext-\\[\\d/]",
+          message:
+            "Use a font-size token (text-tiny/meta/aux/body/subhead/title/heading/display), see DESIGN.md.",
+        },
+      ],
+    },
+  },
+
   // Node-side TypeScript (main, preload, shared, tests, root config files).
   {
     files: [

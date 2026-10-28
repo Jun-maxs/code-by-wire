@@ -13,10 +13,10 @@ import { DOCK_LIVE_ROW } from "./dock-live-reveal";
 /** Status rendering reads the dock's canonical table (dock-status-glyph.ts) via taskDockStatus;
  *  SUBJECT_TONE below styles the subject text only. */
 const SUBJECT_TONE: Record<Task["status"], string> = {
-  completed: "text-(--ui-text-tertiary) line-through",
-  in_progress: "text-(--ui-text-secondary)",
-  blocked: "text-(--ui-text-secondary)",
-  pending: "text-(--ui-text-secondary)",
+  completed: "text-fg-faint line-through",
+  in_progress: "text-fg-muted",
+  blocked: "text-fg-muted",
+  pending: "text-fg-muted",
 };
 
 /**

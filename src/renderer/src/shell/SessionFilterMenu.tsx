@@ -14,7 +14,7 @@ export function SessionFilterMenu({
 }) {
   const { t } = useI18n();
   const itemClass =
-    "flex w-full cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-xs text-fg-muted transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg";
+    "flex w-full cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-aux text-fg-muted transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg";
 
   return (
     <div
@@ -46,7 +46,7 @@ export function SessionFilterMenu({
 
       <div className="my-1 border-t border-(--ui-stroke-tertiary)" />
       <fieldset className="m-0 border-0 p-0">
-        <legend className="px-2 pb-1 pt-0.5 text-[0.6875rem] font-medium text-(--ui-text-quaternary)">
+        <legend className="px-2 pb-1 pt-0.5 text-meta font-medium text-fg-dim">
           {t.shell.sidebar.groupBy}
         </legend>
         {(["folder", "product"] as const).map((grouping) => (
@@ -73,7 +73,7 @@ export function SessionFilterMenu({
 
       <div className="my-1 border-t border-(--ui-stroke-tertiary)" />
       <fieldset className="m-0 border-0 p-0">
-        <legend className="px-2 pb-1 pt-0.5 text-[0.6875rem] font-medium text-(--ui-text-quaternary)">
+        <legend className="px-2 pb-1 pt-0.5 text-meta font-medium text-fg-dim">
           {t.shell.sidebar.agentGroup}
         </legend>
         <label className={itemClass}>

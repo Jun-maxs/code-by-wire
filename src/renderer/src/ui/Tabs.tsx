@@ -39,14 +39,14 @@ export function Tabs<T extends string>({
               "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 text-aux transition-colors",
               focusRing,
               active
-                ? "border-(--ui-text-primary) font-medium text-(--ui-text-primary)"
-                : "border-transparent text-(--ui-text-tertiary) hover:text-(--ui-text-primary)",
+                ? "border-(--ui-text-primary) font-medium text-fg"
+                : "border-transparent text-fg-faint hover:text-fg",
             )}
           >
             {t.icon && <Icon name={t.icon} size={13} />}
             {t.label}
             {t.count !== undefined && (
-              <span className="font-mono text-label tabular-nums text-(--ui-text-quaternary)">
+              <span className="font-mono text-label tabular-nums text-fg-dim">
                 {t.count}
               </span>
             )}

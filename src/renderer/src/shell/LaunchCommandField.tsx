@@ -168,7 +168,7 @@ export function LaunchCommandField({
           placeholder={t.shell.newSession.argsPlaceholder}
           spellCheck={false}
           rows={1}
-          className="w-full resize-none overflow-hidden bg-transparent outline-none placeholder:italic placeholder:text-fg-faint"
+          className="w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-fg-dim"
         />
       </div>
 

@@ -142,7 +142,7 @@ export function ClaudeAccountSwitch() {
         aria-expanded={at !== null}
         title={t.settings.accounts.switch}
         onClick={toggle}
-        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-secondary)"
+        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-aux text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg-muted"
       >
         <Icon name="circle-user" size={12} />
         {t.settings.accounts.switch}

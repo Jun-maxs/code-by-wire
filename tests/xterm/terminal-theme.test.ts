@@ -8,10 +8,10 @@ import {
 describe("shared terminal theme (spec §8.10)", () => {
   it("dark chrome is the VS Code default with the app-chrome background override", () => {
     const dark = terminalTheme("dark");
-    expect(dark.background).toBe("#0e0e0e");
+    expect(dark.background).toBe("#000000");
     expect(dark.foreground).toBe("#cccccc");
     expect(dark.cursor).toBe("#cccccc");
-    expect(dark.cursorAccent).toBe("#0e0e0e");
+    expect(dark.cursorAccent).toBe("#000000");
     expect(dark.selectionBackground).toBe("#264f7866");
   });
 
@@ -31,7 +31,7 @@ describe("shared terminal theme (spec §8.10)", () => {
   it("per-terminal overrides win (Claude's teal cursor) without touching ANSI", () => {
     const claude = terminalTheme("dark", { cursor: "#2dd4bf" });
     expect(claude.cursor).toBe("#2dd4bf");
-    expect(claude.background).toBe("#0e0e0e");
+    expect(claude.background).toBe("#000000");
     expect(claude.red).toBe(VSCODE_DARK_ANSI.red);
   });
 });

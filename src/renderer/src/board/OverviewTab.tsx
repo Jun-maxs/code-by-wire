@@ -22,15 +22,18 @@ import {
   LEVEL_TEXT,
   PRIORITY_DOT,
   Panel,
-  Ring,
-  STATUS_BG,
-  STATUS_VAR,
   TopicChip,
   btn,
   riskLevel,
 } from "./parts";
 import { fmtDay, fmtH } from "./strings";
 
+/**
+ * The board's overview (2026-10-28 upgrade, DESIGN.md): what to do today leads. The four numbers sit in
+ * one summary strip; the left column is "needs you" (sessions waiting, risky tasks) then "do first";
+ * the right column carries the AI insight, the 14-day load and the status split. Colors only mark
+ * state — bars and gauges are neutral.
+ */
 export function OverviewTab({ onOpenInsight }: { onOpenInsight: () => void }) {
   const ctx = useBoardCtx();
   const { doc, s, today, sessionsById, sessions, openSession, openTask } = ctx;
@@ -57,7 +60,7 @@ export function OverviewTab({ onOpenInsight }: { onOpenInsight: () => void }) {
   for (const d of load) if (d.date <= eta && d.workday) workdays++;
   if (eta > load[load.length - 1].date)
     workdays = Math.max(workdays, Math.ceil(leftH / doc.capacityH));
-  const focus = focusOrder(doc.tasks, today).slice(0, 5);
+  const focus = focusOrder(doc.tasks, today).slice(0, 7);
   const nextDue = open
     .map((t) => t.due)
     .filter((d): d is string => !!d && d >= today)
@@ -72,223 +75,178 @@ export function OverviewTab({ onOpenInsight }: { onOpenInsight: () => void }) {
     (x) => x.state === "waiting" && !x.parentSessionId,
   );
   const workday = isWorkday(today, doc.weekends);
+  const needsYou = waiting.length + risky.length;
 
   return (
     <div className="flex flex-col gap-4 px-5 pb-6">
-      <div className="flex flex-wrap items-end justify-between gap-3 pt-1">
-        <div>
-          <p className="flex items-center gap-1.5 text-meta text-fg-faint">
-            <Dot className="bg-ok" />
-            {today} {s.weekday[now.getDay()]}
-          </p>
-          <h1 className="mt-1 text-heading font-semibold tracking-tight text-fg">
-            {s.greet(now.getHours())}，{s.todayHead(todayLoad.taskIds.length)}
-          </h1>
-          <p className="mt-1 text-aux text-fg-faint">
-            {workday
-              ? s.todayLede(
-                  fmtH(todayLoad.hours),
-                  fmtH(doc.capacityH),
-                  nextDue ? fmtDay(nextDue) : null,
-                )
-              : s.weekend}
-          </p>
-        </div>
-        <div className="flex gap-1.5">
-          <Chip>
-            <Icon name="clock" size={11} />
-            {s.capacity(fmtH(doc.capacityH))}
-          </Chip>
-          <Chip>
-            <Icon name="check" size={11} />
-            {s.weekDone(
-              done.filter((t) => (t.doneAt ?? 0) > Date.now() - 7 * 864e5)
-                .length,
-            )}
-          </Chip>
-        </div>
-      </div>
+      <header className="pt-1">
+        <p className="text-meta text-fg-faint">
+          {today} {s.weekday[now.getDay()]}
+        </p>
+        <h1 className="mt-1 text-heading font-semibold tracking-tight text-fg">
+          {s.greet(now.getHours())}，{s.todayHead(todayLoad.taskIds.length)}
+        </h1>
+        <p className="mt-1 text-aux text-fg-muted">
+          {workday
+            ? s.todayLede(
+                fmtH(todayLoad.hours),
+                fmtH(doc.capacityH),
+                nextDue ? fmtDay(nextDue) : null,
+              )
+            : s.weekend}
+        </p>
+      </header>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Tile label={s.tileActive} icon="square-kanban">
-          <Big value={String(open.length)} unit={s.unit} />
-          <p className="text-meta text-fg-faint">
-            <span className="text-working">
-              {s.status.doing} {counts.doing}
-            </span>
-            {" · "}
-            {s.status.todo} {counts.todo}
-            {" · "}
-            <span className={counts.decide ? "text-accent" : ""}>
-              {s.status.decide} {counts.decide}
-            </span>
-          </p>
-          <div className="mt-auto flex h-1 gap-[2px] overflow-hidden rounded-full">
-            {(["doing", "todo", "decide"] as const).map((st) =>
-              counts[st] ? (
-                <div
-                  key={st}
-                  className={cx("h-full rounded-full", STATUS_BG[st])}
-                  style={{ flex: counts[st] }}
-                />
-              ) : null,
-            )}
-            {open.length === 0 && (
-              <div className="h-full flex-1 rounded-full bg-(--ui-bg-tertiary)" />
-            )}
-          </div>
-        </Tile>
-        <Tile
+      <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-ink-800 bg-ink-925 md:grid-cols-4">
+        <Stat label={s.tileActive} value={String(open.length)} unit={s.unit}>
+          {s.status.doing} {counts.doing}
+          {counts.todo > 0 && ` · ${s.status.todo} ${counts.todo}`}
+          {counts.decide > 0 && (
+            <>
+              {" · "}
+              <span className="text-accent">
+                {s.status.decide} {counts.decide}
+              </span>
+            </>
+          )}
+        </Stat>
+        <Stat
           label={s.tileProgress}
-          icon="chart-column"
-          aside={
-            <Ring value={progress} size={46} color="var(--color-ok)">
-              <span className="font-mono text-[10px] tabular-nums text-fg-muted">
-                {done.length}/{doc.tasks.length}
-              </span>
-            </Ring>
-          }
+          value={Math.round(progress * 100).toString()}
+          unit="%"
         >
-          <Big value={(progress * 100).toFixed(1)} unit="%" />
-          <p className="text-meta text-fg-faint">
-            {s.tileProgressSub(done.length, doc.tasks.length)}
-          </p>
-        </Tile>
-        <Tile label={s.tileLeft} icon="clock">
-          <Big value={(Math.round(leftH * 10) / 10).toString()} unit="h" />
-          <p className="text-meta text-fg-faint">
-            {s.tileLeftSub(fmtH(totalEst), fmtH(doneH))}
-          </p>
-        </Tile>
-        <Tile label={s.tileEta} icon="flag">
-          <Big value={leftH > 0 ? fmtDay(eta) : "—"} />
-          <p className="text-meta text-fg-faint">
-            <span className={risky.length ? "text-danger" : ""}>
-              {risky.length}
-            </span>
-            {s
-              .tileEtaSub(risky.length, workdays, fmtH(doc.capacityH))
-              .replace(/^\d+/, "")}
-          </p>
-        </Tile>
-      </div>
-
-      <InsightSummary onOpen={onOpenInsight} />
-
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel
-          title={s.loadTitle}
-          lede={s.loadLede}
-          right={
-            <Chip tone={todayLoad.hours > doc.capacityH ? "high" : "plain"}>
-              {s.loadToday(fmtH(todayLoad.hours))}
-            </Chip>
-          }
+          {s.doneOf(done.length, doc.tasks.length)}
+        </Stat>
+        <Stat
+          label={s.tileLeft}
+          value={(Math.round(leftH * 10) / 10).toString()}
+          unit="h"
         >
-          <LoadChart days={load} capacity={doc.capacityH} />
-        </Panel>
-        <Panel title={s.distTitle} lede={s.distLede}>
-          <StatusDonut counts={counts} hours={hoursByStatus(doc.tasks)} />
-        </Panel>
-      </div>
+          {s.ofTotal(fmtH(totalEst))}
+        </Stat>
+        <Stat label={s.tileEta} value={leftH > 0 ? fmtDay(eta) : "—"}>
+          {leftH > 0 ? s.etaDays(workdays) : s.capacity(fmtH(doc.capacityH))}
+        </Stat>
+      </dl>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <Panel title={s.focusTitle} lede={s.focusLede}>
-          <div className="flex flex-col px-2 pb-2 pt-2">
-            {focus.length === 0 && (
-              <p className="px-2 py-3 text-aux text-fg-faint">{s.focusEmpty}</p>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Panel>
+            {needsYou > 0 && (
+              <div className="border-b border-ink-850 px-2 pb-2 pt-3">
+                <SectionLabel count={needsYou}>{s.needYou}</SectionLabel>
+                {waiting.slice(0, 4).map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => openSession(w.id)}
+                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
+                  >
+                    <Dot className="bg-accent" />
+                    <span className="min-w-0 flex-1 truncate text-body text-fg">
+                      {ctx.sessionTitle(w)}
+                    </span>
+                    <span className="shrink-0 text-meta text-fg-faint">
+                      {s.waitingRow}
+                    </span>
+                    <Icon
+                      name="chevron-right"
+                      size={13}
+                      className="text-fg-faint"
+                    />
+                  </button>
+                ))}
+                {risky.slice(0, 5).map(({ t, risks }) => (
+                  <RiskRow
+                    key={t.id}
+                    task={t}
+                    risk={risks[0]}
+                    onOpen={() => openTask(t.id)}
+                  />
+                ))}
+              </div>
             )}
-            {focus.map((t) => (
-              <FocusRow key={t.id} task={t} onOpen={() => openTask(t.id)} />
-            ))}
-          </div>
-        </Panel>
-        <Panel
-          title={s.riskTitle}
-          right={
-            risky.length > 0 ? (
-              <span className="font-mono text-meta text-fg-faint">
-                {risky.length}
-              </span>
-            ) : undefined
-          }
-        >
-          <div className="flex flex-col px-2 pb-2 pt-2">
-            {waiting.length > 0 && (
-              <button
-                type="button"
-                onClick={() => openSession(waiting[0].id)}
-                className="flex items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
+            <div className="px-2 pb-2 pt-3">
+              <SectionLabel>{s.doFirst}</SectionLabel>
+              {focus.length === 0 && (
+                <p className="px-2 py-3 text-aux text-fg-faint">
+                  {s.focusEmpty}
+                </p>
+              )}
+              {focus.map((t) => (
+                <FocusRow key={t.id} task={t} onOpen={() => openTask(t.id)} />
+              ))}
+            </div>
+          </Panel>
+          <Panel
+            title={s.loadTitle}
+            right={
+              <span
+                className={cx(
+                  "font-mono text-meta tabular-nums",
+                  todayLoad.hours > doc.capacityH
+                    ? "text-danger"
+                    : "text-fg-faint",
+                )}
               >
-                <Icon name="terminal" size={13} className="text-accent" />
-                <span className="min-w-0 flex-1 truncate text-body text-fg">
-                  {s.waitingTitle(waiting.length)}
-                </span>
-                <span className="truncate text-meta text-fg-faint">
-                  {ctx.sessionTitle(waiting[0])}
-                </span>
-              </button>
-            )}
-            {risky.length === 0 && waiting.length === 0 && (
-              <p className="px-2 py-3 text-aux text-fg-faint">{s.riskEmpty}</p>
-            )}
-            {risky.slice(0, 6).map(({ t, risks }) => (
-              <RiskRow
-                key={t.id}
-                task={t}
-                risk={risks[0]}
-                onOpen={() => openTask(t.id)}
-              />
-            ))}
-          </div>
-        </Panel>
+                {s.loadToday(fmtH(todayLoad.hours))}
+              </span>
+            }
+          >
+            <LoadChart days={load} capacity={doc.capacityH} />
+          </Panel>
+        </div>
+
+        <InsightSummary onOpen={onOpenInsight} />
       </div>
     </div>
   );
 }
 
-function hoursByStatus(tasks: BoardTask[]) {
-  const out = { todo: 0, doing: 0, decide: 0, done: 0 };
-  for (const t of tasks)
-    out[t.status] += t.status === "done" ? t.estimateH : remainingH(t);
-  return out;
+function SectionLabel({
+  children,
+  count,
+  hint,
+}: {
+  children: React.ReactNode;
+  count?: number;
+  hint?: string;
+}) {
+  return (
+    <p className="flex items-baseline gap-2 px-2 pb-1">
+      <span className="text-aux font-semibold text-fg">{children}</span>
+      {count !== undefined && (
+        <span className="font-mono text-meta tabular-nums text-accent">
+          {count}
+        </span>
+      )}
+      {hint && <span className="truncate text-meta text-fg-faint">{hint}</span>}
+    </p>
+  );
 }
 
-function Tile({
+function Stat({
   label,
-  icon,
-  aside,
+  value,
+  unit,
   children,
 }: {
   label: string;
-  icon: "square-kanban" | "chart-column" | "clock" | "flag";
-  aside?: React.ReactNode;
+  value: string;
+  unit?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-[118px] flex-col gap-1.5 rounded-xl border border-ink-800 bg-ink-925 px-4 py-3.5">
-      <div className="flex items-center justify-between">
-        <span className="text-aux text-fg-faint">{label}</span>
-        <Icon name={icon} size={14} className="text-fg-faint" />
-      </div>
-      <div className="flex flex-1 items-end justify-between gap-2">
-        <div className="flex h-full min-w-0 flex-1 flex-col gap-1.5">
-          {children}
-        </div>
-        {aside}
-      </div>
+    <div className="flex min-w-0 flex-col gap-0.5 border-ink-850 px-4 py-3 not-last:border-r max-md:nth-2:border-r-0 max-md:nth-[-n+2]:border-b">
+      <dt className="text-meta text-fg-faint">{label}</dt>
+      <dd className="flex items-baseline gap-1">
+        <span className="font-mono text-title font-semibold tabular-nums text-fg">
+          {value}
+        </span>
+        {unit && <span className="text-meta text-fg-faint">{unit}</span>}
+      </dd>
+      <dd className="truncate text-meta text-fg-faint">{children}</dd>
     </div>
-  );
-}
-
-function Big({ value, unit }: { value: string; unit?: string }) {
-  return (
-    <p className="flex items-baseline gap-1">
-      <span className="font-mono text-display font-semibold tabular-nums tracking-tight text-fg">
-        {value}
-      </span>
-      {unit && <span className="text-aux text-fg-faint">{unit}</span>}
-    </p>
   );
 }
 
@@ -296,81 +254,66 @@ function InsightSummary({ onOpen }: { onOpen: () => void }) {
   const { doc, s, run, runInsight } = useBoardCtx();
   const last = doc.insights[0];
   return (
-    <section className="flex items-start gap-4 rounded-xl border border-ink-800 bg-ink-925 px-4 py-3.5">
-      <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-(--ui-bg-tertiary) text-fg">
-        <Icon name="sparkles" size={17} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2 text-meta text-fg-faint">
-          {s.insight}
-          <Dot
-            className={
-              run.running
-                ? "bg-working animate-pulse"
-                : last
-                  ? "bg-ok"
-                  : "bg-idle"
-            }
-          />
-          {run.running
-            ? s.insightRunning
-            : last
-              ? s.insightLast(
-                  s.agoMin(Math.floor((Date.now() - last.at) / 60000)),
-                )
-              : s.insightNone}
+    <Panel>
+      <div className="flex flex-col gap-1.5 px-4 py-3.5">
+        <p className="flex items-baseline gap-2">
+          <span className="text-subhead font-semibold text-fg">
+            {s.insight}
+          </span>
+          <span className="truncate text-meta text-fg-faint">
+            {run.running
+              ? s.insightRunning
+              : last
+                ? s.insightLast(
+                    s.agoMin(Math.floor((Date.now() - last.at) / 60000)),
+                  )
+                : s.insightNone}
+          </span>
+          {last && !run.running && (
+            <span className="ml-auto font-mono tabular-nums text-fg-muted">
+              {s.scoreLabel} {last.score}
+            </span>
+          )}
         </p>
-        <h2 className="mt-1 text-title font-semibold text-fg">
+        <h2 className="mt-1 text-body font-semibold text-fg">
           {last ? last.headline : s.insightNone}
         </h2>
-        <p className="mt-1 line-clamp-2 text-aux leading-relaxed text-fg-muted">
+        <p className="line-clamp-3 text-aux leading-relaxed text-fg-muted">
           {last ? last.summary : s.insightNoneHint}
         </p>
         {run.error && !run.running && (
-          <p className="mt-1 line-clamp-2 text-meta text-danger">
+          <p className="line-clamp-2 text-meta text-danger">
             {s.failed(run.error)}
           </p>
         )}
-        {last && last.risks.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {last.risks.slice(0, 4).map((r, i) => (
-              <Chip key={i} tone={r.level}>
-                {r.title}
-              </Chip>
-            ))}
-          </div>
-        )}
+        <div className="mt-1">
+          {last ? (
+            <button
+              type="button"
+              onClick={onOpen}
+              className={cx(btn.ghost, "-ml-2")}
+            >
+              {s.insightOpen}
+              <Icon name="chevron-right" size={13} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={run.running || doc.tasks.length === 0}
+              onClick={() => runInsight("manual")}
+              className={btn.outline}
+            >
+              <Icon
+                name={run.running ? "loader-circle" : "sparkles"}
+                size={13}
+                className={run.running ? "animate-spin" : ""}
+              />
+              {run.running ? s.insightRunning : s.insightRun}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        {last && (
-          <Ring value={last.score / 100} size={46} color="var(--color-fg)">
-            <span className="font-mono text-body font-semibold tabular-nums text-fg">
-              {last.score}
-            </span>
-          </Ring>
-        )}
-        {last ? (
-          <button type="button" onClick={onOpen} className={btn.ghost}>
-            {s.insightOpen}
-            <Icon name="chevron-right" size={13} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={run.running || doc.tasks.length === 0}
-            onClick={() => runInsight("manual")}
-            className={btn.outline}
-          >
-            <Icon
-              name={run.running ? "loader-circle" : "sparkles"}
-              size={13}
-              className={run.running ? "animate-spin" : ""}
-            />
-            {run.running ? s.insightRunning : s.insightRun}
-          </button>
-        )}
-      </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -379,11 +322,11 @@ function LoadChart({ days, capacity }: { days: LoadDay[]; capacity: number }) {
   const { s } = useBoardCtx();
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(capacity * 1.25, ...days.map((d) => d.hours));
-  const H = 150;
+  const H = 88;
   const capY = H - (capacity / max) * H;
   return (
     <div className="px-4 pb-3 pt-3">
-      <div className="relative" style={{ height: H + 34 }}>
+      <div className="relative" style={{ height: H + 30 }}>
         <div
           className="absolute inset-x-0 border-t border-dashed border-(--ui-stroke-primary)"
           style={{ top: capY }}
@@ -410,8 +353,8 @@ function LoadChart({ days, capacity }: { days: LoadDay[]; capacity: number }) {
                 >
                   <div
                     className={cx(
-                      "w-full max-w-[28px] rounded-t-[4px] transition-opacity duration-100",
-                      over ? "bg-danger" : "bg-fg/70",
+                      "w-full max-w-[20px] rounded-t-[3px] transition-opacity duration-100",
+                      over ? "bg-danger" : "bg-fg/40",
                       d.hours === 0 && "bg-(--ui-stroke-secondary)!",
                       hover !== null && hover !== i && "opacity-50",
                     )}
@@ -420,15 +363,16 @@ function LoadChart({ days, capacity }: { days: LoadDay[]; capacity: number }) {
                 </div>
                 <span
                   className={cx(
-                    "mt-1.5 font-mono text-[10px] tabular-nums",
+                    "mt-1.5 font-mono text-tiny tabular-nums",
                     i === 0 ? "text-fg" : "text-fg-faint",
                   )}
                 >
-                  {fmtDay(d.date)}
+                  {/* Dates only where they help in a narrow column: today and each Monday. */}
+                  {i === 0 || date.getDay() === 1 ? fmtDay(d.date) : " "}
                 </span>
                 <span
                   className={cx(
-                    "text-[10px]",
+                    "text-tiny",
                     d.workday ? "text-fg-faint" : "text-fg-faint/50",
                   )}
                 >
@@ -455,95 +399,6 @@ function LoadChart({ days, capacity }: { days: LoadDay[]; capacity: number }) {
           })}
         </div>
       </div>
-      <div className="mt-2 flex gap-4 text-meta text-fg-faint">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2 rounded-[2px] bg-fg/70" />
-          {s.loadPlanned}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2 rounded-[2px] bg-danger" />
-          {s.loadOver}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 border-t border-dashed border-(--ui-stroke-primary)" />
-          {s.loadCap}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function StatusDonut({
-  counts,
-  hours,
-}: {
-  counts: Record<"todo" | "doing" | "decide" | "done", number>;
-  hours: Record<"todo" | "doing" | "decide" | "done", number>;
-}) {
-  const { s } = useBoardCtx();
-  const total = TASK_STATUSES.reduce((a, st) => a + counts[st], 0);
-  const size = 128;
-  const stroke = 12;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const gap = total > 1 ? 3 : 0;
-  let acc = 0;
-  return (
-    <div className="flex items-center gap-5 px-4 pb-4 pt-3">
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke="var(--ui-bg-tertiary)"
-            strokeWidth={stroke}
-          />
-          {total > 0 &&
-            TASK_STATUSES.map((st) => {
-              const len = (counts[st] / total) * c;
-              const el =
-                len > 0 ? (
-                  <circle
-                    key={st}
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={r}
-                    fill="none"
-                    stroke={STATUS_VAR[st]}
-                    strokeWidth={stroke}
-                    strokeDasharray={`${Math.max(0, len - gap)} ${c}`}
-                    strokeDashoffset={-acc}
-                  />
-                ) : null;
-              acc += len;
-              return el;
-            })}
-        </svg>
-        <div className="absolute inset-0 grid place-items-center text-center">
-          <div>
-            <p className="font-mono text-display font-semibold tabular-nums text-fg">
-              {total}
-            </p>
-            <p className="text-meta text-fg-faint">{s.distCenter}</p>
-          </div>
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {TASK_STATUSES.map((st) => (
-          <div key={st} className="flex items-center gap-2 text-aux">
-            <Dot className={STATUS_BG[st]} />
-            <span className="min-w-0 flex-1 truncate text-fg-muted">
-              {s.status[st]}
-            </span>
-            <span className="font-mono tabular-nums text-fg">{counts[st]}</span>
-            <span className="w-12 text-right font-mono text-meta tabular-nums text-fg-faint">
-              {fmtH(hours[st])}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -562,7 +417,7 @@ function FocusRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
     >
       <Dot className={PRIORITY_DOT[t.priority]} />
       <span className="min-w-0 flex-1 truncate text-body text-fg">
@@ -611,7 +466,7 @@ function RiskRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-(--ui-row-hover-background)"
     >
       <Icon name="triangle-alert" size={13} className={LEVEL_TEXT[level]} />
       <span className="min-w-0 flex-1 truncate text-body text-fg">

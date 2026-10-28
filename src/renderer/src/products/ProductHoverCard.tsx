@@ -63,12 +63,12 @@ export function ProductHoverCard({
           <div
             role="tooltip"
             style={{ left: pos.left, top: pos.top, width: CARD_WIDTH }}
-            className="pointer-events-none fixed z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-3 text-[0.75rem] leading-snug text-(--ui-text-secondary) shadow-(--shadow-md) backdrop-blur-xl"
+            className="pointer-events-none fixed z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-3 text-aux leading-snug text-fg-muted shadow-(--shadow-md) backdrop-blur-xl"
           >
-            <div className="mb-1.5 flex items-center gap-1.5 text-[0.8125rem] font-medium text-fg">
+            <div className="mb-1.5 flex items-center gap-1.5 text-body font-medium text-fg">
               <span
                 aria-hidden
-                className="size-2 shrink-0 rounded-full"
+                className="size-2 shrink-0 rounded-[2px]"
                 style={{ background: product.color }}
               />
               {product.name}
@@ -97,9 +97,7 @@ export function ProductHoverCard({
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-1">
-      <div className="text-[0.6875rem] text-(--ui-text-quaternary)">
-        {label}
-      </div>
+      <div className="text-meta text-fg-dim">{label}</div>
       <div className="break-words">{children}</div>
     </div>
   );

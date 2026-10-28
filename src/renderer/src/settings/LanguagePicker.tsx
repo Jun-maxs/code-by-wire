@@ -66,14 +66,14 @@ export function LanguagePicker() {
                   setOpen(false);
                 }}
                 className={cx(
-                  "flex w-full items-center justify-between rounded-xs px-2 py-1.5 text-left text-xs transition-colors",
+                  "flex w-full items-center justify-between rounded-xs px-2 py-1.5 text-left text-aux transition-colors",
                   active
                     ? "text-fg"
                     : "text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg",
                 )}
               >
                 {option.name}
-                <span className="flex items-center gap-1.5 font-mono text-[0.64rem] uppercase text-fg-faint">
+                <span className="flex items-center gap-1.5 font-mono text-tiny uppercase text-fg-faint">
                   {option.id}
                   {active && <Icon name="check" size={12} />}
                 </span>

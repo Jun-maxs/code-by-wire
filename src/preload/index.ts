@@ -46,6 +46,8 @@ const api: AppApi = {
   generateCard: (key) => ipcRenderer.invoke(IPC.generateCard, key),
   readBoard: () => ipcRenderer.invoke(IPC.readBoard),
   saveBoard: (doc) => ipcRenderer.invoke(IPC.saveBoard, doc),
+  linkSessionToTask: (sessionId, taskId) =>
+    ipcRenderer.invoke(IPC.boardLinkSession, sessionId, taskId),
   runBoardInsight: (prompt, trigger) =>
     ipcRenderer.invoke(IPC.runBoardInsight, prompt, trigger),
   boardInsightState: () => ipcRenderer.invoke(IPC.boardInsightState),

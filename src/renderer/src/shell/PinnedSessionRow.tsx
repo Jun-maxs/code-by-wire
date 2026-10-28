@@ -79,7 +79,7 @@ export function PinnedSessionRow({
           onChange={menu.renameField.onChange}
           onBlur={menu.renameField.onBlur}
           onKeyDown={menu.renameField.onKeyDown}
-          className="h-5 min-w-0 flex-1 rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 text-[0.8125rem] text-fg outline-none"
+          className="h-5 min-w-0 flex-1 rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 text-body text-fg outline-none"
         />
       </div>
     );
@@ -118,7 +118,7 @@ export function PinnedSessionRow({
           </span>
           <span
             className={cx(
-              "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
+              "min-w-0 flex-1 truncate text-body leading-none text-fg-muted group-hover:text-fg",
               selected && "text-fg",
             )}
             title={session.title}
@@ -127,7 +127,7 @@ export function PinnedSessionRow({
           </span>
           <span
             className={cx(
-              "shrink-0 text-[0.68rem] leading-none text-(--ui-text-quaternary)",
+              "shrink-0 text-meta leading-none text-fg-dim",
               metaHide,
             )}
           >
@@ -144,7 +144,7 @@ export function PinnedSessionRow({
             <AgentIcon agent={session.agent} size={13} />
           </span>
         </span>
-        <span className="flex w-full min-w-0 items-center gap-1 pl-5 text-[0.72rem] leading-none text-(--ui-text-quaternary)">
+        <span className="flex w-full min-w-0 items-center gap-1 pl-5 text-meta leading-none text-fg-dim">
           <span className="min-w-0 truncate">{repo}</span>
           {branch && (
             <>
@@ -167,7 +167,7 @@ export function PinnedSessionRow({
           )}
           <span
             className={cx(
-              "ml-auto shrink-0 rounded-sm border border-(--ui-stroke-tertiary) px-1 py-px text-[0.6rem] leading-none text-(--ui-text-tertiary)",
+              "ml-auto shrink-0 rounded-sm border border-(--ui-stroke-tertiary) px-1 py-px text-tiny leading-none text-fg-faint",
               metaHide,
             )}
           >
@@ -191,7 +191,7 @@ export function PinnedSessionRow({
           aria-expanded={menu.open}
           aria-haspopup="menu"
           className={cx(
-            "grid size-5 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:opacity-100 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100",
+            "grid size-5 cursor-pointer place-items-center rounded-sm text-fg-dim opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:opacity-100 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100",
             menu.open &&
               "opacity-100 bg-(--ui-control-active-background) text-fg",
           )}

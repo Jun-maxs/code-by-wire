@@ -56,9 +56,11 @@ function lightVar(name: string): string {
 
 // The surface/border stack — the "background colors", darkest to lightest. ink-600 is excluded:
 // it is the Ended status hue (a deliberately cool slate), not a surface.
+// The canvas is pure black since 2026-10-28 (DESIGN.md), so the sunken well sits between the
+// canvas and the cards it's used in instead of below the canvas.
 const SURFACE_STACK = [
-  "well",
   "ink-950",
+  "well",
   "ink-925",
   "ink-900",
   "ink-850",
@@ -78,7 +80,7 @@ describe("cockpit theme — graphite surfaces (not warm, not cool)", () => {
     }
   });
 
-  it("surfaces get strictly lighter from well -> ink-700", () => {
+  it("surfaces get strictly lighter from ink-950 -> ink-700", () => {
     const lum = SURFACE_STACK.map((n) => rgb(token(n))[0]); // near-equal RGB (spread <= 1), so the red channel tracks lightness
     for (let i = 1; i < lum.length; i++) {
       expect(

@@ -19,7 +19,7 @@ export function SidebarPanelLabel({
   return (
     <span
       className={cx(
-        "flex min-w-0 items-center gap-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-(--theme-primary)",
+        "flex min-w-0 items-center gap-1.5 text-tiny font-semibold uppercase tracking-[0.16em] text-(--theme-primary)",
         className,
       )}
     >

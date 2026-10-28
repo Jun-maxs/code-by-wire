@@ -141,7 +141,7 @@ adoptReclaude();
  *  persisted app theme or the window flashes the wrong color on launch. Native window chrome, so
  *  it lives here rather than in index.css. */
 const WINDOW_BACKGROUND: Record<"dark" | "light", string> = {
-  dark: "#0e0e0e",
+  dark: "#000000",
   light: "#ffffff",
 };
 
@@ -165,9 +165,7 @@ function createWindow(
     height: 720,
     // Fork: CBW_OFFSCREEN=1 (screenshots over CDP) parks the window off every display, unfocused and
     // off the taskbar, so a check never takes the owner's screen.
-    ...(OFFSCREEN
-      ? { x: -4000, y: 0, show: false, skipTaskbar: true }
-      : {}),
+    ...(OFFSCREEN ? { x: -4000, y: 0, show: false, skipTaskbar: true } : {}),
     backgroundColor: WINDOW_BACKGROUND[appTheme],
     ...(isMac
       ? {

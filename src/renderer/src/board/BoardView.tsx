@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { blankTask, type BoardTask } from "@shared/board";
 import { productForSession } from "@shared/products";
 import type { Session } from "@shared/types";
@@ -17,6 +17,7 @@ import { TopicsSection } from "../settings/TopicsSection";
 import { btn } from "./parts";
 import { boardStrings } from "./strings";
 import { useBoard } from "./use-board";
+import { onOpenTask, takePendingTask } from "./session-tasks";
 
 type Tab = "overview" | "kanban" | "schedule" | "ideas" | "habits";
 const TABS: { id: Tab; icon: IconName }[] = [
@@ -54,7 +55,9 @@ export function BoardView({
     setTabState(t);
   };
   const [query, setQuery] = useState("");
-  const [taskId, setTaskId] = useState<string | null>(null);
+  // A task asked for from outside the board (a session's task chip) opens on arrival.
+  const [taskId, setTaskId] = useState<string | null>(takePendingTask);
+  useEffect(() => onOpenTask(setTaskId), []);
   const [panel, setPanel] = useState<"insight" | "import" | "topics" | null>(
     null,
   );

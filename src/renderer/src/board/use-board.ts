@@ -10,6 +10,7 @@ import {
 import { productForSession } from "@shared/products";
 import type { Session } from "@shared/types";
 import { ProductsContext } from "../products/products-context";
+import { announceBoard, onBoardChanged, onBoardFlush } from "./session-tasks";
 
 /** Edits land on screen at once and reach disk after this quiet spell (typing in a field). */
 const SAVE_DEBOUNCE_MS = 400;
@@ -83,8 +84,23 @@ export function useBoard(sessions: Session[]): BoardApi {
     timer.current = null;
     const next = pending.current;
     pending.current = null;
-    if (next) void window.api.saveBoard(next);
+    if (next)
+      void window.api
+        .saveBoard(next)
+        .then((saved) => announceBoard(saved, "board"));
   }, []);
+  // Links made from the sidebar or a session's menu land in the file; pick them up here (the board
+  // flushed its pending edits just before, so there's nothing local to lose).
+  useEffect(() => {
+    const offFlush = onBoardFlush(flush);
+    const offChanged = onBoardChanged((d, source) => {
+      if (source === "link" && !pending.current) setDoc(d);
+    });
+    return () => {
+      offFlush();
+      offChanged();
+    };
+  }, [flush]);
   // Never lose the last keystrokes when the view closes.
   useEffect(() => flush, [flush]);
 

@@ -46,7 +46,7 @@ function MonitorRow({
       }
       trailing={
         <MetricRack>
-          <MetricCell width="w-16" tone="text-(--ui-text-secondary)">
+          <MetricCell width="w-16" tone="text-fg-muted">
             {t.time.duration(elapsed)}
           </MetricCell>
           {monitor.startMs !== undefined && (
@@ -67,15 +67,13 @@ function MonitorRow({
       >
         {monitor.description ? (
           <>
-            <span className="text-(--ui-text-secondary)">
-              {monitor.description}
-            </span>
-            <span className="ml-2 font-mono text-meta text-(--ui-text-tertiary)">
+            <span className="text-fg-muted">{monitor.description}</span>
+            <span className="ml-2 font-mono text-meta text-fg-faint">
               {monitor.command}
             </span>
           </>
         ) : (
-          <span className="font-mono text-meta text-(--ui-text-secondary)">
+          <span className="font-mono text-meta text-fg-muted">
             {monitor.command}
           </span>
         )}

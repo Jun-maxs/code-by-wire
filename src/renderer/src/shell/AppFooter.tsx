@@ -26,15 +26,16 @@ export function AppFooter({ version }: { version: string | null }) {
     };
   }, []);
   return (
-    <footer className="no-drag flex h-5 shrink-0 items-stretch justify-between gap-2 border-t border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-1 py-0 text-(--ui-text-tertiary)">
+    <footer className="no-drag flex h-5 shrink-0 items-stretch justify-between gap-2 border-t border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-1 py-0 text-fg-faint">
       <div className="flex items-stretch">
-        <span className="inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] font-medium uppercase text-(--ui-text-secondary)">
+        <span className="inline-flex h-full items-center gap-1 px-1.5 text-meta font-medium uppercase text-fg-muted">
+          {/* eslint-disable-next-line no-restricted-syntax -- the wordmark's block-shade glyphs, not text */}
           <span aria-hidden className="font-mono text-[8px] leading-none">
             ░▒▓█
           </span>
           code-by-wire
         </span>
-        <span className="inline-flex h-full items-center px-1.5 font-mono text-[0.6875rem]">
+        <span className="inline-flex h-full items-center px-1.5 font-mono text-meta">
           {version ? `v${version}` : "—"}
         </span>
       </div>
@@ -52,7 +53,7 @@ export function AppFooter({ version }: { version: string | null }) {
             void window.api.setCaffeinate(!caffeinated).then(setCaffeinated);
           }}
           className={cx(
-            "relative inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem]",
+            "relative inline-flex h-full items-center gap-1 rounded-none px-1.5 text-meta",
             caffeinated
               ? "bg-(--chrome-action-hover) text-fg"
               : "hover:text-fg",
@@ -77,7 +78,7 @@ export function AppFooter({ version }: { version: string | null }) {
           aria-pressed={terminalOpen}
           onClick={() => setTerminalTakeover(!terminalOpen)}
           className={cx(
-            "inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem]",
+            "inline-flex h-full items-center gap-1 rounded-none px-1.5 text-meta",
             terminalOpen
               ? "bg-(--chrome-action-hover) text-fg"
               : "hover:text-fg",

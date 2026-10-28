@@ -342,6 +342,10 @@ export const zh: Translations = {
       deleteSession: "删除（移到回收站）",
       topic: "归到主题",
       noTopic: "不归类",
+      task: "挂到任务",
+      noTask: "不挂任务",
+      openTask: "在看板里打开",
+      taskOf: (title: string) => `任务：${title}`,
       deleteLiveTitle: "先结束会话再删除",
       deleteConfirmTitle: "删除这个会话？",
       deleteConfirmBody:

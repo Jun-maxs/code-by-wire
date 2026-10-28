@@ -1,5 +1,12 @@
 import { ProductsProvider } from "./products/ProductsProvider";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useStore } from "@nanostores/react";
 import type { Session, ModelSelection, Account } from "@shared/types";
 import type { CliStatusByAgent } from "@shared/cli-status";
@@ -33,6 +40,7 @@ import { useStatsPump } from "./stats/use-stats-pump";
 import { SettingsView, type SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
 import { BOARD_ID } from "./board/sentinel";
+import { SessionTasksProvider } from "./board/session-tasks";
 import { BoardView } from "./board/BoardView";
 import { useBoardAutoInsight } from "./board/use-board";
 import { useUpdate } from "./ui/use-update";
@@ -447,6 +455,7 @@ export function App() {
   const isSettings = selectedId === SETTINGS_ID;
   const isNewSession = selectedId === NEW_SESSION_ID;
   const isBoard = selectedId === BOARD_ID;
+  const showBoard = useCallback(() => setSelectedId(BOARD_ID), [setSelectedId]);
   // All three pinned views (Overview, Settings, New session) are non-session selections: the
   // per-session lookup and the auto-select effect must treat them as valid, never as a
   // stale/missing session to re-home — otherwise a background sync that changes the id list while
@@ -575,108 +584,110 @@ export function App() {
 
   return (
     <ProductsProvider>
-      <BoardAutoInsight sessions={all} />
-      <div className="app-bg flex h-screen flex-col text-fg">
-        <PaneShell className="min-h-0 flex-1">
-          <Pane
-            id={CBW_LEFT_PANE_ID}
-            side="left"
-            width={LEFT_DEFAULT_WIDTH}
-            minWidth={LEFT_MIN_WIDTH}
-            maxWidth={LEFT_MAX_WIDTH}
-            resizable
-            hoverReveal
-            forceCollapsed={narrow}
-          >
-            <LeftSidebar
-              sessions={all}
-              homeDir={homeDir}
-              projectState={projectState}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onNew={() => {
-                setQuickAddPrefill(null); // manual open starts blank, not on a stale failure
-                setSelectedId(NEW_SESSION_ID);
-              }}
-              onQuickAdd={quickAddSession}
-              canSpawnFor={(a) => spawnGateFor(cliStatus, a).canSpawn}
-              onResume={resumeSession}
-              onFork={forkSession}
-              onEnd={endSession}
-              onRename={(id, title) => void renameSession(id, title)}
-              onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
-              onSetProjectPlacement={setProjectPlacement}
-              updatePending={updatePending}
-              route={route}
-              onRoute={setSelectedId}
-            />
-          </Pane>
-          <PaneMain>{middle}</PaneMain>
-          <Pane
-            id={CBW_TERMINAL_PANE_ID}
-            side="right"
-            width="42vw"
-            minWidth="22vw"
-            maxWidth="80vw"
-            height="38vh"
-            minHeight="8rem"
-            maxHeight="80vh"
-            resizable
-            divider
-            disabled={!terminalOpen}
-            bottomRow={terminalAsRow}
-          >
-            {/* Seam ownership: in column mode the pane's divider hairline draws the left seam (no
+      <SessionTasksProvider onShowBoard={showBoard}>
+        <BoardAutoInsight sessions={all} />
+        <div className="app-bg flex h-screen flex-col text-fg">
+          <PaneShell className="min-h-0 flex-1">
+            <Pane
+              id={CBW_LEFT_PANE_ID}
+              side="left"
+              width={LEFT_DEFAULT_WIDTH}
+              minWidth={LEFT_MIN_WIDTH}
+              maxWidth={LEFT_MAX_WIDTH}
+              resizable
+              hoverReveal
+              forceCollapsed={narrow}
+            >
+              <LeftSidebar
+                sessions={all}
+                homeDir={homeDir}
+                projectState={projectState}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onNew={() => {
+                  setQuickAddPrefill(null); // manual open starts blank, not on a stale failure
+                  setSelectedId(NEW_SESSION_ID);
+                }}
+                onQuickAdd={quickAddSession}
+                canSpawnFor={(a) => spawnGateFor(cliStatus, a).canSpawn}
+                onResume={resumeSession}
+                onFork={forkSession}
+                onEnd={endSession}
+                onRename={(id, title) => void renameSession(id, title)}
+                onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
+                onSetProjectPlacement={setProjectPlacement}
+                updatePending={updatePending}
+                route={route}
+                onRoute={setSelectedId}
+              />
+            </Pane>
+            <PaneMain>{middle}</PaneMain>
+            <Pane
+              id={CBW_TERMINAL_PANE_ID}
+              side="right"
+              width="42vw"
+              minWidth="22vw"
+              maxWidth="80vw"
+              height="38vh"
+              minHeight="8rem"
+              maxHeight="80vh"
+              resizable
+              divider
+              disabled={!terminalOpen}
+              bottomRow={terminalAsRow}
+            >
+              {/* Seam ownership: in column mode the pane's divider hairline draws the left seam (no
               border here). In row mode the sidebar pane has no divider — this border-l continues
               the metrics sidebar's own border-l down the shared seam; the reaching sash above it
               is the (invisible) drag layer only. */}
-            <div
-              className={cx(
-                "relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background)",
-                terminalAsRow && "border-l border-(--ui-stroke-secondary)",
-              )}
-            >
-              {/* As a full-height column the terminal reaches the top of the window, so it must clear
+              <div
+                className={cx(
+                  "relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background)",
+                  terminalAsRow && "border-l border-(--ui-stroke-secondary)",
+                )}
+              >
+                {/* As a full-height column the terminal reaches the top of the window, so it must clear
                 the titlebar band (the fixed sidebar-toggle clusters float there) — the same
                 --titlebar-height drag strip every other rail column reserves (see RightSidebar). As a
                 bottom row it sits beneath the already-cleared metrics column, so it needs no strip
                 (hermes' pt-(--titlebar-height) vs pt-0 on terminalAsRow). */}
-              {!terminalAsRow && (
-                <div
-                  className="drag-region shrink-0 select-none"
-                  style={{ height: "var(--titlebar-height)" }}
+                {!terminalAsRow && (
+                  <div
+                    className="drag-region shrink-0 select-none"
+                    style={{ height: "var(--titlebar-height)" }}
+                  />
+                )}
+                <TerminalPaneChrome />
+              </div>
+            </Pane>
+            <Pane
+              id={CBW_RIGHT_PANE_ID}
+              side="right"
+              width={RIGHT_DEFAULT_WIDTH}
+              minWidth={RIGHT_MIN_WIDTH}
+              maxWidth={RIGHT_MAX_WIDTH}
+              resizable
+              hoverReveal
+              disabled={!hasSession}
+              forceCollapsed={narrow}
+            >
+              {selected && (
+                <RightSidebar
+                  session={selected}
+                  metrics={metrics}
+                  account={account}
                 />
               )}
-              <TerminalPaneChrome />
-            </div>
-          </Pane>
-          <Pane
-            id={CBW_RIGHT_PANE_ID}
-            side="right"
-            width={RIGHT_DEFAULT_WIDTH}
-            minWidth={RIGHT_MIN_WIDTH}
-            maxWidth={RIGHT_MAX_WIDTH}
-            resizable
-            hoverReveal
-            disabled={!hasSession}
-            forceCollapsed={narrow}
-          >
-            {selected && (
-              <RightSidebar
-                session={selected}
-                metrics={metrics}
-                account={account}
-              />
-            )}
-          </Pane>
-        </PaneShell>
-        <PersistentTerminal />
-        {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
+            </Pane>
+          </PaneShell>
+          <PersistentTerminal />
+          {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
           (drag unions, then no-drag subtracts), so the clusters' no-drag must come after
           the sidebars'/header's full-width drag strips or the strips swallow their clicks. */}
-        <TitlebarControls hasSession={hasSession} />
-        <AppFooter version={__APP_VERSION__} />
-      </div>
+          <TitlebarControls hasSession={hasSession} />
+          <AppFooter version={__APP_VERSION__} />
+        </div>
+      </SessionTasksProvider>
     </ProductsProvider>
   );
 }

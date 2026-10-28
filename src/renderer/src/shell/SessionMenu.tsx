@@ -52,7 +52,7 @@ export function SessionMenu({
         onChange={renameField.onChange}
         onBlur={renameField.onBlur}
         onKeyDown={renameField.onKeyDown}
-        className="no-drag h-6 w-72 max-w-full rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-2 text-[0.75rem] font-medium text-fg outline-none"
+        className="no-drag h-6 w-72 max-w-full rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-2 text-aux font-medium text-fg outline-none"
       />
     );
   }
@@ -66,16 +66,16 @@ export function SessionMenu({
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
         title={t.shell.sessionMenu.menuTitle}
-        className="flex h-6 min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-xs border border-transparent bg-transparent px-2 py-0 text-left text-(--ui-text-secondary) transition-colors duration-100 hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none aria-expanded:border-(--ui-stroke-tertiary) aria-expanded:bg-(--ui-control-active-background)"
+        className="flex h-6 min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-xs border border-transparent bg-transparent px-2 py-0 text-left text-fg-muted transition-colors duration-100 hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none aria-expanded:border-(--ui-stroke-tertiary) aria-expanded:bg-(--ui-control-active-background)"
       >
-        <span className="min-w-0 truncate text-[0.75rem] font-medium leading-none">
+        <span className="min-w-0 truncate text-aux font-medium leading-none">
           {session.title}
         </span>
         <Icon
           name="chevron-down"
           size={13}
           className={cx(
-            "shrink-0 text-(--ui-text-tertiary) transition-transform",
+            "shrink-0 text-fg-faint transition-transform",
             open && "rotate-180",
           )}
         />

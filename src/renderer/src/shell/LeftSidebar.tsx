@@ -365,7 +365,7 @@ export function LeftSidebar({
     const expanded = limit !== undefined;
     const shown = hidden.slice(0, limit ?? OLDER_PAGE_SIZE);
     const olderRowClass =
-      "flex h-6 w-full cursor-pointer items-center rounded-sm px-2 text-xs text-(--ui-text-quaternary) transition-colors duration-100 ease-out hover:bg-(--ui-row-hover-background) hover:text-fg hover:transition-none";
+      "flex h-6 w-full cursor-pointer items-center rounded-sm px-2 text-aux text-fg-dim transition-colors duration-100 ease-out hover:bg-(--ui-row-hover-background) hover:text-fg hover:transition-none";
     return (
       <div className="pb-1">
         <button
@@ -473,7 +473,7 @@ export function LeftSidebar({
           <>
             {visible.length === 0 ? (
               manuallyExpanded.has(g.key) && (
-                <p className="px-2 py-1 pb-2 text-xs text-(--ui-text-quaternary)">
+                <p className="px-2 py-1 pb-2 text-aux text-fg-dim">
                   {t.shell.sidebar.noMatchingSessions}
                 </p>
               )
@@ -504,10 +504,10 @@ export function LeftSidebar({
             disabled={!anySpawnable}
             title={anySpawnable ? undefined : t.settings.cli.unavailableReason}
             className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-body font-medium transition-colors duration-100 ease-out hover:transition-none",
               anySpawnable
-                ? "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg"
-                : "cursor-not-allowed text-(--ui-text-quaternary)",
+                ? "text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg"
+                : "cursor-not-allowed text-fg-dim",
             )}
           >
             <Icon name="rocket" size={16} className="shrink-0 opacity-70" />
@@ -518,10 +518,10 @@ export function LeftSidebar({
             onClick={() => onRoute(BOARD_ID)}
             aria-pressed={route === BOARD_ID}
             className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-body font-medium transition-colors duration-100 ease-out hover:transition-none",
               route === BOARD_ID
                 ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                : "text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg",
             )}
           >
             <Icon
@@ -536,10 +536,10 @@ export function LeftSidebar({
             onClick={() => onRoute(OVERVIEW_ID)}
             aria-pressed={route === OVERVIEW_ID}
             className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-body font-medium transition-colors duration-100 ease-out hover:transition-none",
               route === OVERVIEW_ID
                 ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                : "text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg",
             )}
           >
             <Icon
@@ -557,10 +557,10 @@ export function LeftSidebar({
               updatePending ? t.shell.sidebar.updatePendingTitle : undefined
             }
             className={cx(
-              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
+              "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-body font-medium transition-colors duration-100 ease-out hover:transition-none",
               route === SETTINGS_ID
                 ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                : "text-fg-muted hover:bg-(--ui-control-hover-background) hover:text-fg",
             )}
           >
             <span className="relative grid shrink-0 place-items-center">
@@ -593,7 +593,7 @@ export function LeftSidebar({
             <Icon
               name="search"
               size={14}
-              className="pointer-events-none shrink-0 text-(--ui-text-tertiary)/70"
+              className="pointer-events-none shrink-0 text-fg-faint/70"
             />
             <input
               type="text"
@@ -601,14 +601,14 @@ export function LeftSidebar({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.shell.sidebar.searchPlaceholder}
               aria-label={t.shell.sidebar.searchLabel}
-              className="h-7 min-w-0 flex-1 bg-transparent text-[0.8125rem] text-fg placeholder:text-(--ui-text-tertiary) focus:outline-none"
+              className="h-7 min-w-0 flex-1 bg-transparent text-body text-fg placeholder:text-fg-faint focus:outline-none"
             />
             {query && (
               <button
                 type="button"
                 aria-label={t.shell.sidebar.clearSearch}
                 onClick={() => setQuery("")}
-                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-(--ui-text-tertiary)/85 transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-fg-faint/85 transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
               >
                 <Icon name="x" size={16} />
               </button>
@@ -669,7 +669,7 @@ export function LeftSidebar({
                       ? t.shell.sidebar.expandAll
                       : t.shell.sidebar.collapseAll
                   }
-                  className="grid size-5 cursor-pointer place-items-center rounded-sm border border-transparent text-(--ui-text-quaternary) transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+                  className="grid size-5 cursor-pointer place-items-center rounded-sm border border-transparent text-fg-dim transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
                 >
                   <Icon
                     name={
@@ -699,7 +699,7 @@ export function LeftSidebar({
                     "grid size-5 cursor-pointer place-items-center rounded-sm border transition-colors duration-100 ease-out hover:transition-none",
                     agentFilterActive
                       ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
-                      : "border-transparent text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+                      : "border-transparent text-fg-dim hover:bg-(--ui-control-hover-background) hover:text-fg",
                   )}
                 >
                   <Icon name="filter" size={12} />
@@ -715,7 +715,7 @@ export function LeftSidebar({
                   </>
                 )}
                 {groups.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
+                  <p className="px-2 py-2 text-aux text-fg-dim">
                     {agentFilterActive && sessions.length > 0
                       ? t.shell.sidebar.noMatchingSessions
                       : t.shell.sidebar.noSessionsYet}
@@ -732,12 +732,12 @@ export function LeftSidebar({
               type="button"
               onClick={() => setHiddenCollapsed((value) => !value)}
               aria-expanded={!hiddenCollapsed}
-              className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-(--ui-text-quaternary) hover:bg-(--ui-row-hover-background) hover:text-fg"
+              className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-fg-dim hover:bg-(--ui-row-hover-background) hover:text-fg"
             >
-              <span className="text-[0.64rem] font-semibold uppercase tracking-[0.12em]">
+              <span className="text-tiny font-semibold uppercase tracking-[0.12em]">
                 {t.shell.sidebar.hiddenLabel}
               </span>
-              <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-[0.64rem] tabular-nums">
+              <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-tiny tabular-nums">
                 {hiddenCount}
               </span>
               <Icon
@@ -748,7 +748,7 @@ export function LeftSidebar({
             {!hiddenCollapsed && (
               <div className="flex flex-col gap-px">
                 {hiddenProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-(--ui-text-quaternary)">
+                  <p className="px-2 py-1 text-aux text-fg-dim">
                     {t.shell.sidebar.noHiddenProjects}
                   </p>
                 ) : (
@@ -791,7 +791,7 @@ export function LeftSidebar({
                   setAgentMenu(null);
                   void quickAdd(m.key, m.cwd, a);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs text-fg-muted transition-colors enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg disabled:cursor-default disabled:opacity-40"
+                className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux text-fg-muted transition-colors enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg disabled:cursor-default disabled:opacity-40"
               >
                 <AgentIcon agent={a} size={13} />
                 {AGENTS[a].label}

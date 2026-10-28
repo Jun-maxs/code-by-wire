@@ -117,7 +117,7 @@ export function Wordmark() {
       <span className="inline-flex items-center gap-1.5 font-display text-aux font-semibold uppercase text-fg">
         <span
           aria-hidden
-          className="font-mono text-[9px] leading-none -translate-y-px"
+          className="font-mono text-tiny leading-none -translate-y-px"
         >
           ░▒▓█
         </span>

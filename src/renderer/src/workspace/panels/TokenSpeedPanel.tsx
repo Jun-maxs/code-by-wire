@@ -36,7 +36,7 @@ export function TokenSpeedPanel({
         icon="activity"
         info={t.dock.throughput.info}
         right={
-          <span className="rounded-sm border border-(--ui-stroke-secondary) px-1.5 py-0.5 text-[0.65rem] font-medium leading-none text-(--ui-text-tertiary)">
+          <span className="rounded-sm border border-(--ui-stroke-secondary) px-1.5 py-0.5 text-tiny font-medium leading-none text-fg-faint">
             {t.dock.throughput.windowLabel}
           </span>
         }
@@ -47,7 +47,7 @@ export function TokenSpeedPanel({
         {speed ? (
           <span className="font-mono text-title font-medium tabular-nums text-fg">
             {t.time.tpsValue(speed.totalTps)}
-            <span className="text-xs text-fg-faint"> {t.time.tpsUnit}</span>
+            <span className="text-aux text-fg-faint"> {t.time.tpsUnit}</span>
           </span>
         ) : (
           <span className="font-mono text-title font-medium tabular-nums text-fg-faint">

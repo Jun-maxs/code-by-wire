@@ -8,7 +8,7 @@ import { useI18n } from "../../i18n";
 import { PanelSection, PanelHeading, StatRow } from "./chrome";
 
 const POPOVER =
-  "absolute left-0 top-full z-20 mt-1 w-60 rounded-md border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] px-2.5 py-2 text-left text-xs leading-snug text-(--ui-text-secondary) shadow-(--shadow-md) backdrop-blur-xl";
+  "absolute left-0 top-full z-20 mt-1 w-60 rounded-md border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] px-2.5 py-2 text-left text-aux leading-snug text-fg-muted shadow-(--shadow-md) backdrop-blur-xl";
 
 /** TokenKind.key → the matching Usage token field, so the kind rows read off one mapping. */
 const KIND_TOKENS: Record<TokenKind["key"], (u: Usage) => number> = {
@@ -82,9 +82,9 @@ export function SpendPanel({
       <div className="flex items-baseline justify-between">
         <div className="font-mono text-title font-medium leading-none tabular-nums text-fg">
           {t.numbers.tokensShort(total)}
-          <span className="text-xs text-fg-faint"> {t.dock.tokensUnit}</span>
+          <span className="text-aux text-fg-faint"> {t.dock.tokensUnit}</span>
         </div>
-        <span className="font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+        <span className="font-mono text-aux tabular-nums text-fg-faint">
           {costUsd != null ? formatUsd(costUsd) : "-"}
         </span>
       </div>

@@ -6,6 +6,7 @@
  *
  * Works per chunk: a sequence split across two writes keeps its italic, which is rare and harmless.
  */
+// eslint-disable-next-line no-control-regex -- matching escape sequences is the point
 const SGR = /\x1b\[([0-9;:]*)m/g;
 
 export function stripItalic(data: string): string {

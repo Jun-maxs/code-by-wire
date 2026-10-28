@@ -177,7 +177,7 @@ function TopicRow({
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="mt-1.5 size-2.5 shrink-0 rounded-full"
+          className="mt-1.5 size-2.5 shrink-0 rounded-[2px]"
           style={{ background: topic.color }}
         />
         <div className="min-w-0 flex-1">
@@ -200,7 +200,7 @@ function TopicRow({
                 <span
                   key={k}
                   title={k}
-                  className="rounded-sm border border-ink-800 px-1.5 py-px text-[0.7rem] text-fg-muted"
+                  className="rounded-sm border border-ink-800 px-1.5 py-px text-meta text-fg-muted"
                 >
                   {keywordLabel(k)}
                 </span>
@@ -457,7 +457,7 @@ function TopicForm({
           {t.settings.topics.keywords}
         </span>
         <textarea
-          className={cx(field, "min-h-[4.5rem] text-[0.75rem]")}
+          className={cx(field, "min-h-[4.5rem] text-aux")}
           rows={Math.min(10, Math.max(3, keywords.split("\n").length + 1))}
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
@@ -471,7 +471,7 @@ function TopicForm({
           {t.settings.topics.repos}
         </span>
         <textarea
-          className={cx(field, "min-h-[2.75rem] font-mono text-[0.75rem]")}
+          className={cx(field, "min-h-[2.75rem] font-mono text-aux")}
           value={repos}
           onChange={(e) => setRepos(e.target.value)}
         />

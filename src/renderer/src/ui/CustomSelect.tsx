@@ -266,7 +266,7 @@ export function CustomSelect<T extends string | number>({
                 }}
                 onClick={() => select(index)}
                 className={cx(
-                  "flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left text-xs transition-colors",
+                  "flex w-full items-center justify-between gap-3 rounded-xs px-2 py-1.5 text-left text-aux transition-colors",
                   option.disabled
                     ? "cursor-not-allowed text-fg-faint opacity-50"
                     : active

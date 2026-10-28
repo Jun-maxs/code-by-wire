@@ -47,7 +47,7 @@ function ShellRow({
       }
       trailing={
         <MetricRack>
-          <MetricCell width="w-16" tone="text-(--ui-text-secondary)">
+          <MetricCell width="w-16" tone="text-fg-muted">
             {t.time.duration(elapsed)}
           </MetricCell>
           {shell.startMs !== undefined && (
@@ -68,15 +68,13 @@ function ShellRow({
       >
         {shell.description ? (
           <>
-            <span className="text-(--ui-text-secondary)">
-              {shell.description}
-            </span>
-            <span className="ml-2 font-mono text-meta text-(--ui-text-tertiary)">
+            <span className="text-fg-muted">{shell.description}</span>
+            <span className="ml-2 font-mono text-meta text-fg-faint">
               {shell.command}
             </span>
           </>
         ) : (
-          <span className="font-mono text-meta text-(--ui-text-secondary)">
+          <span className="font-mono text-meta text-fg-muted">
             {shell.command}
           </span>
         )}

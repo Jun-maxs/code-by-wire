@@ -25,16 +25,18 @@ export const STATUS_VAR: Record<TaskStatus, string> = {
   done: "var(--color-ok)",
 };
 
+/** Priority reads as weight, not hue (DESIGN.md): amber means "waiting on you", red means failed. */
 export const PRIORITY_DOT: Record<Priority, string> = {
-  P0: "bg-danger",
-  P1: "bg-accent",
-  P2: "bg-idle",
+  P0: "bg-fg",
+  P1: "bg-fg-faint",
+  P2: "bg-ink-600",
 };
 
-export const LEVEL_TONE: Record<RiskLevel, string> = {
-  high: "border-danger/40 bg-danger/8",
-  mid: "border-accent/40 bg-accent/8",
-  low: "border-(--ui-stroke-secondary) bg-(--ui-bg-quaternary)",
+/** Risk levels mark a dot, not the whole chip (DESIGN.md: state hues only on state marks). */
+export const LEVEL_DOT: Record<RiskLevel, string> = {
+  high: "bg-danger",
+  mid: "bg-accent",
+  low: "bg-idle",
 };
 export const LEVEL_TEXT: Record<RiskLevel, string> = {
   high: "text-danger",
@@ -69,16 +71,22 @@ export function Chip({
   return (
     <span
       className={cx(
-        "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-sm border px-1.5 text-meta leading-none",
+        "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-sm border border-(--ui-stroke-tertiary) px-1.5 text-meta leading-none",
         tone === "plain"
-          ? "border-(--ui-stroke-tertiary) text-fg-faint"
-          : cx(LEVEL_TONE[tone], LEVEL_TEXT[tone]),
+          ? "text-fg-faint"
+          : "bg-(--ui-bg-quaternary) text-fg-muted",
       )}
     >
+      {tone !== "plain" && (
+        <span
+          aria-hidden
+          className={cx("size-1.5 rounded-full", LEVEL_DOT[tone])}
+        />
+      )}
       {color && (
         <span
           aria-hidden
-          className="size-1.5 rounded-full"
+          className="size-1.5 rounded-[2px]"
           style={{ background: color }}
         />
       )}

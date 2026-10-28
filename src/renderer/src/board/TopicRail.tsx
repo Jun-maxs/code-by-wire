@@ -59,7 +59,7 @@ export function TopicRail({
             {r.color ? (
               <span
                 aria-hidden
-                className="size-2 shrink-0 rounded-full"
+                className="size-2 shrink-0 rounded-[2px]"
                 style={{ background: r.color }}
               />
             ) : (

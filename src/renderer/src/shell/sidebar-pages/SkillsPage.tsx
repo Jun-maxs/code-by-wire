@@ -11,17 +11,18 @@ import {
 import { cx } from "../../ui/atoms";
 import { Icon } from "../../ui/icons";
 
+/** Status text stays neutral; the row's dot carries the color (DESIGN.md). */
 const TONE: Record<SkillCheckStatus, string> = {
-  latest: "text-ok",
-  behind: "text-accent",
-  differs: "text-accent",
-  custom: "text-(--ui-text-tertiary)",
-  unknown: "text-(--ui-text-quaternary)",
+  latest: "text-fg-faint",
+  behind: "text-fg-muted",
+  differs: "text-fg-muted",
+  custom: "text-fg-faint",
+  unknown: "text-fg-dim",
   error: "text-danger",
 };
 
 const smallBtn =
-  "inline-flex h-6 items-center gap-1 rounded-sm px-1.5 text-xs text-(--ui-text-tertiary) transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
+  "inline-flex h-6 items-center gap-1 rounded-sm px-1.5 text-aux text-fg-faint transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
 
 const DAY = 86_400_000;
 /** Checks older than this rerun by themselves when the page opens. */
@@ -237,11 +238,7 @@ export function SkillsPage() {
   }, []);
 
   if (!data)
-    return (
-      <p className="px-4 py-4 text-xs text-(--ui-text-quaternary)">
-        {L.loading}
-      </p>
-    );
+    return <p className="px-4 py-4 text-aux text-fg-dim">{L.loading}</p>;
 
   const now = Date.now();
   const review = data.skills.filter((s) => needsReview(s, checks[s.name]));
@@ -272,19 +269,17 @@ export function SkillsPage() {
               aria-selected={filter === f}
               onClick={() => setFilter(f)}
               className={cx(
-                "flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-[3px] px-1 text-xs transition-colors duration-100",
+                "flex h-6 min-w-0 flex-1 items-center justify-center gap-1 rounded-[3px] px-1 text-aux transition-colors duration-100",
                 filter === f
                   ? "bg-(--ui-bg-quaternary) text-fg"
-                  : "text-(--ui-text-tertiary) hover:text-fg",
+                  : "text-fg-faint hover:text-fg",
               )}
             >
               <span className="truncate">{L.filters[f]}</span>
               <span
                 className={cx(
                   "tabular-nums",
-                  f !== "all" && counts[f] > 0
-                    ? "text-accent"
-                    : "text-(--ui-text-quaternary)",
+                  f !== "all" && counts[f] > 0 ? "text-fg" : "text-fg-dim",
                 )}
               >
                 {counts[f]}
@@ -309,14 +304,14 @@ export function SkillsPage() {
       </div>
 
       <div className="flex items-center justify-between gap-2 px-1 pb-1">
-        <p className="min-w-0 truncate text-[0.6875rem] text-(--ui-text-quaternary)">
+        <p className="min-w-0 truncate text-meta text-fg-dim">
           {L.scanned(data.usageScannedAt, scanning || data.usageScanning)}
         </p>
         {!scanning && (
           <button
             type="button"
             onClick={rescan}
-            className="shrink-0 text-[0.6875rem] text-(--ui-text-tertiary) hover:text-fg"
+            className="shrink-0 text-meta text-fg-faint hover:text-fg"
           >
             {L.rescan}
           </button>
@@ -325,7 +320,7 @@ export function SkillsPage() {
 
       {filter !== "all" && (
         <div className="mx-1 mb-1 flex flex-col gap-1.5 rounded-md bg-(--ui-bg-quaternary) px-2.5 py-2">
-          <p className="text-xs leading-snug text-(--ui-text-tertiary)">
+          <p className="text-aux leading-snug text-fg-faint">
             {filter === "idle" ? L.idleHint : L.reviewHint}
           </p>
           {filter === "idle" && bulk.length > 0 && (
@@ -350,7 +345,7 @@ export function SkillsPage() {
                   : L.removeIdle(bulk.length)}
               </button>
               {idle.length > bulk.length && (
-                <p className="text-[0.6875rem] text-(--ui-text-quaternary)">
+                <p className="text-meta text-fg-dim">
                   {L.customKept(idle.length - bulk.length)}
                 </p>
               )}
@@ -360,9 +355,7 @@ export function SkillsPage() {
       )}
 
       {shown.length === 0 && filter !== "all" && (
-        <p className="px-2 py-3 text-xs text-(--ui-text-quaternary)">
-          {L.empty[filter]}
-        </p>
+        <p className="px-2 py-3 text-aux text-fg-dim">{L.empty[filter]}</p>
       )}
 
       {shown.map((s) => (
@@ -383,23 +376,19 @@ export function SkillsPage() {
 
       {filter === "all" && data.plugins.length > 0 && (
         <>
-          <p className="px-1 pb-1 pt-3 text-xs font-medium text-(--ui-text-tertiary)">
+          <p className="px-1 pb-1 pt-3 text-aux font-medium text-fg-faint">
             {L.plugins}
           </p>
           {data.plugins.map((p) => (
             <div
               key={`${p.name}@${p.marketplace}`}
-              className="flex items-center gap-2 rounded-md px-2 py-1 text-[0.8125rem]"
+              className="flex items-center gap-2 rounded-md px-2 py-1 text-body"
             >
-              <Icon
-                name="square-code"
-                size={12}
-                className="text-(--ui-text-quaternary)"
-              />
-              <span className="min-w-0 flex-1 truncate text-(--ui-text-secondary)">
+              <Icon name="square-code" size={12} className="text-fg-dim" />
+              <span className="min-w-0 flex-1 truncate text-fg-muted">
                 {p.name}
               </span>
-              <span className="truncate font-mono text-xs text-(--ui-text-quaternary)">
+              <span className="truncate font-mono text-aux text-fg-dim">
                 {p.version ?? ""}
               </span>
             </div>
@@ -415,20 +404,20 @@ function FileList({ label, files }: { label: string; files: string[] }) {
   const head = files.slice(0, 5);
   return (
     <div className="flex flex-col">
-      <span className="text-[0.6875rem] text-(--ui-text-tertiary)">
+      <span className="text-meta text-fg-faint">
         {label} · {files.length}
       </span>
       {head.map((f) => (
         <span
           key={f}
-          className="truncate font-mono text-[0.6875rem] text-(--ui-text-quaternary)"
+          className="truncate font-mono text-meta text-fg-dim"
           title={f}
         >
           {f}
         </span>
       ))}
       {files.length > head.length && (
-        <span className="text-[0.6875rem] text-(--ui-text-quaternary)">…</span>
+        <span className="text-meta text-fg-dim">…</span>
       )}
     </div>
   );
@@ -494,18 +483,16 @@ function SkillRow({
         />
         <span
           className={cx(
-            "min-w-0 flex-1 truncate text-[0.8125rem]",
-            idle ? "text-(--ui-text-tertiary)" : "text-(--ui-text-secondary)",
+            "min-w-0 flex-1 truncate text-body",
+            idle ? "text-fg-faint" : "text-fg-muted",
           )}
         >
           {s.name}
         </span>
         <span
           className={cx(
-            "shrink-0 text-[0.6875rem] tabular-nums",
-            usage?.count
-              ? "text-(--ui-text-tertiary)"
-              : "text-(--ui-text-quaternary)",
+            "shrink-0 text-meta tabular-nums",
+            usage?.count ? "text-fg-faint" : "text-fg-dim",
           )}
           title={L.usedLine(usage)}
         >
@@ -515,8 +502,8 @@ function SkillRow({
       {(check || status) && (
         <p
           className={cx(
-            "mt-0.5 truncate pl-3.5 text-xs",
-            check ? TONE[check.status] : "text-accent",
+            "mt-0.5 truncate pl-3.5 text-aux",
+            check ? TONE[check.status] : "text-fg-muted",
           )}
           title={check?.detail ?? status ?? ""}
         >
@@ -526,20 +513,20 @@ function SkillRow({
       {expanded && (
         <div className="mt-1.5 flex flex-col gap-1.5 pl-3.5">
           {s.description && (
-            <p className="line-clamp-3 text-xs leading-snug text-(--ui-text-tertiary)">
+            <p className="line-clamp-3 text-aux leading-snug text-fg-faint">
               {s.description}
             </p>
           )}
-          <p className="text-xs text-(--ui-text-tertiary)">
+          <p className="text-aux text-fg-faint">
             {L.usedLine(usage)} · {L.kind[s.source.kind]}
           </p>
           {s.alsoInPlugin && (
-            <p className="text-xs text-(--ui-text-tertiary)">
+            <p className="text-aux text-fg-faint">
               {L.inPlugin(s.alsoInPlugin)}
             </p>
           )}
           {s.copiesDiffer && check?.detail && (
-            <p className="text-xs text-accent">{L.copiesDiffer}</p>
+            <p className="text-aux text-fg-muted">{L.copiesDiffer}</p>
           )}
           {check?.diff && (
             <div className="flex flex-col gap-1">
@@ -549,7 +536,7 @@ function SkillRow({
             </div>
           )}
           <p
-            className="truncate font-mono text-[0.6875rem] text-(--ui-text-quaternary)"
+            className="truncate font-mono text-meta text-fg-dim"
             title={s.locations.join("\n")}
           >
             {s.paths[0]}
@@ -574,7 +561,7 @@ function SkillRow({
                 type="button"
                 disabled={busy}
                 onClick={onUpdate}
-                className={cx(smallBtn, "text-accent")}
+                className={cx(smallBtn, "text-fg")}
               >
                 <Icon name="arrow-up-right" size={12} />
                 {L.update}

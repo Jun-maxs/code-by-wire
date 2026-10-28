@@ -4,15 +4,7 @@ import { AiSettings } from "./AiSettings";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { useBoardCtx } from "./context";
-import {
-  Chip,
-  LEVEL_TEXT,
-  LEVEL_TONE,
-  Ring,
-  btn,
-  input,
-  shortTopicName,
-} from "./parts";
+import { Chip, LEVEL_TEXT, Ring, btn, input, shortTopicName } from "./parts";
 import { Sheet } from "./TaskDrawer";
 
 /** The AI insight report: score, one-line verdict, what went well, risks, suggestions; history and
@@ -174,10 +166,7 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
                 {insight.risks.map((r, i) => (
                   <div
                     key={i}
-                    className={cx(
-                      "rounded-lg border px-3 py-2.5",
-                      LEVEL_TONE[r.level],
-                    )}
+                    className="rounded-lg border border-ink-800 bg-ink-925 px-3 py-2.5"
                   >
                     <p className="flex items-center gap-2">
                       <span

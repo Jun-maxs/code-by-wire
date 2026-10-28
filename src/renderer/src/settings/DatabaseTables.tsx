@@ -52,7 +52,7 @@ export function DatabaseTables({
                     key={column}
                     className={cx(
                       "rounded border border-ink-800 bg-ink-900 px-1.5 py-0.5",
-                      "text-[10px] leading-4 text-fg-faint",
+                      "text-tiny leading-4 text-fg-faint",
                     )}
                   >
                     {column}

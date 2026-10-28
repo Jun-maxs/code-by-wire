@@ -480,7 +480,7 @@ function Sessions({
                   {topic && ctx.topics[topic] && (
                     <span
                       aria-hidden
-                      className="size-1.5 shrink-0 rounded-full"
+                      className="size-1.5 shrink-0 rounded-[2px]"
                       style={{ background: ctx.topics[topic].color }}
                     />
                   )}

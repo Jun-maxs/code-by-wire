@@ -9,12 +9,12 @@
      they now alias the seed layer (--theme-neutral-chrome/-card) instead of a literal, so the
      `:root[data-theme="light"]` override (added below) drives both this stack and the --ui-* layer
      from one source instead of two disconnected literals that could silently drift. */
-  --color-well: #080808; /* sunken: inputs, code blocks */
-  --color-ink-900: #181818; /* raised: headers, chips, menus, popover */
-  --color-ink-850: #1e1e1e; /* subtle hover / faint divider */
-  --color-ink-800: #2a2a2a; /* default hairline border */
-  --color-ink-750: #303030; /* hover on raised surfaces */
-  --color-ink-700: #3a3a3a; /* strong border */
+  --color-well: #050505; /* sunken: inputs, code blocks — between the #000 canvas and #0c0c0c cards */
+  --color-ink-900: #161616; /* raised: headers, chips, menus, popover */
+  --color-ink-850: #1c1c1c; /* subtle hover / faint divider */
+  --color-ink-800: #262626; /* default hairline border */
+  --color-ink-750: #2e2e2e; /* hover on raised surfaces */
+  --color-ink-700: #383838; /* strong border */
   --color-ink-600: #4a4a4a; /* Ended state, dim glyphs (was bluish #49525f) */
 
   /* Status hues — reserved for session state, never decorative */
@@ -58,8 +58,8 @@
   --color-model-codex-mini: #6ab8c9; /* slate-cyan */
 
   /* Recessed sidebar — darkened surfaces for the sidebar column */
-  --color-sidebar: #0a0a0a;
-  --color-sidebar-border: #202020;
+  --color-sidebar: #000000;
+  --color-sidebar-border: #1c1c1c;
 
   /* Type — hermes "Mono" desktop fonts. System sans for all UI/body and
      placards/labels (display reuses the sans face; hierarchy comes from case,
@@ -79,6 +79,8 @@
   /* Type scale — one principled ladder replacing per-component ad-hoc sizes.
      px shown at the 16px root. Each tier carries a default line-height;
      components may still override with an explicit `leading-*`. */
+  --text-tiny: 0.625rem; /* 10px — count badges and Latin overlines only (fork, 2026-10-28) */
+  --text-tiny--line-height: 1.2;
   --text-micro: 0.6875rem; /* 11px — micro overlines, micro tabular data */
   --text-micro--line-height: 1.3;
   --text-label: 0.75rem; /* 12px — section labels, badges, small mono meta */
@@ -122,6 +124,9 @@
   --color-fg: var(--ui-text-primary);
   --color-fg-muted: var(--ui-text-secondary);
   --color-fg-faint: var(--ui-text-tertiary);
+  --color-fg-dim: var(
+    --ui-text-quaternary
+  ); /* hints, disabled, placeholders (fork, 2026-10-28) */
   --color-primary: var(--theme-primary);
 }
 
@@ -141,9 +146,10 @@
   --theme-foreground: #eaeaea;
   --theme-primary: #eaeaea;
   --theme-midground: #9a9a9a;
-  --theme-neutral-chrome: #0e0e0e;
-  --theme-neutral-sidebar: #0a0a0a;
-  --theme-neutral-card: #141414;
+  /* Fork change (2026-10-28, DESIGN.md): pure black canvas and sidebar, cards one step up. */
+  --theme-neutral-chrome: #000000;
+  --theme-neutral-sidebar: #000000;
+  --theme-neutral-card: #0c0c0c;
 
   /* Hermes blends each surface's tinted "seed" into a mode-appropriate neutral
      so switching skins fades smoothly. Mono's seed IS its neutral (a flat
@@ -269,10 +275,12 @@
   );
 
   /* Text hierarchy (hermes styles.css:230-233). */
-  --ui-text-primary: color-mix(in srgb, var(--ui-base) 94%, transparent);
-  --ui-text-secondary: color-mix(in srgb, var(--ui-base) 74%, transparent);
-  --ui-text-tertiary: color-mix(in srgb, var(--ui-base) 54%, transparent);
-  --ui-text-quaternary: color-mix(in srgb, var(--ui-base) 36%, transparent);
+  /* Fork change (2026-10-28, DESIGN.md): recalibrated for the pure black canvas by APCA — Lc 90 / 72 /
+     52 / 36 on #000 (was 85 / 58 / 34 / 16 there). The light theme keeps hermes's ratios below. */
+  --ui-text-primary: color-mix(in srgb, var(--ui-base) 97%, transparent);
+  --ui-text-secondary: color-mix(in srgb, var(--ui-base) 85%, transparent);
+  --ui-text-tertiary: color-mix(in srgb, var(--ui-base) 70%, transparent);
+  --ui-text-quaternary: color-mix(in srgb, var(--ui-base) 56%, transparent);
 
   /* Strokes (hermes styles.css:234-253) + the borderless-overlay hairline
      paired with --shadow-nous (styles.css:111). */
@@ -342,7 +350,7 @@
      `background` (#ffffff, xterm/terminal-theme.ts's shared terminalTheme("light")) exactly,
      per the 2026-07-14 light-theme design doc §7's "use the terminal theme table's own literal
      background value unconditionally". */
-  --terminal-editor-surface-background: #0e0e0e;
+  --terminal-editor-surface-background: #000000;
 
   /* Backs terminal/TerminalView.tsx's container (the observed-session terminal, a completely
      different UI region from the shell-terminal pane above) — same Terminal-theme-scoped rationale,
@@ -353,7 +361,7 @@
      frame, no seam). The light override two blocks down is #ffffff — xterm/terminal-theme.ts's
      own light background (terminalTheme("light")), NOT --color-well's own light literal (#f2f2f2) —
      per the same "use the terminal theme's own literal background" rule. */
-  --terminal-well-background: #0e0e0e;
+  --terminal-well-background: #000000;
 
   /* Sidebar aliases (hermes styles.css:379-388), using the dark 12% variant
      for --sidebar-edge-border (styles.css:415). */
@@ -394,6 +402,10 @@
    and the mix-ratio knobs (--theme-mix-chrome etc.) stay numerically identical in both modes: for
    the Mono skin, seed always equals neutral, so the mix percentage is a no-op either way. */
 :root[data-theme="light"] {
+  --ui-text-primary: color-mix(in srgb, var(--ui-base) 94%, transparent);
+  --ui-text-secondary: color-mix(in srgb, var(--ui-base) 74%, transparent);
+  --ui-text-tertiary: color-mix(in srgb, var(--ui-base) 54%, transparent);
+  --ui-text-quaternary: color-mix(in srgb, var(--ui-base) 36%, transparent);
   --theme-foreground: #161616;
   --theme-primary: #161616;
   --theme-neutral-chrome: #ffffff;
@@ -456,11 +468,18 @@ body {
   font-synthesis-style: none;
 }
 
-/* Reuses --color-working (the app's teal accent, also driving the "working" status glyph and both
-   terminals' cursor color) at the same 38% strength the previous yellow used — an intentional
-   app-specific choice, not a ported value. */
+/* Overlines (uppercase + wide tracking) are a Latin device: in Chinese the tracking only pulls the
+   characters apart. Under the zh locale they keep their size and weight and drop the casing and spacing
+   (fork, 2026-10-28, DESIGN.md). */
+:root:lang(zh) .uppercase {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+/* Neutral since 2026-10-28 (DESIGN.md: one accent, status hues only on status marks); was the teal
+   working color at 38%. */
 ::selection {
-  background: color-mix(in srgb, var(--color-working) 38%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 26%, transparent);
   color: inherit;
 }
 

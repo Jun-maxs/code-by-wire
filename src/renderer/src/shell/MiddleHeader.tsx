@@ -7,6 +7,7 @@ import { Icon } from "../ui/icons";
 import { AgentIcon } from "../ui/agent-icons";
 import { useFullscreen } from "../ui/use-fullscreen";
 import { useI18n } from "../i18n";
+import { useSessionTasks } from "../board/session-tasks";
 import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
 
 /**
@@ -82,9 +83,12 @@ export function MiddleHeader({
         style={{ height: "var(--titlebar-height)", paddingLeft, paddingRight }}
       >
         {session ? (
-          menu
+          <>
+            {menu}
+            <TaskChip sessionId={session.id} />
+          </>
         ) : (
-          <span className="truncate text-[0.75rem] font-medium leading-none text-(--ui-text-secondary)">
+          <span className="truncate text-aux font-medium leading-none text-fg-muted">
             {title}
           </span>
         )}
@@ -162,16 +166,34 @@ function ViewSegment({
       disabled={disabled}
       title={title}
       className={cx(
-        "flex h-4 items-center gap-1.5 rounded-xs px-2 text-[0.7rem] font-medium leading-none transition-colors duration-100",
+        "flex h-4 items-center gap-1.5 rounded-xs px-2 text-meta font-medium leading-none transition-colors duration-100",
         active
           ? "bg-(--ui-control-active-background) text-fg"
-          : "text-(--ui-text-tertiary) hover:text-fg",
-        disabled &&
-          "cursor-not-allowed opacity-40 hover:text-(--ui-text-tertiary)",
+          : "text-fg-faint hover:text-fg",
+        disabled && "cursor-not-allowed opacity-40 hover:text-fg-faint",
       )}
     >
       {icon}
       {label}
+    </button>
+  );
+}
+
+/** The board task this session belongs to (fork, 2026-10-28); click to open it on the board. */
+function TaskChip({ sessionId }: { sessionId: string }) {
+  const { t } = useI18n();
+  const tasks = useSessionTasks();
+  const task = tasks?.taskOf(sessionId);
+  if (!tasks || !task) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => tasks.openTask(task.id)}
+      title={t.shell.sessionMenu.openTask}
+      className="no-drag inline-flex h-5 min-w-0 max-w-[16rem] shrink items-center gap-1 rounded-sm border border-(--ui-stroke-tertiary) px-1.5 text-meta text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
+    >
+      <Icon name="square-kanban" size={11} className="shrink-0" />
+      <span className="truncate">{task.title}</span>
     </button>
   );
 }

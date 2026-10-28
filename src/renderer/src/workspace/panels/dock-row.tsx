@@ -91,7 +91,7 @@ export function MetricRack({ children }: { children: ReactNode }) {
  *  overflowing the row when the panel is squeezed narrower than the content needs. */
 export function MetricCell({
   width,
-  tone = "text-(--ui-text-tertiary)",
+  tone = "text-fg-faint",
   unit,
   className,
   children,
@@ -112,7 +112,7 @@ export function MetricCell({
       {...rest}
     >
       {children}
-      {unit && <span className="ml-1 text-(--ui-text-tertiary)">{unit}</span>}
+      {unit && <span className="ml-1 text-fg-faint">{unit}</span>}
     </span>
   );
 }

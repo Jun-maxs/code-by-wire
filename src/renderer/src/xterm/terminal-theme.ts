@@ -10,16 +10,16 @@ export interface TerminalThemeOverrides {
 }
 
 // VS Code's default integrated-terminal chrome (terminalColorRegistry.ts) — except
-// background/cursorAccent, which VS Code ships as #1e1e1e but cbw overrides to #0e0e0e to
+// background/cursorAccent, which VS Code ships as #1e1e1e but cbw overrides to #000000 (was #0e0e0e; pure black since 2026-10-28) to
 // match the app's own dark chrome (--theme-neutral-chrome) exactly: the terminal-pane frame
 // (index.css --terminal-editor-surface-background) uses the same literal, and a different
 // canvas value would draw a visible seam between frame and canvas whenever both themes are
 // Dark. ANSI slots come from the shared vscode-terminal-palette module.
 const DARK_CHROME = {
-  background: "#0e0e0e",
+  background: "#000000",
   foreground: "#cccccc",
   cursor: "#cccccc",
-  cursorAccent: "#0e0e0e",
+  cursorAccent: "#000000",
   selectionBackground: "#264f7866",
 } as const;
 

@@ -82,6 +82,7 @@ export const IPC = {
   generateCard: "products:generate",
   readBoard: "board:read",
   saveBoard: "board:save",
+  boardLinkSession: "board:linkSession",
   runBoardInsight: "board:insight-run",
   boardInsightState: "board:insight-state",
   testBoardAi: "board:ai-test",
@@ -389,6 +390,11 @@ export interface IpcApi {
   readBoard(): Promise<BoardDoc>;
   /** Replace the whole board document; returns it as stored (sanitized). */
   saveBoard(doc: BoardDoc): Promise<BoardDoc>;
+  /** Put a session under one task (null = none), read-modify-write in main; returns the board. */
+  linkSessionToTask(
+    sessionId: string,
+    taskId: string | null,
+  ): Promise<BoardDoc>;
   /** Start the AI insight run on a renderer-built prompt; the result lands in the board's insights. */
   runBoardInsight(
     prompt: string,

@@ -3,6 +3,8 @@ import type { Session } from "@shared/types";
 import { cx, Lamp } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { AgentIcon } from "../ui/agent-icons";
+import { agentOrDefault } from "@shared/agents";
+import { useSessionTasks } from "../board/session-tasks";
 import { useI18n } from "../i18n";
 import { useSessionMenu } from "./use-session-menu";
 import { SessionMenuDropdown } from "./SessionMenuDropdown";
@@ -78,6 +80,7 @@ export function SessionRow({
   const rowStyle =
     cappedDepth > 0 ? { marginLeft: `${cappedDepth * 12}px` } : undefined;
 
+  const task = useSessionTasks()?.taskOf(session.id);
   if (menu.editing) {
     return (
       <div
@@ -95,7 +98,7 @@ export function SessionRow({
           onChange={menu.renameField.onChange}
           onBlur={menu.renameField.onBlur}
           onKeyDown={menu.renameField.onKeyDown}
-          className="h-5 min-w-0 flex-1 rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 text-[0.8125rem] text-fg outline-none"
+          className="h-5 min-w-0 flex-1 rounded-xs border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 text-body text-fg outline-none"
         />
       </div>
     );
@@ -147,7 +150,7 @@ export function SessionRow({
           </span>
           <span
             className={cx(
-              "min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-secondary) group-hover:text-fg",
+              "min-w-0 flex-1 truncate text-body leading-none text-fg-muted group-hover:text-fg",
               selected && "text-fg",
             )}
             title={product ? `${product.name} · ${displayTitle}` : displayTitle}
@@ -157,14 +160,14 @@ export function SessionRow({
             {product && !hideProduct && (
               <span className="font-medium" style={{ color: product.color }}>
                 {shortTopicName(product.name)}
-                <span className="text-(--ui-text-quaternary)"> · </span>
+                <span className="text-fg-dim"> · </span>
               </span>
             )}
             {displayTitle}
           </span>
           {session.remote && (
             <span
-              className="shrink-0 text-(--ui-text-quaternary)"
+              className="shrink-0 text-fg-dim"
               title={t.shell.newSession.remoteHint}
             >
               <Icon name="smartphone" size={11} />
@@ -173,7 +176,7 @@ export function SessionRow({
           {hasChildren && (
             <span
               className={cx(
-                "shrink-0 text-[0.68rem] tabular-nums text-(--ui-text-quaternary)",
+                "shrink-0 text-meta tabular-nums text-fg-dim",
                 activeDescendantCount > 0 && "text-primary",
               )}
               title={t.shell.sessionRow.subagentCount(
@@ -187,7 +190,7 @@ export function SessionRow({
           {!hasChildren && session.worktree && (
             <span
               className={cx(
-                "flex min-w-0 shrink-[2] items-center gap-1 text-[0.72rem] leading-none text-(--ui-text-quaternary)",
+                "flex min-w-0 shrink-[2] items-center gap-1 text-meta leading-none text-fg-dim",
                 "group-hover:hidden group-has-[:focus-visible]:hidden",
                 menu.open && "hidden",
               )}
@@ -210,7 +213,7 @@ export function SessionRow({
                 ? t.shell.sessionRow.collapseSubagents(descendantCount)
                 : t.shell.sessionRow.expandSubagents(descendantCount)
             }
-            className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+            className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-fg-dim hover:bg-(--ui-control-hover-background) hover:text-fg"
           >
             <Icon
               name="chevron-right"
@@ -232,26 +235,37 @@ export function SessionRow({
           {threadKindLabel ? (
             <span
               className={cx(
-                "shrink-0 rounded-sm bg-(--ui-control-active-background) px-1 py-0.5 text-[0.625rem] leading-none text-(--ui-text-quaternary) transition-opacity duration-100",
+                "shrink-0 rounded-sm bg-(--ui-control-active-background) px-1 py-0.5 text-tiny leading-none text-fg-dim transition-opacity duration-100",
                 trailingContentVisibility,
               )}
               title={threadKindLabel}
             >
               {threadKindLabel}
             </span>
-          ) : (
-            showAgentIcon && (
-              <span
-                aria-hidden
-                className={cx(
-                  "pointer-events-none grid size-5 place-items-center transition-opacity duration-100",
-                  trailingContentVisibility,
-                )}
-              >
-                <AgentIcon agent={session.agent} size={13} />
-              </span>
-            )
-          )}
+          ) : // Only agents other than the default get a mark (fork, 2026-10-28): a Claude mark on every
+          // row said nothing and drowned the state marks.
+          // A session on a board task shows the board mark there instead (fork, 2026-10-28).
+          showAgentIcon && session.agent !== agentOrDefault(undefined) ? (
+            <span
+              aria-hidden
+              className={cx(
+                "pointer-events-none grid size-5 place-items-center transition-opacity duration-100",
+                trailingContentVisibility,
+              )}
+            >
+              <AgentIcon agent={session.agent} size={13} />
+            </span>
+          ) : task ? (
+            <span
+              aria-hidden
+              className={cx(
+                "pointer-events-none grid size-5 place-items-center text-fg-dim transition-opacity duration-100",
+                trailingContentVisibility,
+              )}
+            >
+              <Icon name="square-kanban" size={12} />
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => menu.toggleMenu()}
@@ -259,7 +273,7 @@ export function SessionRow({
             aria-expanded={menu.open}
             aria-haspopup="menu"
             className={cx(
-              "pointer-events-none absolute right-0 top-0 grid size-5 cursor-pointer place-items-center rounded-sm text-(--ui-text-quaternary) opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:pointer-events-auto focus-visible:opacity-100",
+              "pointer-events-none absolute right-0 top-0 grid size-5 cursor-pointer place-items-center rounded-sm text-fg-dim opacity-0 transition-opacity duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg focus-visible:pointer-events-auto focus-visible:opacity-100",
               reveal,
               menu.open &&
                 "pointer-events-auto opacity-100 bg-(--ui-control-active-background) text-fg",

@@ -379,6 +379,10 @@ export const en = {
       deleteSession: "Delete (move to trash)",
       topic: "Topic",
       noTopic: "No topic",
+      task: "Task",
+      noTask: "No task",
+      openTask: "Open on the board",
+      taskOf: (title: string) => `Task: ${title}`,
       deleteLiveTitle: "End the session before deleting it",
       deleteConfirmTitle: "Delete this session?",
       deleteConfirmBody:

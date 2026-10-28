@@ -36,7 +36,7 @@ function RateRow({
   const pct = w ? clampPct(Math.round(w.usedPct)) : 0;
   return (
     <div className={cx("flex items-center gap-1", !w && "opacity-40")}>
-      <span className="w-7 shrink-0 text-xs text-(--ui-text-tertiary)">
+      <span className="w-7 shrink-0 text-aux text-fg-faint">
         {w?.windowMinutes != null ? t.time.windowLabel(w.windowMinutes) : label}
       </span>
       <div className="min-w-0 flex-1">
@@ -48,10 +48,10 @@ function RateRow({
           height={4}
         />
       </div>
-      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-secondary)">
+      <span className="w-9 shrink-0 text-right font-mono text-aux tabular-nums text-fg-muted">
         {w ? `${pct}%` : "-"}
       </span>
-      <span className="w-17 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+      <span className="w-17 shrink-0 text-right font-mono text-aux tabular-nums text-fg-faint">
         {w ? t.time.countdown(w.resetsAt, now) : "-"}
       </span>
     </div>
@@ -150,11 +150,11 @@ export function PressurePanel({
               )}
             >
               {view.pct}
-              <span className="text-xs text-fg-faint">
+              <span className="text-aux text-fg-faint">
                 {t.dock.pressure.contextUnit}
               </span>
             </div>
-            <div className="font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+            <div className="font-mono text-aux tabular-nums text-fg-faint">
               {t.numbers.tokensShort(view.total)} /{" "}
               {t.numbers.tokensShort(contextWindow)}
             </div>
@@ -168,9 +168,7 @@ export function PressurePanel({
           />
         </>
       ) : (
-        <p className="text-xs text-(--ui-text-quaternary)">
-          {t.dock.pressure.noContext}
-        </p>
+        <p className="text-aux text-fg-dim">{t.dock.pressure.noContext}</p>
       )}
       <div className="mt-1 space-y-1.5">
         {showRateRow(fetchedOnly, windowsFetched, rateLimits?.fiveHour) && (
@@ -233,7 +231,7 @@ function RelayRow({ usage }: { usage: RelayUsage }) {
       className="flex items-center gap-1"
       title={t.dock.pressure.relayDetail(usage.host, spent, remaining)}
     >
-      <span className="w-7 shrink-0 text-xs text-(--ui-text-tertiary)">
+      <span className="w-7 shrink-0 text-aux text-fg-faint">
         {t.dock.pressure.relay}
       </span>
       <div className="min-w-0 flex-1">
@@ -246,15 +244,15 @@ function RelayRow({ usage }: { usage: RelayUsage }) {
             height={4}
           />
         ) : (
-          <span className="block truncate text-xs text-(--ui-text-tertiary)">
+          <span className="block truncate text-aux text-fg-faint">
             {usage.host}
           </span>
         )}
       </div>
-      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-secondary)">
+      <span className="w-9 shrink-0 text-right font-mono text-aux tabular-nums text-fg-muted">
         {pct !== null ? `${pct}%` : ""}
       </span>
-      <span className="w-17 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+      <span className="w-17 shrink-0 text-right font-mono text-aux tabular-nums text-fg-faint">
         {remaining ?? spent}
       </span>
     </div>
@@ -272,7 +270,7 @@ function ExtraRow({ extra }: { extra: ExtraUsage }) {
       : undefined;
   return (
     <div className="flex items-center gap-1" title={detail}>
-      <span className="w-7 shrink-0 text-xs text-(--ui-text-tertiary)">
+      <span className="w-7 shrink-0 text-aux text-fg-faint">
         {t.dock.pressure.extra}
       </span>
       <div className="min-w-0 flex-1">
@@ -284,10 +282,10 @@ function ExtraRow({ extra }: { extra: ExtraUsage }) {
           height={4}
         />
       </div>
-      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-secondary)">
+      <span className="w-9 shrink-0 text-right font-mono text-aux tabular-nums text-fg-muted">
         {pct}%
       </span>
-      <span className="w-17 shrink-0 text-right font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+      <span className="w-17 shrink-0 text-right font-mono text-aux tabular-nums text-fg-faint">
         -
       </span>
     </div>

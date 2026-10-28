@@ -50,7 +50,7 @@ export function TerminalInstance({
           padding and stranding a phantom gap on the trailing/bottom edges. Making this div the
           positioned ancestor .xterm actually binds to keeps both in agreement. */}
       <div
-        className="relative h-full min-h-0 overflow-hidden text-(--ui-text-secondary) [&_.xterm]:h-full [&_.xterm-screen]:bg-(--terminal-editor-surface-background)! [&_.xterm-viewport]:bg-(--terminal-editor-surface-background)!"
+        className="relative h-full min-h-0 overflow-hidden text-fg-muted [&_.xterm]:h-full [&_.xterm-screen]:bg-(--terminal-editor-surface-background)! [&_.xterm-viewport]:bg-(--terminal-editor-surface-background)!"
         ref={hostRef}
       />
     </div>

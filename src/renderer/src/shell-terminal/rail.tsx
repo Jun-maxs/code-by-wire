@@ -16,7 +16,7 @@ import {
 } from "./terminals";
 
 const RAIL_ACTION =
-  "grid size-7 place-items-center rounded-sm text-(--ui-text-tertiary) transition-colors hover:bg-(--chrome-action-hover) hover:text-fg [-webkit-app-region:no-drag]";
+  "grid size-7 place-items-center rounded-sm text-fg-faint transition-colors hover:bg-(--chrome-action-hover) hover:text-fg [-webkit-app-region:no-drag]";
 
 interface MenuState {
   x: number;
@@ -53,7 +53,7 @@ export function TerminalRail() {
         <li className="flex w-full justify-center">
           <button
             aria-label={t.terminal.newTerminal}
-            className={cx(RAIL_ACTION, "text-(--ui-text-quaternary)")}
+            className={cx(RAIL_ACTION, "text-fg-dim")}
             onClick={() => createTerminal()}
             title={t.terminal.newTerminal}
             type="button"
@@ -110,7 +110,7 @@ function TerminalRailItem({
           "grid size-7 place-items-center rounded-sm transition-colors",
           active
             ? "bg-(--chrome-action-hover) text-fg"
-            : "text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-fg",
+            : "text-fg-faint hover:bg-(--chrome-action-hover) hover:text-fg",
         )}
         onAuxClick={(event) => {
           if (event.button === 1) {
@@ -157,7 +157,7 @@ function RailContextMenu({
   }, [onClose]);
 
   const item =
-    "block w-full px-2.5 py-1 text-left text-[0.6875rem] text-(--ui-text-secondary) hover:bg-(--chrome-action-hover) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
+    "block w-full px-2.5 py-1 text-left text-meta text-fg-muted hover:bg-(--chrome-action-hover) hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent";
   const run = (fn: () => void) => () => {
     fn();
     onClose();

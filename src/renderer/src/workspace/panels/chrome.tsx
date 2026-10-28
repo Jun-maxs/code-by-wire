@@ -9,9 +9,7 @@ import { useI18n } from "../../i18n";
 /** A dock tab body's empty state: faint, small, padded to the tab's content inset. Shared by the Turns
  *  and Subagents tabs so their "No X yet." lines stay identical. */
 export function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <p className="px-4 py-3 text-xs text-(--ui-text-quaternary)">{children}</p>
-  );
+  return <p className="px-4 py-3 text-aux text-fg-dim">{children}</p>;
 }
 
 /** A rail panel's shell: flat hermes section chrome — no divider borders of its own, just vertical
@@ -57,7 +55,7 @@ export function PanelHeading({
           // width and top-full drops it below the strip.
           <InfoButton
             label={t.dock.aboutMetric(title)}
-            popoverClassName="left-0 right-0 top-full mt-1.5 rounded-md border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] px-2.5 py-2 text-xs leading-snug text-(--ui-text-secondary) shadow-(--shadow-md) backdrop-blur-xl"
+            popoverClassName="left-0 right-0 top-full mt-1.5 rounded-md border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] px-2.5 py-2 text-aux leading-snug text-fg-muted shadow-(--shadow-md) backdrop-blur-xl"
           >
             {info}
           </InfoButton>
@@ -78,7 +76,7 @@ export function StatRow({
   value: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center gap-2 text-aux">
       <span className="flex-1 text-fg-muted">{label}</span>
       <span className="font-mono tabular-nums text-fg">{value}</span>
     </div>

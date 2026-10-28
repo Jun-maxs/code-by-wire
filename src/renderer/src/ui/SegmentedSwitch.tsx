@@ -41,10 +41,10 @@ export function SegmentedSwitch<T extends string>({
               if (!active) onChange(opt.value);
             }}
             className={cx(
-              "flex h-4 items-center gap-1.5 rounded-xs px-2 text-[0.7rem] font-medium leading-none transition-colors duration-100",
+              "flex h-4 items-center gap-1.5 rounded-xs px-2 text-meta font-medium leading-none transition-colors duration-100",
               active
                 ? "bg-(--ui-control-active-background) text-fg"
-                : "text-(--ui-text-tertiary) hover:text-fg",
+                : "text-fg-faint hover:text-fg",
             )}
           >
             <Icon name={opt.icon} size={13} />

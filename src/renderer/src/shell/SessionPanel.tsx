@@ -100,10 +100,8 @@ function SessionRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-[3px]">
-      <span className="shrink-0 text-xs text-(--ui-text-tertiary)">
-        {label}
-      </span>
-      <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-(--ui-text-secondary)">
+      <span className="shrink-0 text-aux text-fg-faint">{label}</span>
+      <span className="flex min-w-0 items-center gap-1.5 font-mono text-aux text-fg-muted">
         {children}
       </span>
     </div>

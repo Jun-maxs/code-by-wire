@@ -591,3 +591,31 @@ export interface InsightRunState {
   /** Last failure message, cleared on the next start. */
   error: string | null;
 }
+
+/** Put a session under one task (or none): it leaves every other task first, so a session belongs to
+ *  at most one task — what the sidebar shows as its task. Unknown task ids just detach it. */
+export function linkSession(
+  doc: BoardDoc,
+  sessionId: string,
+  taskId: string | null,
+): BoardDoc {
+  return {
+    ...doc,
+    tasks: doc.tasks.map((t) => {
+      const has = t.sessionIds.includes(sessionId);
+      if (t.id === taskId)
+        return has ? t : { ...t, sessionIds: [...t.sessionIds, sessionId] };
+      return has
+        ? { ...t, sessionIds: t.sessionIds.filter((id) => id !== sessionId) }
+        : t;
+    }),
+  };
+}
+
+/** session id → the task that carries it (the first, if an older board has it under several). */
+export function tasksBySession(doc: BoardDoc): Map<string, BoardTask> {
+  const out = new Map<string, BoardTask>();
+  for (const t of doc.tasks)
+    for (const id of t.sessionIds) if (!out.has(id)) out.set(id, t);
+  return out;
+}

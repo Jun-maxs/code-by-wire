@@ -69,7 +69,12 @@ import {
   scanSkillUsage,
   updateSkill,
 } from "./skills";
-import { emptyBoard, normalizeAi, type Insight } from "@shared/board";
+import {
+  emptyBoard,
+  linkSession,
+  normalizeAi,
+  type Insight,
+} from "@shared/board";
 import { remapPlacements, type ProjectStateStore } from "./project-state";
 import type { LaunchPresetStore } from "./launch-presets";
 import { emptyLaunchPresets, type LaunchPresets } from "@shared/extra-args";
@@ -780,6 +785,19 @@ export function registerIpc({
   };
   ipcMain.handle(IPC.readProducts, productsNow);
   ipcMain.handle(IPC.readBoard, () => board?.read() ?? emptyBoard());
+  ipcMain.handle(
+    IPC.boardLinkSession,
+    (_e, sessionId: string, taskId: string | null) =>
+      board
+        ? board.save(
+            linkSession(
+              board.read(),
+              String(sessionId),
+              taskId ? String(taskId) : null,
+            ),
+          )
+        : emptyBoard(),
+  );
   ipcMain.handle(IPC.saveBoard, (_e, doc: unknown) =>
     board ? board.save(doc) : emptyBoard(),
   );

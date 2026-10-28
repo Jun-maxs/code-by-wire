@@ -483,7 +483,7 @@ export function HabitsTab() {
                 <span
                   key={d}
                   className={cx(
-                    "w-5 text-center font-mono text-[10px] tabular-nums",
+                    "w-5 text-center font-mono text-tiny tabular-nums",
                     d === today ? "text-fg" : "text-fg-faint",
                   )}
                 >

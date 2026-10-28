@@ -13,6 +13,7 @@ import {
   ProductsRefreshContext,
   useSessionProduct,
 } from "../products/products-context";
+import { useSessionTasks } from "../board/session-tasks";
 
 /** The portaled dropdown body shared by every session-menu trigger: seven always-rendered action rows
  *  (only `disabled`/`title` vary — the design's "never hide an action, dim the unavailable ones with a
@@ -61,6 +62,22 @@ export function SessionMenuDropdown({
   const refreshProducts = useContext(ProductsRefreshContext);
   const currentTopic = useSessionProduct(session);
   const [topicsOpen, setTopicsOpen] = useState(false);
+  // Fork feature: put the session under a board task (one task per session).
+  const boardTasks = useSessionTasks();
+  const currentTask = boardTasks?.taskOf(session.id);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const linkTask = (taskId: string | null): void => {
+    closeMenu();
+    setTasksOpen(false);
+    void boardTasks?.link(session.id, taskId).catch(() => undefined);
+    // The sidebar groups by topic: follow the task's topic so the session sits with its task.
+    const topic = boardTasks?.tasks.find((x) => x.id === taskId)?.topic;
+    if (topic && topic !== currentTopic?.key)
+      void window.api
+        .assignSessionTopic(session.id, topic)
+        .then(refreshProducts)
+        .catch(() => undefined);
+  };
   const assignTopic = (key: string): void => {
     closeMenu();
     setTopicsOpen(false);
@@ -77,7 +94,7 @@ export function SessionMenuDropdown({
     if (!open || !pos || !el) return setTop(null);
     const fit = window.innerHeight - el.offsetHeight - 8;
     setTop(Math.max(8, Math.min(pos.top, fit)));
-  }, [open, pos, topicsOpen, menuRef]);
+  }, [open, pos, topicsOpen, tasksOpen, menuRef]);
   const topics = products
     ? Object.values(products.products).sort((a, b) =>
         a.name.localeCompare(b.name),
@@ -154,11 +171,11 @@ export function SessionMenuDropdown({
                           aria-checked={currentTopic?.key === p.key}
                           onClick={() => assignTopic(p.key)}
                           title={p.name}
-                          className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[0.75rem] text-(--ui-text-secondary) hover:bg-(--ui-row-hover-background) hover:text-fg"
+                          className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux text-fg-muted hover:bg-(--ui-row-hover-background) hover:text-fg"
                         >
                           <span
                             aria-hidden
-                            className="size-1.5 shrink-0 rounded-full"
+                            className="size-1.5 shrink-0 rounded-[2px]"
                             style={{ background: p.color }}
                           />
                           <span className="min-w-0 flex-1 truncate">
@@ -174,7 +191,7 @@ export function SessionMenuDropdown({
                         role="menuitemradio"
                         aria-checked={!currentTopic}
                         onClick={() => assignTopic("")}
-                        className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-[0.75rem] text-(--ui-text-tertiary) hover:bg-(--ui-row-hover-background) hover:text-fg"
+                        className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux text-fg-faint hover:bg-(--ui-row-hover-background) hover:text-fg"
                       >
                         <span className="size-1.5 shrink-0" />
                         <span className="flex-1">
@@ -186,8 +203,74 @@ export function SessionMenuDropdown({
                 </>
               )}
 
+              {boardTasks && (
+                <>
+                  <MenuItem
+                    icon="square-kanban"
+                    label={
+                      currentTask
+                        ? `${t.shell.sessionMenu.task} · ${currentTask.title}`
+                        : t.shell.sessionMenu.task
+                    }
+                    onClick={() => setTasksOpen((v) => !v)}
+                  />
+                  {tasksOpen && (
+                    <div className="ml-6 flex max-h-56 flex-col overflow-y-auto border-l border-(--ui-stroke-tertiary) pl-1">
+                      {boardTasks.tasks.map((task) => (
+                        <button
+                          key={task.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={currentTask?.id === task.id}
+                          onClick={() => linkTask(task.id)}
+                          title={task.title}
+                          className={cx(
+                            "flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux hover:bg-(--ui-row-hover-background) hover:text-fg",
+                            task.status === "done"
+                              ? "text-fg-dim"
+                              : "text-fg-muted",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {task.title}
+                          </span>
+                          {currentTask?.id === task.id && (
+                            <Icon name="check" size={12} />
+                          )}
+                        </button>
+                      ))}
+                      {currentTask && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              closeMenu();
+                              boardTasks.openTask(currentTask.id);
+                            }}
+                            className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux text-fg-faint hover:bg-(--ui-row-hover-background) hover:text-fg"
+                          >
+                            <Icon name="arrow-up-right" size={12} />
+                            {t.shell.sessionMenu.openTask}
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={false}
+                            onClick={() => linkTask(null)}
+                            className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux text-fg-faint hover:bg-(--ui-row-hover-background) hover:text-fg"
+                          >
+                            <Icon name="unlink" size={12} />
+                            {t.shell.sessionMenu.noTask}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
               {resume.error && (
-                <p role="alert" className="px-2 py-1 text-xs text-danger">
+                <p role="alert" className="px-2 py-1 text-aux text-danger">
                   {resume.error}
                 </p>
               )}
@@ -204,7 +287,7 @@ export function SessionMenuDropdown({
               />
 
               {fork.error && (
-                <p role="alert" className="px-2 py-1 text-xs text-danger">
+                <p role="alert" className="px-2 py-1 text-aux text-danger">
                   {fork.error}
                 </p>
               )}
@@ -249,7 +332,7 @@ export function SessionMenuDropdown({
                 className="my-1 h-px bg-(--ui-stroke-tertiary)"
               />
 
-              <div className="px-2 pb-1 pt-0.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-(--theme-primary)">
+              <div className="px-2 pb-1 pt-0.5 text-tiny font-semibold uppercase tracking-[0.16em] text-(--theme-primary)">
                 {t.shell.sessionMenu.openIn}
               </div>
               {items.map((item) => (
@@ -262,7 +345,7 @@ export function SessionMenuDropdown({
                 />
               ))}
               {openInError && (
-                <p role="alert" className="mt-1 px-2 py-1 text-xs text-danger">
+                <p role="alert" className="mt-1 px-2 py-1 text-aux text-danger">
                   {openInError}
                 </p>
               )}
@@ -351,7 +434,7 @@ function MenuItem({
       disabled={disabled}
       title={title}
       className={cx(
-        "flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:bg-(--ui-control-hover-background) disabled:cursor-default disabled:opacity-40",
+        "flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-aux transition-colors focus-visible:outline-none focus-visible:bg-(--ui-control-hover-background) disabled:cursor-default disabled:opacity-40",
         danger
           ? "text-danger enabled:hover:bg-danger/10"
           : "text-fg-muted enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg",

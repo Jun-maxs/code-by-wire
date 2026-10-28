@@ -64,7 +64,7 @@ export function RightSidebar({
     }
   };
   return (
-    <div className="flex h-full flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background) text-(--ui-text-tertiary)">
+    <div className="flex h-full flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background) text-fg-faint">
       <div
         className="drag-region shrink-0 select-none"
         style={{ height: "var(--titlebar-height)" }}
@@ -82,10 +82,10 @@ export function RightSidebar({
               aria-selected={page === p.id}
               onClick={() => setPage(p.id)}
               className={cx(
-                "flex h-6 flex-1 items-center justify-center gap-1 rounded-sm text-xs transition-colors duration-100",
+                "flex h-6 flex-1 items-center justify-center gap-1 rounded-sm text-aux transition-colors duration-100",
                 page === p.id
                   ? "bg-(--ui-control-active-background) font-medium text-fg"
-                  : "text-(--ui-text-tertiary) hover:text-fg",
+                  : "text-fg-faint hover:text-fg",
               )}
             >
               <Icon name={p.icon} size={12} />
