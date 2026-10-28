@@ -82,6 +82,56 @@ export interface Insight {
   suggestions: { tag: string; title: string; detail: string }[];
 }
 
+/** Which model writes the insight: the Claude CLI (rec) or any OpenAI-compatible endpoint
+ *  (local Ollama, the yuanjp gateway, …). The key stays in userData/board.json on this machine. */
+export interface BoardAi {
+  provider: "claude" | "openai";
+  /** `--model` for the Claude CLI: an alias (haiku/sonnet/opus) or a full id. */
+  claudeModel: string;
+  /** e.g. http://127.0.0.1:11434/v1 */
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  message: string;
+  ms: number;
+}
+
+export const DEFAULT_AI: BoardAi = {
+  provider: "claude",
+  claudeModel: "haiku",
+  baseUrl: "",
+  apiKey: "",
+  model: "",
+};
+
+export function normalizeAi(v: unknown): BoardAi {
+  const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const s = (x: unknown) => (typeof x === "string" ? x.trim() : "");
+  return {
+    provider: r.provider === "openai" ? "openai" : "claude",
+    claudeModel: s(r.claudeModel) || DEFAULT_AI.claudeModel,
+    baseUrl: s(r.baseUrl),
+    apiKey: s(r.apiKey),
+    model: s(r.model),
+  };
+}
+
+/** Short label for the model in use: "Claude CLI · haiku" or "qwen2.5:7b · 127.0.0.1:11434". */
+export function aiLabel(ai: BoardAi): string {
+  if (ai.provider === "claude") return `Claude CLI · ${ai.claudeModel}`;
+  let host = ai.baseUrl;
+  try {
+    host = new URL(ai.baseUrl).host;
+  } catch {
+    // keep the raw text
+  }
+  return `${ai.model || "?"} · ${host || "?"}`;
+}
+
 export interface BoardDoc {
   version: 1;
   tasks: BoardTask[];
@@ -95,6 +145,7 @@ export interface BoardDoc {
   weekends: boolean;
   /** Local hour the daily insight runs (while the app is open); null turns it off. */
   insightHour: number | null;
+  ai: BoardAi;
 }
 
 export const MAX_INSIGHTS = 30;
@@ -109,6 +160,7 @@ export function emptyBoard(): BoardDoc {
     capacityH: 6,
     weekends: false,
     insightHour: 21,
+    ai: { ...DEFAULT_AI },
   };
 }
 
@@ -228,6 +280,7 @@ export function normalizeBoard(raw: unknown): BoardDoc {
       r.insightHour === null
         ? null
         : Math.min(23, Math.max(0, Math.round(num(r.insightHour, 21)))),
+    ai: normalizeAi(r.ai),
   };
 }
 

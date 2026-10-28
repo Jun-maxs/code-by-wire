@@ -54,7 +54,7 @@ import { applyPinOverrides } from "@shared/pin-override";
 import type { SessionTitleStore } from "./session-titles";
 import type { SessionPinStore } from "./session-pins";
 import type { BoardStore } from "./board-store";
-import { emptyBoard, type Insight } from "@shared/board";
+import { emptyBoard, normalizeAi, type Insight } from "@shared/board";
 import { remapPlacements, type ProjectStateStore } from "./project-state";
 import type { LaunchPresetStore } from "./launch-presets";
 import { emptyLaunchPresets, type LaunchPresets } from "@shared/extra-args";
@@ -682,6 +682,11 @@ export function registerIpc({
     IPC.boardInsightState,
     () =>
       board?.insightState() ?? { running: false, startedAt: null, error: null },
+  );
+  ipcMain.handle(IPC.testBoardAi, (_e, ai: unknown) =>
+    board
+      ? board.testAi(normalizeAi(ai))
+      : { ok: false, message: "no board store", ms: 0 },
   );
   ipcMain.handle(IPC.readProductCard, (_e, key: string): string | null => {
     const dirs = productsDirs?.();

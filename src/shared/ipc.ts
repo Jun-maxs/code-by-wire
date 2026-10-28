@@ -1,6 +1,12 @@
 import type { TrashResult } from "./session-trash";
 import type { CardRun, ProductsData, TopicInput } from "./products";
-import type { BoardDoc, Insight, InsightRunState } from "./board";
+import type {
+  AiTestResult,
+  BoardAi,
+  BoardDoc,
+  Insight,
+  InsightRunState,
+} from "./board";
 import type {
   Session,
   Account,
@@ -73,6 +79,7 @@ export const IPC = {
   saveBoard: "board:save",
   runBoardInsight: "board:insight-run",
   boardInsightState: "board:insight-state",
+  testBoardAi: "board:ai-test",
   trashSession: "session:trash",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
@@ -375,6 +382,8 @@ export interface IpcApi {
     trigger: Insight["trigger"],
   ): Promise<InsightRunState>;
   boardInsightState(): Promise<InsightRunState>;
+  /** Send a tiny prompt through an AI setting (saved or not) to check it answers. */
+  testBoardAi(ai: BoardAi): Promise<AiTestResult>;
   /** Move an ended session's transcript (and subagent dir) to the OS trash and drop it from the index.
    *  Refused for a live session. The row disappears on the next overview poll. */
   trashSession(id: string): Promise<TrashResult>;

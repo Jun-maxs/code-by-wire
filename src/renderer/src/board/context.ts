@@ -18,6 +18,8 @@ export interface BoardCtx extends BoardApi {
   /** Spawn a session for the task and attach it; resolves to its id, or null on failure. */
   newSessionFor: (task: BoardTask) => Promise<string | null>;
   openTask: (id: string) => void;
+  /** The topic the board is filtered to (new tasks and ideas land in it), or null. */
+  defaultTopic: string | null;
 }
 
 export const BoardContext = createContext<BoardCtx | null>(null);

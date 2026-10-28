@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { blankTask, type BoardTask } from "@shared/board";
+import { aiLabel, blankTask, type BoardTask } from "@shared/board";
+import { AiSettings } from "./AiSettings";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { useBoardCtx } from "./context";
@@ -48,12 +49,65 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
             run.running ? "animate-pulse bg-working" : "bg-ok",
           )}
         />
-        {s.model}
+        {aiLabel(doc.ai)}
         <span className="opacity-50">·</span>
         {s.autoAt(doc.insightHour)}
       </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+        {settings && (
+          <div className="flex flex-col gap-3 rounded-lg border border-ink-800 bg-ink-950 p-3">
+            <AiSettings />
+            <div className="h-px bg-ink-850" />
+            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
+              {s.sCapacity}
+              <input
+                type="number"
+                min={1}
+                max={16}
+                step={0.5}
+                value={doc.capacityH}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (v > 0 && v <= 24) update((d) => ({ ...d, capacityH: v }));
+                }}
+                className={cx(input, "w-20 font-mono")}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
+              {s.sHour}
+              <select
+                value={doc.insightHour ?? ""}
+                onChange={(e) =>
+                  update((d) => ({
+                    ...d,
+                    insightHour:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                className={cx(input, "w-24")}
+              >
+                <option value="">{s.sOff}</option>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {h}:00
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
+              {s.sWeekends}
+              <input
+                type="checkbox"
+                checked={doc.weekends}
+                onChange={(e) =>
+                  update((d) => ({ ...d, weekends: e.target.checked }))
+                }
+                className="size-3.5 accent-(--color-fg)"
+              />
+            </label>
+          </div>
+        )}
         {run.error && !run.running && (
           <p className="rounded-md border border-danger/40 bg-danger/8 px-3 py-2 text-aux text-danger">
             {s.failed(run.error)}
@@ -195,58 +249,6 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
               </Section>
             )}
           </>
-        )}
-
-        {settings && (
-          <div className="flex flex-col gap-3 rounded-lg border border-ink-800 bg-ink-950 p-3">
-            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
-              {s.sCapacity}
-              <input
-                type="number"
-                min={1}
-                max={16}
-                step={0.5}
-                value={doc.capacityH}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (v > 0 && v <= 24) update((d) => ({ ...d, capacityH: v }));
-                }}
-                className={cx(input, "w-20 font-mono")}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
-              {s.sHour}
-              <select
-                value={doc.insightHour ?? ""}
-                onChange={(e) =>
-                  update((d) => ({
-                    ...d,
-                    insightHour:
-                      e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                className={cx(input, "w-24")}
-              >
-                <option value="">{s.sOff}</option>
-                {Array.from({ length: 24 }, (_, h) => (
-                  <option key={h} value={h}>
-                    {h}:00
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
-              {s.sWeekends}
-              <input
-                type="checkbox"
-                checked={doc.weekends}
-                onChange={(e) =>
-                  update((d) => ({ ...d, weekends: e.target.checked }))
-                }
-                className="size-3.5 accent-(--color-fg)"
-              />
-            </label>
-          </div>
         )}
       </div>
 

@@ -209,9 +209,9 @@ function PlanChip({
 
 /** 灵感: jot first, sort later. An idea can become a task in one click. */
 export function IdeasTab({ query }: { query: string }) {
-  const { doc, s, update, topics, openTask } = useBoardCtx();
+  const { doc, s, update, topics, openTask, defaultTopic } = useBoardCtx();
   const [text, setText] = useState("");
-  const [topic, setTopic] = useState("");
+  const [topic, setTopic] = useState(defaultTopic ?? "");
   const q = query.toLowerCase();
   const ideas = doc.ideas.filter((i) => !q || i.text.toLowerCase().includes(q));
   const open = ideas.filter((i) => !i.taskId);

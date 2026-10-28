@@ -130,7 +130,7 @@ export function KanbanTab({ query }: { query: string }) {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-cols-[minmax(240px,1fr)] grid-flow-col gap-3 overflow-x-auto">
+      <div className="grid min-h-0 flex-1 auto-cols-[minmax(200px,1fr)] grid-flow-col gap-3 overflow-x-auto">
         {TASK_STATUSES.map((status) => {
           const cards = visible
             .filter((t) => t.status === status)
@@ -358,7 +358,7 @@ function dayOf(ms: number): string {
 }
 
 function QuickAdd({ status }: { status: TaskStatus }) {
-  const { s, update } = useBoardCtx();
+  const { s, update, defaultTopic } = useBoardCtx();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   if (!editing)
@@ -391,7 +391,10 @@ function QuickAdd({ status }: { status: TaskStatus }) {
         if (!title) return;
         update((d) => ({
           ...d,
-          tasks: [...d.tasks, blankTask(d, title, { status })],
+          tasks: [
+            ...d.tasks,
+            blankTask(d, title, { status, topic: defaultTopic }),
+          ],
         }));
         setText("");
       }}

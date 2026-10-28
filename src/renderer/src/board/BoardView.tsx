@@ -11,7 +11,9 @@ import { InsightPanel, ImportDialog } from "./InsightPanel";
 import { KanbanTab } from "./KanbanTab";
 import { OverviewTab } from "./OverviewTab";
 import { HabitsTab, IdeasTab, ScheduleTab } from "./PlanTabs";
-import { TaskDrawer } from "./TaskDrawer";
+import { Sheet, TaskDrawer } from "./TaskDrawer";
+import { TopicRail } from "./TopicRail";
+import { TopicsSection } from "../settings/TopicsSection";
 import { btn } from "./parts";
 import { boardStrings } from "./strings";
 import { useBoard } from "./use-board";
@@ -26,6 +28,7 @@ const TABS: { id: Tab; icon: IconName }[] = [
 ];
 
 let lastTab: Tab = "overview";
+let lastTopic = "all";
 
 /**
  * The work board (fork feature, 2026-10-28): tasks that each carry agent sessions, laid out as an
@@ -52,7 +55,15 @@ export function BoardView({
   };
   const [query, setQuery] = useState("");
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"insight" | "import" | null>(null);
+  const [panel, setPanel] = useState<"insight" | "import" | "topics" | null>(
+    null,
+  );
+  // "all", "none" (tasks without a topic) or a topic key; remembered across visits like the tab.
+  const [topic, setTopicState] = useState<string>(lastTopic);
+  const setTopic = (t: string) => {
+    lastTopic = t;
+    setTopicState(t);
+  };
 
   const sessionsById = useMemo(
     () => new Map(sessions.map((x) => [x.id, x])),
@@ -105,8 +116,24 @@ export function BoardView({
     [sessionsById, sessions, products, onNewSession, api],
   );
 
+  // Every page reads the board through the topic filter; edits still go to the whole document.
+  const inTopic = (k: string | null) =>
+    topic === "all" || (topic === "none" ? !k : k === topic);
+  const viewDoc = useMemo(
+    () => ({
+      ...api.doc,
+      tasks: api.doc.tasks.filter((t) => inTopic(t.topic)),
+      ideas: api.doc.ideas.filter((i) => inTopic(i.topic)),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api.doc, topic],
+  );
+  const defaultTopic = topic === "all" || topic === "none" ? null : topic;
+
   const ctx: BoardCtx = {
     ...api,
+    doc: viewDoc,
+    defaultTopic,
     s,
     sessions,
     sessionsById,
@@ -119,9 +146,7 @@ export function BoardView({
   };
 
   const createTask = () => {
-    const task = blankTask(api.doc, "", {
-      status: tab === "kanban" ? "todo" : "todo",
-    });
+    const task = blankTask(api.doc, "", { topic: defaultTopic });
     api.update((d) => ({ ...d, tasks: [...d.tasks, task] }));
     setTaskId(task.id);
   };
@@ -217,28 +242,38 @@ export function BoardView({
           </div>
         </div>
 
-        <div
-          className={cx(
-            "min-h-0 flex-1",
-            tab === "kanban" || tab === "schedule" ? "" : "overflow-y-auto",
-          )}
-        >
-          {empty ? (
-            <EmptyBoard
-              onNew={createTask}
-              onImport={products ? () => setPanel("import") : null}
+        <div className="flex min-h-0 flex-1">
+          {tab !== "habits" && (
+            <TopicRail
+              topic={topic}
+              onTopic={setTopic}
+              onManage={() => setPanel("topics")}
+              tasks={api.doc.tasks}
             />
-          ) : tab === "overview" ? (
-            <OverviewTab onOpenInsight={() => setPanel("insight")} />
-          ) : tab === "kanban" ? (
-            <KanbanTab query={query} />
-          ) : tab === "schedule" ? (
-            <ScheduleTab query={query} />
-          ) : tab === "ideas" ? (
-            <IdeasTab query={query} />
-          ) : (
-            <HabitsTab />
           )}
+          <div
+            className={cx(
+              "min-w-0 min-h-0 flex-1",
+              tab === "kanban" || tab === "schedule" ? "" : "overflow-y-auto",
+            )}
+          >
+            {empty ? (
+              <EmptyBoard
+                onNew={createTask}
+                onImport={products ? () => setPanel("import") : null}
+              />
+            ) : tab === "overview" ? (
+              <OverviewTab onOpenInsight={() => setPanel("insight")} />
+            ) : tab === "kanban" ? (
+              <KanbanTab query={query} />
+            ) : tab === "schedule" ? (
+              <ScheduleTab query={query} />
+            ) : tab === "ideas" ? (
+              <IdeasTab query={query} />
+            ) : (
+              <HabitsTab />
+            )}
+          </div>
         </div>
 
         {taskId && (
@@ -246,6 +281,33 @@ export function BoardView({
         )}
         {panel === "insight" && <InsightPanel onClose={() => setPanel(null)} />}
         {panel === "import" && <ImportDialog onClose={() => setPanel(null)} />}
+        {panel === "topics" && (
+          <Sheet
+            onClose={() => setPanel(null)}
+            label={s.topicsManage}
+            width={620}
+          >
+            <div className="flex items-center justify-between border-b border-ink-850 px-4 py-3">
+              <div>
+                <h2 className="text-subhead font-semibold text-fg">
+                  {s.topicsManage}
+                </h2>
+                <p className="mt-0.5 text-aux text-fg-faint">{s.topicsLede}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPanel(null)}
+                className={btn.ghost}
+                aria-label="close"
+              >
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <TopicsSection />
+            </div>
+          </Sheet>
+        )}
       </div>
     </BoardContext.Provider>
   );
