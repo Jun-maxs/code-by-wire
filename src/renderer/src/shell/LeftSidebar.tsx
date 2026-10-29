@@ -16,6 +16,7 @@ import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { AgentIcon } from "../ui/agent-icons";
 import { useI18n } from "../i18n";
+import { useContentSearch } from "./use-content-search";
 import {
   activeSessionCount,
   capSessionForest,
@@ -131,7 +132,9 @@ export function LeftSidebar({
   };
   // The dropdown's highlight reflects the only filter left in it.
   const agentFilterActive = preferences.agent !== "all";
-  const searched = filterSessions(sessions, query);
+  // Fork: the search box also matches what was said in a session (full-text index in main).
+  const content = useContentSearch(sessions, query);
+  const searched = filterSessions(sessions, query, content.hits);
   const pinned = pinnedSessions(searched);
   // Build families before project grouping so a child follows its root even if its own rollout cwd
   // differs. filterGroups applies search + preferences together and retains ancestor context.
@@ -151,6 +154,7 @@ export function LeftSidebar({
       : groupSessionsByProject(sessions, homeDir),
     preferences,
     query,
+    content.hits,
   );
   // Per-folder "Older (N)" disclosure (issue #431): key → how many hidden entries to reveal.
   // Ephemeral by design — revealing history is an errand, not a mode.
@@ -323,6 +327,13 @@ export function LeftSidebar({
         <SessionRow
           hideProduct={byProduct}
           session={node.session}
+          snippet={
+            node.session.title
+              .toLowerCase()
+              .includes(query.trim().toLowerCase())
+              ? undefined
+              : content.hits.get(node.session.id)
+          }
           selected={node.session.id === selectedId}
           onSelect={() => onSelect(node.session.id)}
           canSpawn={canSpawnFor(node.session.agent)}
@@ -614,6 +625,11 @@ export function LeftSidebar({
               </button>
             )}
           </div>
+          {content.indexing && (
+            <p className="pt-1 text-meta leading-snug text-fg-dim">
+              {t.shell.sidebar.contentIndexing}
+            </p>
+          )}
         </div>
 
         <OverlayScroll className="min-h-0 flex-1" contentClassName="pb-2">

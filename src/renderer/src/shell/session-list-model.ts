@@ -31,17 +31,24 @@ export function sortSessions(sessions: Session[]): Session[] {
 /** Case-insensitive substring match on title, project, or the folder's repo label (so searching a
  *  repository's name finds every session grouped under it, whatever subdirectory or worktree each
  *  one started in) — the sidebar search box's filter. */
-export function filterSessions(sessions: Session[], query: string): Session[] {
+export function filterSessions(
+  sessions: Session[],
+  query: string,
+  contentHits?: ReadonlyMap<string, string>,
+): Session[] {
   const q = query.trim().toLowerCase();
   if (!q) return sessions;
-  return sessions.filter((s) => sessionMatchesQuery(s, q));
+  return sessions.filter((s) => sessionMatchesQuery(s, q, contentHits));
 }
 
+/** Fork: `contentHits` (session id → excerpt) adds the sessions whose transcript mentions the query. */
 function sessionMatchesQuery(
   session: Session,
   normalizedQuery: string,
+  contentHits?: ReadonlyMap<string, string>,
 ): boolean {
   return (
+    !!contentHits?.has(session.id) ||
     session.title.toLowerCase().includes(normalizedQuery) ||
     (session.project ?? "").toLowerCase().includes(normalizedQuery) ||
     sessionRepoLabel(session).toLowerCase().includes(normalizedQuery)
@@ -118,13 +125,14 @@ export function filterGroups(
   groups: SessionGroup[],
   preferences: SessionsListPreferences,
   query = "",
+  contentHits?: ReadonlyMap<string, string>,
 ): SessionGroup[] {
   const normalizedQuery = query.trim().toLowerCase();
   const matchingGroups = groups.filter(
     (group) =>
       !normalizedQuery ||
       group.sessions.some((session) =>
-        sessionMatchesQuery(session, normalizedQuery),
+        sessionMatchesQuery(session, normalizedQuery, contentHits),
       ),
   );
   if (normalizedQuery) {
@@ -133,7 +141,9 @@ export function filterGroups(
         group.key,
         Math.max(
           ...group.sessions
-            .filter((session) => sessionMatchesQuery(session, normalizedQuery))
+            .filter((session) =>
+              sessionMatchesQuery(session, normalizedQuery, contentHits),
+            )
             .map((session) => session.lastActivityMs),
         ),
       ]),
@@ -146,7 +156,8 @@ export function filterGroups(
     ...group,
     sessions: filterSessionsWithAncestors(group.sessions, (session) => {
       const matchesQuery =
-        !normalizedQuery || sessionMatchesQuery(session, normalizedQuery);
+        !normalizedQuery ||
+        sessionMatchesQuery(session, normalizedQuery, contentHits);
       // Ended sessions are never filtered out (issue #431): a folder's own cap decides how much
       // history it shows inline, so search and the agent preference are the only narrowing here.
       return (

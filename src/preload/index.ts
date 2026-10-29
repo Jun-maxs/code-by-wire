@@ -61,6 +61,8 @@ const api: AppApi = {
   getSessionCleanup: () => ipcRenderer.invoke(IPC.sessionCleanupGet),
   setSessionCleanup: (next) => ipcRenderer.invoke(IPC.sessionCleanupSet, next),
   runSessionCleanup: () => ipcRenderer.invoke(IPC.sessionCleanupRun),
+  trackSessionContent: () => ipcRenderer.invoke(IPC.contentTrack),
+  searchSessionContent: (query) => ipcRenderer.invoke(IPC.contentSearch, query),
   getLaunchPresets: () => ipcRenderer.invoke(IPC.launchPresetsGet),
   setLaunchPresets: (presets) =>
     ipcRenderer.invoke(IPC.launchPresetsSet, presets),

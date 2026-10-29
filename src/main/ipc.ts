@@ -146,8 +146,11 @@ import type {
 } from "@shared/diagnostic-report";
 import type { ManagedRegistry } from "./managed-registry";
 import { AGENT_PROBES } from "./cli-status";
+import type { ContentSearch } from "./content-search";
 
 export interface IpcDeps {
+  /** Fork: full-text index over session transcripts (sidebar search by content). */
+  contentSearch?: ContentSearch;
   db: SqliteDb;
   provider: Provider;
   /** Live statusLine captures. Defaults to "no captures" so the index still serves without them. */
@@ -248,6 +251,7 @@ export function registerIpc({
   sessionTitles,
   sessionPins,
   remoteSessions,
+  contentSearch,
   productsDirs,
   board,
   launchPresets,
@@ -757,6 +761,20 @@ export function registerIpc({
     );
     return cleanupView();
   });
+  if (contentSearch) {
+    // The provider knows every transcript (live and ended); index them all, not just what's on screen.
+    ipcMain.handle(IPC.contentTrack, async () => {
+      const candidates = await provider.listCandidates();
+      contentSearch.track(
+        candidates.flatMap((c) =>
+          c.transcriptPath ? [{ id: c.id, path: c.transcriptPath }] : [],
+        ),
+      );
+    });
+    ipcMain.handle(IPC.contentSearch, (_e, query: string) =>
+      contentSearch.search(String(query ?? "")),
+    );
+  }
   ipcMain.handle(IPC.sessionCleanupRun, async () => {
     await runCleanup("manual");
     return cleanupView();

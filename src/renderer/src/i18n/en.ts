@@ -289,9 +289,11 @@ export const en = {
       stats: "Stats",
       updatePendingTitle: "Update pending — see Settings › About",
       updatePendingSrOnly: "(update pending)",
-      searchPlaceholder: "Search sessions…",
+      searchPlaceholder: "Search titles and conversations…",
       searchLabel: "Search sessions",
       clearSearch: "Clear search",
+      contentIndexing:
+        "Still indexing conversations; older sessions may not show up yet.",
       sessionsLabel: "Sessions",
       pinnedLabel: "Pinned",
       noPinnedSessions: "No pinned sessions.",

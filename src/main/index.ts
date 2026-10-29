@@ -112,6 +112,7 @@ import {
   type HudSettingsView,
 } from "@shared/ipc";
 import { logError, logWarn } from "./log-buffer";
+import { createContentSearch } from "./content-search";
 
 /** Fork: a screenshot run — main window off-screen and unfocused, no HUD overlay. */
 const OFFSCREEN = process.env.CBW_OFFSCREEN === "1";
@@ -329,6 +330,11 @@ app
     const remoteSessions = createRemoteSessionStore({
       dir: app.getPath("userData"),
     });
+    // Fork feature: the sidebar's search-by-content index, in its own file beside the others.
+    const contentSearch = createContentSearch(
+      join(app.getPath("userData"), "content-search.db"),
+    );
+    app.on("will-quit", () => contentSearch.close());
     const openWindow = (): void =>
       createWindow(
         managed,
@@ -681,6 +687,7 @@ app
       sessionTitles,
       sessionPins,
       remoteSessions,
+      contentSearch,
       board,
       productsDirs: () => {
         // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).

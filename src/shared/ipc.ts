@@ -4,6 +4,7 @@ import type {
   SessionCleanupView,
 } from "./session-cleanup";
 import type { CardRun, ProductsData, TopicInput } from "./products";
+import type { ContentSearchResult } from "./content-search";
 import type { SkillCheck, SkillRemoveResult, SkillsData } from "./skills";
 import type {
   AiTestResult,
@@ -95,6 +96,8 @@ export const IPC = {
   sessionCleanupGet: "session:cleanupGet",
   sessionCleanupSet: "session:cleanupSet",
   sessionCleanupRun: "session:cleanupRun",
+  contentTrack: "content:track",
+  contentSearch: "content:search",
   setProjectPlacement: "project:setPlacement",
   getToolResult: "toolResult:get",
   updateGetState: "update:getState",
@@ -421,6 +424,10 @@ export interface IpcApi {
   setSessionCleanup(next: SessionCleanupSettings): Promise<SessionCleanupView>;
   /** Run the cleanup now (ignores the on/off switch); resolves when it's done. */
   runSessionCleanup(): Promise<SessionCleanupView>;
+  /** Fork: (re)list every transcript for the full-text index. */
+  trackSessionContent(): Promise<void>;
+  /** Fork: sessions whose transcript mentions `query`. */
+  searchSessionContent(query: string): Promise<ContentSearchResult>;
   /** Every saved launch-args preset, keyed by agent (the New-session preset picker). */
   getLaunchPresets(): Promise<LaunchPresets>;
   /** Replace the whole presets object — the renderer owns list edits and ships the result back. */

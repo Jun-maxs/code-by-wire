@@ -43,6 +43,7 @@ export function SessionRow({
   childrenExpanded = false,
   onToggleChildren,
   hideProduct = false,
+  snippet,
 }: {
   session: Session;
   selected: boolean;
@@ -61,6 +62,8 @@ export function SessionRow({
   onToggleChildren?: () => void;
   /** The sidebar already groups by topic, so the title needn't repeat the topic's name. */
   hideProduct?: boolean;
+  /** Fork: where a sidebar search matched this session's conversation, shown under the title. */
+  snippet?: string;
 }) {
   const { t } = useI18n();
   const menu = useSessionMenu(session, canSpawn, {
@@ -301,6 +304,15 @@ export function SessionRow({
         </div>
         <SessionMenuDropdown session={session} menu={menu} />
       </div>
+      {snippet && (
+        <p
+          className="truncate pb-1 pl-7.5 pr-2 text-meta leading-snug text-fg-dim"
+          style={rowStyle}
+          title={snippet}
+        >
+          {snippet}
+        </p>
+      )}
     </ProductHoverCard>
   );
 }
