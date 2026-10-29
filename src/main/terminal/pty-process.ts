@@ -45,8 +45,23 @@ export function createPtyProcess(o: SpawnOptions): PtyProcess {
   });
   return {
     pid: pty.pid,
-    write: (data) => pty.write(data),
-    resize: (cols, rows) => pty.resize(Math.max(cols, 1), Math.max(rows, 1)),
+    // The process can exit before onExit reaches the manager (or a resize IPC is already in flight);
+    // node-pty then throws "Cannot resize a pty that has already exited", which as an uncaught
+    // exception in the main process pops Electron's error dialog. Nothing to do for a dead pty.
+    write: (data) => {
+      try {
+        pty.write(data);
+      } catch {
+        /* exited */
+      }
+    },
+    resize: (cols, rows) => {
+      try {
+        pty.resize(Math.max(cols, 1), Math.max(rows, 1));
+      } catch {
+        /* exited */
+      }
+    },
     pause: () => pty.pause(),
     resume: () => pty.resume(),
     kill: () => pty.kill(),
