@@ -604,10 +604,13 @@ export const en = {
     expandAria: "Expand activity dock",
     expandTitle: "Expand",
     tabs: {
-      tasks: "Tasks",
+      tasks: "Todos",
       subagents: "Subagents",
       shells: "Shells",
       monitors: "Monitors",
+      // Fork tabs (2026-10-29): the session's board task, and its topic.
+      task: "Task",
+      topic: "Topic",
     },
     tally: (
       tasks: number,
@@ -615,7 +618,7 @@ export const en = {
       shells: number,
       monitors: number,
     ) =>
-      `${tasks} tasks · ${subagents} subagents · ${shells} shells · ${monitors} monitors`,
+      `${tasks} todos · ${subagents} subagents · ${shells} shells · ${monitors} monitors`,
     // One shared status-word group for every dock tab's glyph label / status pill / metric tag, so
     // Tasks (blocked), Shells and Monitors (running/completed/failed/killed/stopped) all read from
     // here instead of each tab minting its own copy of the same words.

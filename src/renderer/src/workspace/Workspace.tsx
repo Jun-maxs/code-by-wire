@@ -233,6 +233,7 @@ function WorkspaceBody({
       </div>
       {AGENTS[s.agent].capabilities.hasActivity && (
         <ActivityDock
+          session={s}
           tasks={tasks ?? []}
           doc={doc}
           shells={shells ?? []}

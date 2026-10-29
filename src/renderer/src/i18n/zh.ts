@@ -541,13 +541,15 @@ export const zh: Translations = {
     expandAria: "展开活动面板",
     expandTitle: "展开",
     tabs: {
-      tasks: "任务",
+      tasks: "待办",
       subagents: "子代理",
       shells: "后台终端",
       monitors: "监控",
+      task: "任务详情",
+      topic: "主题",
     },
     tally: (tasks, subagents, shells, monitors) =>
-      `${tasks} 个任务 · ${subagents} 个子代理 · ${shells} 个后台终端 · ${monitors} 个监控`,
+      `${tasks} 个待办 · ${subagents} 个子代理 · ${shells} 个后台终端 · ${monitors} 个监控`,
     status: {
       running: "运行中",
       completed: "已完成",

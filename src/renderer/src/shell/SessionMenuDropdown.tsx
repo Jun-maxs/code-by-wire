@@ -13,7 +13,7 @@ import {
   ProductsRefreshContext,
   useSessionProduct,
 } from "../products/products-context";
-import { useSessionTasks } from "../board/session-tasks";
+import { useLinkTask, useSessionTasks } from "../board/session-tasks";
 
 /** The portaled dropdown body shared by every session-menu trigger: seven always-rendered action rows
  *  (only `disabled`/`title` vary — the design's "never hide an action, dim the unavailable ones with a
@@ -66,17 +66,11 @@ export function SessionMenuDropdown({
   const boardTasks = useSessionTasks();
   const currentTask = boardTasks?.taskOf(session.id);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const linkSessionTask = useLinkTask(session);
   const linkTask = (taskId: string | null): void => {
     closeMenu();
     setTasksOpen(false);
-    void boardTasks?.link(session.id, taskId).catch(() => undefined);
-    // The sidebar groups by topic: follow the task's topic so the session sits with its task.
-    const topic = boardTasks?.tasks.find((x) => x.id === taskId)?.topic;
-    if (topic && topic !== currentTopic?.key)
-      void window.api
-        .assignSessionTopic(session.id, topic)
-        .then(refreshProducts)
-        .catch(() => undefined);
+    linkSessionTask(taskId);
   };
   const assignTopic = (key: string): void => {
     closeMenu();

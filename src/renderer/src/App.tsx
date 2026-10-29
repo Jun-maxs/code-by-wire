@@ -584,7 +584,11 @@ export function App() {
 
   return (
     <ProductsProvider>
-      <SessionTasksProvider onShowBoard={showBoard}>
+      <SessionTasksProvider
+        onShowBoard={showBoard}
+        sessions={all}
+        onOpenSession={setSelectedId}
+      >
         <BoardAutoInsight sessions={all} />
         <div className="app-bg flex h-screen flex-col text-fg">
           <PaneShell className="min-h-0 flex-1">

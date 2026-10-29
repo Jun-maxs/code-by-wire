@@ -207,6 +207,31 @@ const zh = {
           ? `${Math.floor(m / 60)} 小时前`
           : `${Math.floor(m / 1440)} 天前`,
   weekday: ["日", "一", "二", "三", "四", "五", "六"],
+  /** The session dock's Task and Topic tabs. */
+  dock: {
+    noTask: "这个会话还没挂到看板任务。",
+    pickTask: "挂到任务",
+    sameTopicFirst: "同主题的任务排在前面",
+    noTasks: "看板里还没有任务。",
+    openBoard: "打开看板",
+    openOnBoard: "在看板里打开",
+    changeTask: "换任务",
+    unlink: "不挂任务",
+    priority: "优先级",
+    due: "截止",
+    planned: "计划",
+    estimate: (h: string, left: string) => `预估 ${h}，剩 ${left}`,
+    subtasks: (done: number, all: number) => `子任务 ${done}/${all}`,
+    notes: "备注",
+    sessions: "这个任务的会话",
+    thisSession: "当前",
+    noTopic: "这个会话还没归到主题。可以在会话菜单里「归到主题」。",
+    topicSessions: "同主题的会话",
+    topicTasks: "同主题未完成的任务",
+    noTaskShort: "未挂任务",
+    noCard: "这个主题还没有主题卡。",
+    back: "返回",
+  },
 };
 
 export type BoardStrings = typeof zh;
@@ -392,6 +417,30 @@ const en: BoardStrings = {
           ? `${Math.floor(m / 60)}h ago`
           : `${Math.floor(m / 1440)}d ago`,
   weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  dock: {
+    noTask: "This session isn't on a board task yet.",
+    pickTask: "Put it on a task",
+    sameTopicFirst: "Tasks in the same topic come first",
+    noTasks: "The board has no tasks yet.",
+    openBoard: "Open the board",
+    openOnBoard: "Open on the board",
+    changeTask: "Change task",
+    unlink: "Take off the task",
+    priority: "Priority",
+    due: "Due",
+    planned: "Planned",
+    estimate: (h: string, left: string) => `Estimate ${h}, ${left} left`,
+    subtasks: (done: number, all: number) => `Subtasks ${done}/${all}`,
+    notes: "Notes",
+    sessions: "Sessions on this task",
+    thisSession: "This one",
+    noTopic: 'This session has no topic yet. Use "Topic" in the session menu.',
+    topicSessions: "Sessions in this topic",
+    topicTasks: "Open tasks in this topic",
+    noTaskShort: "No task",
+    noCard: "This topic has no card yet.",
+    back: "Back",
+  },
 };
 
 export function boardStrings(locale: Locale): BoardStrings {

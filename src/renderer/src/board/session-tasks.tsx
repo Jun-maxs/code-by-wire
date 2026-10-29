@@ -8,6 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { tasksBySession, type BoardDoc, type BoardTask } from "@shared/board";
+import type { Session } from "@shared/types";
+import {
+  ProductsRefreshContext,
+  useSessionProduct,
+} from "../products/products-context";
 
 /**
  * Sessions ↔ board tasks outside the board (fork feature, 2026-10-28): the sidebar, the session menu
@@ -64,15 +69,24 @@ interface SessionTasks {
   link: (sessionId: string, taskId: string | null) => Promise<void>;
   /** Go to the board with this task's drawer open. */
   openTask: (taskId: string) => void;
+  /** Go to the board. */
+  showBoard: () => void;
+  /** Every session the app knows, for the dock's "other sessions on this task/topic" lists. */
+  sessions: Session[];
+  openSession: (id: string) => void;
 }
 
 const Ctx = createContext<SessionTasks | null>(null);
 
 export function SessionTasksProvider({
   onShowBoard,
+  sessions,
+  onOpenSession,
   children,
 }: {
   onShowBoard: () => void;
+  sessions: Session[];
+  onOpenSession: (id: string) => void;
   children: ReactNode;
 }) {
   const [doc, setDoc] = useState<BoardDoc | null>(null);
@@ -119,12 +133,41 @@ export function SessionTasksProvider({
     [onShowBoard],
   );
   const value = useMemo<SessionTasks>(
-    () => ({ tasks, taskOf: (id) => bySession.get(id), link, openTask }),
-    [tasks, bySession, link, openTask],
+    () => ({
+      tasks,
+      taskOf: (id) => bySession.get(id),
+      link,
+      openTask,
+      showBoard: onShowBoard,
+      sessions,
+      openSession: onOpenSession,
+    }),
+    [tasks, bySession, link, openTask, onShowBoard, sessions, onOpenSession],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useSessionTasks(): SessionTasks | null {
   return useContext(Ctx);
+}
+
+/** Put `session` under a board task (null unlinks). The sidebar groups by topic, so the session also
+ *  follows the task's topic and sits with its task. */
+export function useLinkTask(session: {
+  id: string;
+  title: string;
+}): (taskId: string | null) => void {
+  const tasks = useSessionTasks();
+  const refreshProducts = useContext(ProductsRefreshContext);
+  const currentTopic = useSessionProduct(session)?.key;
+  return (taskId) => {
+    if (!tasks) return;
+    void tasks.link(session.id, taskId).catch(() => undefined);
+    const topic = tasks.tasks.find((x) => x.id === taskId)?.topic;
+    if (topic && topic !== currentTopic)
+      void window.api
+        .assignSessionTopic(session.id, topic)
+        .then(refreshProducts)
+        .catch(() => undefined);
+  };
 }

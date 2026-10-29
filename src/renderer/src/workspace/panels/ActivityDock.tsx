@@ -4,7 +4,13 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Subagent, Task, BackgroundShell, Monitor } from "@shared/types";
+import type {
+  Subagent,
+  Task,
+  BackgroundShell,
+  Monitor,
+  Session,
+} from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { Tabs } from "../../ui/Tabs";
 import { SidebarPanelLabel } from "../../shell/SidebarPanelLabel";
@@ -13,6 +19,7 @@ import { DockTasks } from "./DockTasks";
 import { SubagentsTab } from "./SubagentsTab";
 import { ShellsTab } from "./ShellsTab";
 import { MonitorsTab } from "./MonitorsTab";
+import { DockTaskDetail, DockTopic } from "./DockBoard";
 import { DockLiveReveal } from "./dock-live-reveal";
 import { OverlayScroll } from "../../ui/OverlayScroll";
 import {
@@ -36,6 +43,7 @@ import { useI18n } from "../../i18n";
  * cleanly to just the live view.
  */
 export function ActivityDock({
+  session,
   tasks,
   doc,
   shells,
@@ -48,6 +56,7 @@ export function ActivityDock({
   onDrillShell,
   onDrillMonitor,
 }: {
+  session: Session;
   tasks: Task[];
   doc: DocState;
   shells: BackgroundShell[];
@@ -177,7 +186,11 @@ export function ActivityDock({
             collapsed dock renders DockTally instead) — so the one-shot scroll-to-live runs exactly
             when a list comes on screen, and never again while it stays open. */}
         <DockLiveReveal key={tab}>
-          {tab === "tasks" ? (
+          {tab === "task" ? (
+            <DockTaskDetail session={session} />
+          ) : tab === "topic" ? (
+            <DockTopic session={session} />
+          ) : tab === "tasks" ? (
             <DockTasks tasks={tasks} />
           ) : tab === "subagents" ? (
             <SubagentsTab
@@ -246,6 +259,8 @@ function DockTabBar({
             label: t.dock.tabs.monitors,
             count: monitorCount,
           },
+          { id: "task", label: t.dock.tabs.task },
+          { id: "topic", label: t.dock.tabs.topic },
         ]}
         value={tab}
         onChange={onChange}

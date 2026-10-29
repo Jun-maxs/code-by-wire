@@ -2,8 +2,15 @@ import type { Subagent, Task, BackgroundShell, Monitor } from "@shared/types";
 
 // JSX-free dock logic, so the tests can import it under tsconfig.node.json (mirrors open-in-items.ts).
 
-/** The dock's tabs. */
-export type DockTab = "tasks" | "subagents" | "shells" | "monitors";
+/** The dock's tabs. `task` and `topic` are fork tabs (2026-10-29): the session's board task and its
+ *  topic; they are never picked automatically. */
+export type DockTab =
+  | "tasks"
+  | "subagents"
+  | "shells"
+  | "monitors"
+  | "task"
+  | "topic";
 
 /** The forest tallies the dock needs, gathered in a single walk. Only `total` (the Subagents count
  *  badge) and `working` (the live-fan-out signal: auto-expand, default tab) have UI consumers today;
