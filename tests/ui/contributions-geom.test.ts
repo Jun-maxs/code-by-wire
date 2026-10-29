@@ -102,4 +102,8 @@ describe("monthLabelCols", () => {
     expect(labels[0]).toEqual({ col: 0, firstDay: "2026-06-01" });
     expect(labels.some((l) => l.firstDay.startsWith("2026-07"))).toBe(true);
   });
+  it("drops a partial first month too narrow for its label", () => {
+    const weeks = calendarGrid("2026-05-29", "2026-07-15");
+    expect(monthLabelCols(weeks)[0].firstDay.slice(0, 7)).toBe("2026-06");
+  });
 });

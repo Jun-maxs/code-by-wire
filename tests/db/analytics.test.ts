@@ -1923,35 +1923,25 @@ describe("readRecords", () => {
     expect(r.longestStreakDays).toBe(2);
   });
 
-  it("takes the largest per-session span and ignores unknown-time turns", () => {
+  it("takes the longest per-session time in use: pauses over 30 minutes and unknown-time turns add nothing", () => {
     const db = openTestDb();
     migrateAnalytics(db);
+    const at = (d: number, h: number, m: number): number =>
+      dayMs(2026, 6, d, h) + m * 60_000;
     upsertTurns(db, [
-      // sess-1: a 2-hour span.
-      turn({
-        messageId: "f1",
-        sessionId: "sess-1",
-        ts: dayMs(2026, 6, 13, 10),
-      }),
-      turn({
-        messageId: "f2",
-        sessionId: "sess-1",
-        ts: dayMs(2026, 6, 13, 12),
-      }),
-      // sess-2: a 30-hour span (the longest).
-      turn({ messageId: "g1", sessionId: "sess-2", ts: dayMs(2026, 6, 13, 8) }),
-      turn({
-        messageId: "g2",
-        sessionId: "sess-2",
-        ts: dayMs(2026, 6, 14, 14),
-      }),
+      // sess-1: three turns 20 minutes apart — 40 minutes in use (the longest).
+      turn({ messageId: "f1", sessionId: "sess-1", ts: at(13, 10, 0) }),
+      turn({ messageId: "f2", sessionId: "sess-1", ts: at(13, 10, 20) }),
+      turn({ messageId: "f3", sessionId: "sess-1", ts: at(13, 10, 40) }),
+      // sess-2: resumed the next day — the overnight gap is time away; 10 minutes in use.
+      turn({ messageId: "g1", sessionId: "sess-2", ts: at(13, 8, 0) }),
+      turn({ messageId: "g2", sessionId: "sess-2", ts: at(14, 14, 0) }),
+      turn({ messageId: "g3", sessionId: "sess-2", ts: at(14, 14, 10) }),
       // sess-3: an unknown-time turn only — no span, and no epoch-stretch.
       turn({ messageId: "h1", sessionId: "sess-3", ts: 0 }),
     ]);
     const r = readRecords(db, ALL_TIME, NOW);
-    expect(r.longestSessionMs).toBe(
-      dayMs(2026, 6, 14, 14) - dayMs(2026, 6, 13, 8),
-    );
+    expect(r.longestSessionMs).toBe(40 * 60_000);
   });
 
   it("computes windowDays from the window bounds for a bounded range", () => {

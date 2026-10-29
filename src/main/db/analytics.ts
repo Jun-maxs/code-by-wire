@@ -55,6 +55,9 @@ import type { WorktreeRow } from "../git/repo-identity";
  */
 const ANALYTICS_SCHEMA_VERSION = 6;
 
+/** The longest pause between two turns that still counts as one stretch of use. */
+const ACTIVE_GAP_MS = 30 * 60_000;
+
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
     .user_version;
@@ -864,14 +867,19 @@ export function readRecords(
     )
     .get(...bind) as { day: string; turns: number } | undefined;
 
-  // NULL spans (a session whose only turns are unknown-time) fall out of MAX; COALESCE covers the
-  // empty window.
+  // Fork change (2026-10-29): a session's time in use, not its first-to-last span — a session resumed
+  // over ten days read as "238 hours". Gaps between turns count up to 30 minutes; a longer gap is time
+  // away. Unknown-time turns (ts 0) sort first and open a gap far over the cap, so they add nothing.
   const longestSessionMs = (
     db
       .prepare(
-        `SELECT COALESCE(MAX(span), 0) AS span FROM (
-           SELECT MAX(ts) - MIN(NULLIF(ts, 0)) AS span
-           FROM turns ${where}
+        `SELECT COALESCE(MAX(active), 0) AS span FROM (
+           SELECT SUM(CASE WHEN gap <= ${ACTIVE_GAP_MS} THEN gap ELSE 0 END) AS active
+           FROM (
+             SELECT session_id,
+                    ts - LAG(ts) OVER (PARTITION BY session_id ORDER BY ts) AS gap
+             FROM turns ${where}
+           )
            GROUP BY session_id
          )`,
       )

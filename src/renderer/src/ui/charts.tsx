@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { niceAxisMax, axisTicks, stackBands } from "./charts-geom";
 import type { CalendarCell } from "./contributions-geom";
+import { useI18n } from "../i18n";
 
 /** One labeled throughput row: label, a mini-bar, a right-aligned value. `pct` is the already-scaled
  *  0..100 fill the caller passes in; we clamp defensively. */
@@ -285,11 +286,12 @@ const CAL_CELL = 11;
 const CAL_GAP = 3;
 const CAL_STEP = CAL_CELL + CAL_GAP;
 
-/** Mon/Wed/Fri weekday labels down the left of the grid (rows 1/3/5, Sunday = row 0). GitHub's convention. */
-const CAL_WEEKDAYS: { row: number; label: string }[] = [
-  { row: 1, label: "Mon" },
-  { row: 3, label: "Wed" },
-  { row: 5, label: "Fri" },
+/** Mon/Wed/Fri weekday labels down the left of the grid (rows 1/3/5, Sunday = row 0). GitHub's convention.
+ *  Named in the app's locale from fixed dates (2026-06-01 is a Monday), so the zh UI reads 周一/周三/周五. */
+const CAL_WEEKDAYS: { row: number; day: string }[] = [
+  { row: 1, day: "2026-06-01" },
+  { row: 3, day: "2026-06-03" },
+  { row: 5, day: "2026-06-05" },
 ];
 
 /** Fixed left-gutter width (px) holding the weekday labels, and the flex gap between it and the scroll area
@@ -326,6 +328,7 @@ export function CalendarHeatmap({
   ariaLabelOf: (day: string) => string;
   monthLabels: { col: number; label: string }[];
 }) {
+  const { locale } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   // `x`/`y` are the hovered cell's position in the OUTER wrapper's coordinates (gutter + gap offset, minus the
   // scroll position baked in at hover time), so the tooltip — which lives in the non-scrolling wrapper, not
@@ -376,7 +379,13 @@ export function CalendarHeatmap({
           className="relative shrink-0"
           style={{ width: CAL_GUTTER_W, height, marginTop: CAL_MONTH_ROW_H }}
         >
-          {CAL_WEEKDAYS.map(({ row, label }) => (
+          {CAL_WEEKDAYS.map(({ row, day }) => ({
+            row,
+            label: new Date(`${day}T12:00:00`).toLocaleDateString(
+              locale === "zh" ? "zh-CN" : "en-US",
+              { weekday: "short" },
+            ),
+          })).map(({ row, label }) => (
             <span
               key={label}
               className="absolute right-0 text-micro text-fg-faint"

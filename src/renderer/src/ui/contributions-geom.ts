@@ -97,5 +97,7 @@ export function monthLabelCols(
     seen.add(month);
     out.push({ col: ci, firstDay: cell.day });
   });
-  return out;
+  // A month that starts too close to the next one (the window's partial first month) has no room for its
+  // label, which would print on top of the next — drop it, as GitHub does (fork fix, 2026-10-29).
+  return out.filter((m, i) => !out[i + 1] || out[i + 1].col - m.col >= 3);
 }
