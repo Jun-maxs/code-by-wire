@@ -17,6 +17,7 @@ import { RangeFilter } from "./shared";
 import { OverviewCard } from "./OverviewCard";
 import { ModelsCard } from "./ModelsCard";
 import { ProjectsCard } from "./ProjectsCard";
+import { TopicsCard } from "./TopicsCard";
 import { SessionsCard } from "./SessionsCard";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
@@ -202,6 +203,7 @@ export function StatsView() {
                     />
                     {hasStatsBreakdowns && (
                       <>
+                        <TopicsCard rows={snap.bySession} />
                         <ProjectsCard rows={snap.byProject} />
                         <SessionsCard rows={snap.bySession} />
                       </>

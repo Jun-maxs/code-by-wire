@@ -549,6 +549,15 @@ export const en = {
     clearDayFilter: "Clear the day filter",
     buildingHistory: "Building history…",
     noUsage: "No usage yet.",
+    // Fork (2026-10-29): sessions grouped by topic instead of folder.
+    byTopic: {
+      title: "By topic",
+      name: "Topic",
+      sessions: "Sessions",
+      turns: "Turns",
+      share: "Share",
+      other: "No topic",
+    },
     shared: {
       unknownModel: "Unknown",
       tokensHeader: "Tokens",

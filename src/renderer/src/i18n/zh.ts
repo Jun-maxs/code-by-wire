@@ -487,6 +487,14 @@ export const zh: Translations = {
     clearDayFilter: "清除日期筛选",
     buildingHistory: "正在构建历史记录…",
     noUsage: "暂无使用记录。",
+    byTopic: {
+      title: "按主题",
+      name: "主题",
+      sessions: "会话",
+      turns: "轮次",
+      share: "占比",
+      other: "未归类",
+    },
     shared: {
       unknownModel: "未知",
       tokensHeader: "词元",
