@@ -189,6 +189,18 @@ export interface TerminalManager {
  * write); `ack` decrements the credit and resumes the pty once it falls below FLOW.lowWaterChars. So
  * the whole pipeline self-throttles to the terminal's render speed instead of drowning it.
  */
+/** Drop what an app launched from inside a Claude Code session inherits but must not pass on: claude
+ *  sets NO_COLOR=1 and the CLAUDECODE/CLAUDE_CODE_CHILD_SESSION markers on its tool children, and a
+ *  claude started under them renders the TUI without any color and turns transcript saving off. */
+export function scrubInheritedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  delete out.NO_COLOR;
+  delete out.FORCE_COLOR;
+  delete out.CLAUDECODE;
+  delete out.CLAUDE_CODE_CHILD_SESSION;
+  return out;
+}
+
 export function createTerminalManager(
   deps: TerminalManagerDeps,
 ): TerminalManager {
@@ -249,7 +261,10 @@ export function createTerminalManager(
       file: command.file,
       args: command.args,
       cwd,
-      env: { ...(deps.env?.() ?? process.env), COLORTERM: "truecolor" },
+      env: {
+        ...scrubInheritedEnv(deps.env?.() ?? process.env),
+        COLORTERM: "truecolor",
+      },
       cols,
       rows,
     });

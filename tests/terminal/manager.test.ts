@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { FLOW } from "../../src/shared/terminal";
 import {
   createTerminalManager,
+  scrubInheritedEnv,
   type TerminalManagerDeps,
 } from "../../src/main/terminal/manager";
 import type {
@@ -238,6 +239,17 @@ describe("createTerminalManager", () => {
       PATH: "/usr/bin",
       COLORTERM: "truecolor",
     });
+  });
+
+  it("drops NO_COLOR and Claude child-session markers inherited from a launching claude", () => {
+    const env = scrubInheritedEnv({
+      PATH: "/usr/bin",
+      NO_COLOR: "1",
+      FORCE_COLOR: "0",
+      CLAUDECODE: "1",
+      CLAUDE_CODE_CHILD_SESSION: "1",
+    });
+    expect(env).toEqual({ PATH: "/usr/bin" });
   });
 
   it("reports the pty pid alongside the id, so the registry can anchor Managed-ness to the process", () => {
