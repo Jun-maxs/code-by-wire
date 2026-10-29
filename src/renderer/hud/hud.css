@@ -52,3 +52,13 @@
 .sidebar-product > img {
   display: none;
 }
+
+/* The overlay never shows a scrollbar: on a scaled display (125%, 150%) the panel's measured frame
+   can come out a pixel or two shorter than its content, and Windows then draws a grey native
+   scrollbar with arrows down the dark panel. The wheel still scrolls a genuinely long panel. */
+.native-hud-document * {
+  scrollbar-width: none !important;
+}
+.native-hud-document *::-webkit-scrollbar {
+  display: none;
+}
