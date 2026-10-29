@@ -355,7 +355,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       focusable: false,
       alwaysOnTop: true,
       show: false,
-      title: "Code-by-wire HUD",
+      title: "Jun-Code HUD",
       // Never throttled: an always-on-top overlay that isn't focused, or comes back after a
       // full-screen app, otherwise keeps its last frame with timers and animations paused.
       webPreferences: {

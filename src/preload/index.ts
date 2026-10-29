@@ -51,6 +51,14 @@ const api: AppApi = {
   runBoardInsight: (prompt, trigger) =>
     ipcRenderer.invoke(IPC.runBoardInsight, prompt, trigger),
   boardInsightState: () => ipcRenderer.invoke(IPC.boardInsightState),
+  junAccountStatus: () => ipcRenderer.invoke(IPC.junAccountStatus),
+  junAccountStartLogin: () => ipcRenderer.invoke(IPC.junAccountStartLogin),
+  junAccountPollLogin: () => ipcRenderer.invoke(IPC.junAccountPollLogin),
+  junAccountCancelLogin: () => ipcRenderer.invoke(IPC.junAccountCancelLogin),
+  junAccountSignOut: () => ipcRenderer.invoke(IPC.junAccountSignOut),
+  junAccountStoreGet: (key) => ipcRenderer.invoke(IPC.junAccountStoreGet, key),
+  junAccountStorePut: (key, value) =>
+    ipcRenderer.invoke(IPC.junAccountStorePut, key, value),
   testBoardAi: (ai) => ipcRenderer.invoke(IPC.testBoardAi, ai),
   listSkills: () => ipcRenderer.invoke(IPC.listSkills),
   checkSkill: (name) => ipcRenderer.invoke(IPC.checkSkill, name),

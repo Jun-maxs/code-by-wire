@@ -453,12 +453,12 @@ export const zh: Translations = {
       managed: {
         label: "托管",
         blurb:
-          "由 Code-by-wire 启动并驱动。你可以在这里发送输入、中断或结束它。",
+          "由 Jun-Code 启动并驱动。你可以在这里发送输入、中断或结束它。",
       },
       observed: {
         label: "观察中",
         blurb:
-          "正在另一个终端或设备中运行。Code-by-wire 仅只读镜像其记录，你无法在此输入。恢复它即可接管。",
+          "正在另一个终端或设备中运行。Jun-Code 仅只读镜像其记录，你无法在此输入。恢复它即可接管。",
       },
     },
     observedTerminal: {

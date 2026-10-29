@@ -147,6 +147,7 @@ import type {
 import type { ManagedRegistry } from "./managed-registry";
 import { AGENT_PROBES } from "./cli-status";
 import type { ContentSearch } from "./content-search";
+import type { JunAccount } from "./jun-account";
 
 export interface IpcDeps {
   /** Fork: full-text index over session transcripts (sidebar search by content). */
@@ -198,6 +199,8 @@ export interface IpcDeps {
   productsDirs?: () => { cardsDir: string; stateDir: string };
   /** The work board document + its AI insight runner. Absent → an empty, unsaved board. */
   board?: BoardStore;
+  /** Hub account (device-code login + per-account store). Absent → reported signed out. */
+  junAccount?: JunAccount;
   /** Durable launch-args presets for the New-session picker. Defaults to no presets. */
   launchPresets?: LaunchPresetStore;
   /** Durable project-group placements, keyed by the sidebar's canonical project key. */
@@ -254,6 +257,7 @@ export function registerIpc({
   contentSearch,
   productsDirs,
   board,
+  junAccount,
   launchPresets,
   projectState,
   updater,
@@ -836,6 +840,31 @@ export function registerIpc({
     () =>
       board?.insightState() ?? { running: false, startedAt: null, error: null },
   );
+  ipcMain.handle(
+    IPC.junAccountStatus,
+    () => junAccount?.status() ?? { signedIn: false },
+  );
+  ipcMain.handle(IPC.junAccountStartLogin, () => {
+    if (!junAccount) throw new Error("hub account not wired");
+    return junAccount.startLogin();
+  });
+  ipcMain.handle(
+    IPC.junAccountPollLogin,
+    async () => (await junAccount?.poll()) ?? { status: "idle" },
+  );
+  ipcMain.handle(IPC.junAccountCancelLogin, () => junAccount?.cancelLogin());
+  ipcMain.handle(
+    IPC.junAccountSignOut,
+    () => junAccount?.signOut() ?? { signedIn: false },
+  );
+  ipcMain.handle(IPC.junAccountStoreGet, (_e, key: string) => {
+    if (!junAccount) throw new Error("hub account not wired");
+    return junAccount.storeGet(String(key));
+  });
+  ipcMain.handle(IPC.junAccountStorePut, (_e, key: string, value: unknown) => {
+    if (!junAccount) throw new Error("hub account not wired");
+    return junAccount.storePut(String(key), value);
+  });
   ipcMain.handle(IPC.listSkills, () => listSkills());
   ipcMain.handle(IPC.checkSkill, (_e, name: string) =>
     checkSkill(String(name)),

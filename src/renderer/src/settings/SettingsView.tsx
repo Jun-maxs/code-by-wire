@@ -6,6 +6,7 @@ import { isUpdatePending } from "@shared/update";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { AppearanceCard } from "./AppearanceCard";
 import { HudCard } from "./HudCard";
+import { JunAccountCard } from "./JunAccountCard";
 import { ClaudeAccountsCard } from "./ClaudeAccounts";
 import { CliCard } from "./CliCard";
 import { CodexCliCard } from "./CodexCliCard";
@@ -126,6 +127,7 @@ export function SettingsView({
                 title={t.settings.appearance.title}
                 lede={t.settings.appearance.lede}
               />
+              <JunAccountCard />
               <AppearanceCard />
               <HudCard />
               <ClaudeAccountsCard />
@@ -240,7 +242,7 @@ function AboutSection({ update }: { update?: UpdateControls }) {
   return (
     <>
       <PageHeader title={t.settings.about.title} />
-      <Card title="Code-by-wire">
+      <Card title="Jun-Code">
         <div className="flex flex-col gap-3 px-4 py-4">
           <Wordmark />
           <p className="max-w-[54ch] text-body leading-relaxed text-fg-muted">

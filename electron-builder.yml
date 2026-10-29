@@ -1,5 +1,5 @@
 appId: io.github.luojiahai.code-by-wire
-productName: Code-by-wire
+productName: Jun-Code
 copyright: Copyright © 2026 luojiahai
 # Native modules are rebuilt explicitly via `pnpm rebuild:native`; don't let
 # electron-builder run its own (it misbehaves under pnpm).

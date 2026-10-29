@@ -510,12 +510,12 @@ export const en = {
       managed: {
         label: "Managed",
         blurb:
-          "Spawned and driven by Code-by-wire. You can send input, interrupt it, and end it from here.",
+          "Spawned and driven by Jun-Code. You can send input, interrupt it, and end it from here.",
       },
       observed: {
         label: "Observed",
         blurb:
-          "Running in another terminal or machine. Code-by-wire mirrors its transcript read-only. You can't type in. Resume it to take the wheel.",
+          "Running in another terminal or machine. Jun-Code mirrors its transcript read-only. You can't type in. Resume it to take the wheel.",
       },
     },
     observedTerminal: {

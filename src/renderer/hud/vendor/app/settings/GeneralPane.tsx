@@ -124,7 +124,7 @@ export function GeneralPane({ snapshot, action }: SettingsPaneProps) {
             title={t("Launch at login", "登录时启动")}
             subtitle={t(
               "Keep an eye on usage whenever you sign in.",
-              "登录系统后自动启动 Code-by-wire，开始监测用量。",
+              "登录系统后自动启动 Jun-Code，开始监测用量。",
             )}
             checked={
               system?.launchAtLogin.enabled ?? snapshot.settings.launchAtLogin

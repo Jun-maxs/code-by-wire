@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@shared/types";
 import { cx } from "../../ui/atoms";
 import { Icon } from "../../ui/icons";
@@ -36,6 +36,45 @@ function save(list: Prompt[]): void {
   } catch {
     // storage full or disabled: the list still works for this run
   }
+}
+
+// Account sync (fork feature, 2026-10-30): signed in to the hub account, the list is also the
+// account's store key "prompts", shared with Jun-App. syncedAt = server version last merged here;
+// dirty = a local edit the server hasn't taken yet.
+const SYNC_KEY = "cbw.prompts.sync.v1";
+interface SyncMeta {
+  syncedAt: number;
+  dirty: boolean;
+}
+function loadMeta(): SyncMeta {
+  try {
+    const raw = localStorage.getItem(SYNC_KEY);
+    // Never synced: prompts saved before sign-in count as pending, so the first sync merges them.
+    if (raw === null) return { syncedAt: 0, dirty: true };
+    const v = JSON.parse(raw) as Partial<SyncMeta>;
+    return { syncedAt: Number(v.syncedAt) || 0, dirty: v.dirty === true };
+  } catch {
+    return { syncedAt: 0, dirty: false };
+  }
+}
+function saveMeta(meta: SyncMeta): void {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify(meta));
+  } catch {
+    // storage disabled: the next open merges again
+  }
+}
+function validPrompts(v: unknown): Prompt[] {
+  return Array.isArray(v)
+    ? v
+        .filter(
+          (p): p is Prompt =>
+            !!p &&
+            typeof (p as Prompt).id === "string" &&
+            typeof (p as Prompt).body === "string",
+        )
+        .map((p) => ({ ...p, title: p.title ?? "", usedAt: p.usedAt ?? 0 }))
+    : [];
 }
 
 const field =
@@ -91,9 +130,56 @@ export function PromptsPage({ session }: { session: Session }) {
   const canInsert =
     session.management === "managed" && session.state !== "ended";
 
+  const signedIn = useRef(false);
+  const push = (next: Prompt[]) => {
+    saveMeta({ ...loadMeta(), dirty: true });
+    if (!signedIn.current) return;
+    window.api.junAccountStorePut("prompts", next).then(
+      (at) => saveMeta({ syncedAt: at, dirty: false }),
+      () => undefined, // stays dirty; merged on the next open
+    );
+  };
+  // On open: take the account's copy if it is newer, or merge a pending offline edit into it.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const status = await window.api.junAccountStatus();
+      if (cancelled || !status.signedIn) return;
+      signedIn.current = true;
+      const remote = await window.api
+        .junAccountStoreGet<Prompt[]>("prompts")
+        .catch(() => null);
+      if (cancelled || !remote) return;
+      const meta = loadMeta();
+      const local = load();
+      if (meta.dirty) {
+        const ids = new Set(local.map((p) => p.id));
+        const merged = [
+          ...local,
+          ...validPrompts(remote.value).filter((p) => !ids.has(p.id)),
+        ];
+        setList(merged);
+        save(merged);
+        const at = await window.api
+          .junAccountStorePut("prompts", merged)
+          .catch(() => null);
+        if (at !== null) saveMeta({ syncedAt: at, dirty: false });
+      } else if (remote.updatedAt > meta.syncedAt) {
+        const next = validPrompts(remote.value);
+        setList(next);
+        save(next);
+        saveMeta({ syncedAt: remote.updatedAt, dirty: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const commit = (next: Prompt[]) => {
     setList(next);
     save(next);
+    push(next);
   };
   const touch = (id: string) =>
     commit(list.map((p) => (p.id === id ? { ...p, usedAt: Date.now() } : p)));

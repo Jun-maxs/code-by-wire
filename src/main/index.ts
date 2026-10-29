@@ -5,6 +5,7 @@ import {
   nativeTheme,
   net,
   powerSaveBlocker,
+  safeStorage,
   shell,
 } from "electron";
 import { applyLegacyDockIconIfNeeded } from "./dock-icon";
@@ -59,6 +60,7 @@ import { createCaffeinate } from "./caffeinate";
 import { createSessionTitleStore } from "./session-titles";
 import { createSessionPinStore } from "./session-pins";
 import { createBoardStore } from "./board-store";
+import { createJunAccount } from "./jun-account";
 import { createLaunchArgsStore } from "./launch-args";
 import {
   createRemoteSessionStore,
@@ -133,6 +135,9 @@ if (process.platform === "win32") restoreWindowsPath();
 // two builds that know different agents sharing one index.db would keep deleting each other's rows.
 if (process.env.CBW_USER_DATA_DIR)
   app.setPath("userData", process.env.CBW_USER_DATA_DIR);
+// Renamed to Jun-Code (2026-10-30) but the data stays where Code-by-wire kept it: the product
+// name decides the default userData folder, so pin it to the old one.
+else app.setPath("userData", join(app.getPath("appData"), "Code-by-wire"));
 
 // reclaude's selected account, unless CLAUDE_CONFIG_DIR is already set: sessions are read from its
 // config dir and launched through rec.exe (see reclaude.ts). Before anything resolves claudeDir.
@@ -504,6 +509,14 @@ app
       dir: app.getPath("userData"),
     });
     const board = createBoardStore({ dir: app.getPath("userData") });
+    const junAccount = createJunAccount({
+      dir: app.getPath("userData"),
+      cipher: {
+        available: () => safeStorage.isEncryptionAvailable(),
+        encrypt: (text) => safeStorage.encryptString(text),
+        decrypt: (data) => safeStorage.decryptString(data),
+      },
+    });
     const projectState = createProjectStateStore({
       dir: app.getPath("userData"),
     });
@@ -689,6 +702,7 @@ app
       remoteSessions,
       contentSearch,
       board,
+      junAccount,
       productsDirs: () => {
         // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
         const cardsDir =

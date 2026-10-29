@@ -13,7 +13,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     {window_ ? (
       <Suspense fallback={null}>
-        <AgentHudApp productName="Code-by-wire" />
+        <AgentHudApp productName="Jun-Code" />
       </Suspense>
     ) : (
       <HudApp />

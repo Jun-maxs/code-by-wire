@@ -5,6 +5,12 @@ import type {
 } from "./session-cleanup";
 import type { CardRun, ProductsData, TopicInput } from "./products";
 import type { ContentSearchResult } from "./content-search";
+import type {
+  JunAccountStatus,
+  JunLoginPoll,
+  JunLoginStart,
+  JunStoreEntry,
+} from "./jun-account";
 import type { SkillCheck, SkillRemoveResult, SkillsData } from "./skills";
 import type {
   AiTestResult,
@@ -86,6 +92,13 @@ export const IPC = {
   boardLinkSession: "board:linkSession",
   runBoardInsight: "board:insight-run",
   boardInsightState: "board:insight-state",
+  junAccountStatus: "jun-account:status",
+  junAccountStartLogin: "jun-account:start-login",
+  junAccountPollLogin: "jun-account:poll-login",
+  junAccountCancelLogin: "jun-account:cancel-login",
+  junAccountSignOut: "jun-account:sign-out",
+  junAccountStoreGet: "jun-account:store-get",
+  junAccountStorePut: "jun-account:store-put",
   testBoardAi: "board:ai-test",
   listSkills: "skills:list",
   checkSkill: "skills:check",
@@ -404,6 +417,18 @@ export interface IpcApi {
     trigger: Insight["trigger"],
   ): Promise<InsightRunState>;
   boardInsightState(): Promise<InsightRunState>;
+  /** Hub account shared with Jun-App (fork feature, 2026-10-30). */
+  junAccountStatus(): Promise<JunAccountStatus>;
+  /** Ask the broker for a device code; the owner approves it on hub.yuanhk.top. */
+  junAccountStartLogin(): Promise<JunLoginStart>;
+  /** Poll the pending login (every ~2 s while the code is shown). */
+  junAccountPollLogin(): Promise<JunLoginPoll>;
+  junAccountCancelLogin(): Promise<void>;
+  junAccountSignOut(): Promise<JunAccountStatus>;
+  /** Read one key of the account's store (throws when signed out or offline). */
+  junAccountStoreGet<T = unknown>(key: string): Promise<JunStoreEntry<T>>;
+  /** Write one key; resolves to the server's updatedAt. */
+  junAccountStorePut(key: string, value: unknown): Promise<number>;
   /** Send a tiny prompt through an AI setting (saved or not) to check it answers. */
   testBoardAi(ai: BoardAi): Promise<AiTestResult>;
   /** Skills installed on this machine (every folder merged by name) and Claude Code plugins. */
