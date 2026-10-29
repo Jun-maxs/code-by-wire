@@ -10,6 +10,18 @@ export function formatRelativeTime(ms: number, now: number): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+/** Time since last activity for a sidebar row, at most three characters wide: "now" under a minute,
+ *  then "12m", "3h", "5d", "2w". Language-neutral shorthand like the rate-limit labels. */
+export function formatAgeShort(ms: number, now: number): string {
+  const m = Math.floor(Math.max(0, now - ms) / 60_000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return d < 14 ? `${d}d` : `${Math.floor(d / 7)}w`;
+}
+
 /**
  * A compact countdown to a reset, e.g. "2h 14m", "3d 4h", "30m", "<1m", or "now" once it has passed.
  * Pieces the largest two non-zero units so it stays short and never churns on seconds. Used for the

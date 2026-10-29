@@ -12,6 +12,7 @@ import { useSessionProduct } from "../products/products-context";
 import { isUnsentSession } from "./session-list-model";
 import { ProductHoverCard } from "../products/ProductHoverCard";
 import { shortTopicName } from "@shared/products";
+import { formatAgeShort } from "@shared/format";
 
 /**
  * The hermes single-line sidebar row: a 26px-tall strip with a state `Lamp` and the title. A
@@ -19,9 +20,9 @@ import { shortTopicName } from "@shared/products";
  * Rename, Resume, Fork, End, Open in), sharing its state machine via `useSessionMenu` — see
  * `SessionMenu.tsx` for the header's own trigger over the same hook. Renaming swaps this row's
  * select-button for a plain (non-button) container so the inline `<input>` never nests inside a
- * `<button>`, which HTML disallows. The relative-time stamp and context-% chip live in the right
- * sidebar's Session panel; the only extra here is the dimmed worktree hint on leaf sessions that
- * merged into their repo's folder (2026-07-09 worktree-merge spec). Trailing controls appear in
+ * `<button>`, which HTML disallows. A short last-activity age follows the title (fork); the
+ * context-% chip lives in the right sidebar's Session panel. The dimmed worktree hint shows on leaf
+ * sessions that merged into their repo's folder (2026-07-09 worktree-merge spec). Trailing controls appear in
  * this order: subagent count, disclosure, then role/agent/actions. Actions replace the role badge
  * or agent in its slot while revealed, keeping every other element stationary.
  */
@@ -81,6 +82,7 @@ export function SessionRow({
     cappedDepth > 0 ? { marginLeft: `${cappedDepth * 12}px` } : undefined;
 
   const task = useSessionTasks()?.taskOf(session.id);
+  const now = Date.now();
   if (menu.editing) {
     return (
       <div
@@ -165,6 +167,21 @@ export function SessionRow({
             )}
             {displayTitle}
           </span>
+          {/* Fork change (2026-10-29): how long since the session last moved, so stale ones read
+           *  apart without opening the right sidebar. The past hour reads a step brighter. */}
+          {session.lastActivityMs > 0 && (
+            <span
+              className={cx(
+                "shrink-0 text-meta leading-none tabular-nums",
+                now - session.lastActivityMs < 3_600_000
+                  ? "text-fg-muted"
+                  : "text-fg-dim",
+              )}
+              title={t.time.ago(session.lastActivityMs, now)}
+            >
+              {formatAgeShort(session.lastActivityMs, now)}
+            </span>
+          )}
           {session.remote && (
             <span
               className="shrink-0 text-fg-dim"
