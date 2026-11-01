@@ -6,33 +6,59 @@ import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
 import { useI18n } from "../i18n";
 
-/** reclaude's organizations and the switch/bind actions, shared by the Settings card and the
- *  Pressure panel's popover. Reads the list when mounted; a switch answers with the new list. */
+/** reclaude's bindings and the switch/bind/add/remove actions, shared by the Settings card and the
+ *  Pressure panel's popover. Reads the list when mounted; every action answers with the new list.
+ *  `busy` is the org being acted on, or "add" while a new account is being signed in to. */
 function useClaudeAccounts() {
+  const { t } = useI18n();
+  const a = t.settings.accounts;
   const [view, setView] = useState<ClaudeAccountsView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     void window.api.listClaudeAccounts().then(setView);
   }, []);
-  const use = async (org: ClaudeOrg, switched: (name: string) => string) => {
-    setBusy(org.id);
-    const next = await window.api.useClaudeAccount(org.id);
+  const act = async (
+    key: string,
+    call: () => Promise<ClaudeAccountsView>,
+    pending: string | null,
+    done: string,
+  ) => {
+    setBusy(key);
+    setNotice(pending);
+    const next = await call();
     setBusy(null);
     setView(next);
-    if (!next.error) setNotice(switched(org.email || org.name));
+    setNotice(next.error ? null : done);
   };
-  const bind = (org: ClaudeOrg, binding: string) => {
-    void window.api.bindClaudeAccount(org.id);
-    setNotice(binding);
-  };
-  return { view, busy, notice, use, bind };
+  const label = (org: ClaudeOrg) => org.email || org.name;
+  const use = (org: ClaudeOrg) =>
+    act(
+      org.id,
+      () => window.api.useClaudeAccount(org.id),
+      null,
+      a.switched(label(org)),
+    );
+  const bind = (org: ClaudeOrg) =>
+    act(org.id, () => window.api.bindClaudeAccount(org.id), a.binding, a.added);
+  const add = () =>
+    act("add", () => window.api.addClaudeAccount(), a.binding, a.added);
+  const remove = (org: ClaudeOrg) =>
+    act(
+      org.id,
+      () => window.api.removeClaudeAccount(org.id),
+      null,
+      a.removed(label(org)),
+    );
+  return { view, busy, notice, use, bind, add, remove };
 }
 
 function AccountList({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
   const a = t.settings.accounts;
-  const { view, busy, notice, use, bind } = useClaudeAccounts();
+  const { view, busy, notice, use, bind, add, remove } = useClaudeAccounts();
+  // The row whose removal waits for a second click.
+  const [confirming, setConfirming] = useState<string | null>(null);
   if (!view)
     return <div className="px-4 py-3 text-meta text-fg-faint">{a.loading}</div>;
   if (view.orgs === null)
@@ -56,7 +82,7 @@ function AccountList({ compact = false }: { compact?: boolean }) {
               {org.email || org.name}
             </div>
             <div className="truncate text-meta text-fg-faint">
-              {org.name} · {org.kind} · #{org.id}
+              {[org.name, org.kind, `#${org.id}`].filter(Boolean).join(" · ")}
             </div>
           </div>
           {org.current ? (
@@ -64,20 +90,66 @@ function AccountList({ compact = false }: { compact?: boolean }) {
               <Icon name="check" size={12} />
               {a.current}
             </span>
+          ) : confirming === org.id ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirming(null);
+                  void remove(org);
+                }}
+                className="rounded-md border border-danger px-2.5 py-1 text-meta text-danger hover:bg-ink-800"
+              >
+                {a.removeConfirm}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(null)}
+                className="rounded-md px-2 py-1 text-meta text-fg-faint hover:bg-ink-800"
+              >
+                {a.cancel}
+              </button>
+            </div>
           ) : (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() =>
-                org.bound ? void use(org, a.switched) : bind(org, a.binding)
-              }
-              className="shrink-0 rounded-md border border-ink-700 px-2.5 py-1 text-meta text-fg hover:bg-ink-800 disabled:opacity-50"
-            >
-              {busy === org.id ? "…" : org.bound ? a.use : a.bind}
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void (org.bound ? use(org) : bind(org))}
+                className="rounded-md border border-ink-700 px-2.5 py-1 text-meta text-fg hover:bg-ink-800 disabled:opacity-50"
+              >
+                {busy === org.id ? "…" : org.bound ? a.use : a.bind}
+              </button>
+              {org.bound && (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  title={a.remove}
+                  aria-label={a.remove}
+                  onClick={() => setConfirming(org.id)}
+                  className="rounded-md p-1 text-fg-faint hover:bg-ink-800 hover:text-danger disabled:opacity-50"
+                >
+                  <Icon name="trash" size={12} />
+                </button>
+              )}
+            </div>
           )}
         </div>
       ))}
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() => void add()}
+        className={cx(
+          "flex items-center gap-1.5 text-left text-meta text-fg-muted hover:bg-ink-800 hover:text-fg disabled:opacity-50",
+          compact
+            ? "rounded-md px-2 py-1.5"
+            : "border-t border-ink-800 px-4 py-3",
+        )}
+      >
+        <Icon name="plus" size={12} />
+        {busy === "add" ? a.adding : a.add}
+      </button>
       {view.error && (
         <div className="px-4 py-2 text-meta text-danger">
           {a.failed(view.error)}
@@ -89,7 +161,7 @@ function AccountList({ compact = false }: { compact?: boolean }) {
           compact ? "px-2 pt-1 pb-1" : "border-t border-ink-800 px-4 py-3",
         )}
       >
-        {notice ?? a.note}
+        {confirming ? a.removeNote : (notice ?? a.note)}
       </div>
     </div>
   );

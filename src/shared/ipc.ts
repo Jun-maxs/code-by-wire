@@ -135,6 +135,8 @@ export const IPC = {
   claudeAccountsList: "claudeAccounts:list",
   claudeAccountsUse: "claudeAccounts:use",
   claudeAccountsBind: "claudeAccounts:bind",
+  claudeAccountsAdd: "claudeAccounts:add",
+  claudeAccountsRemove: "claudeAccounts:remove",
   hudSettingsSet: "hud:settingsSet",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
@@ -523,8 +525,13 @@ export interface IpcApi {
   listClaudeAccounts(): Promise<ClaudeAccountsView>;
   /** Make a bound organization the default (`reclaude org use`); answers with the new list. */
   useClaudeAccount(id: string): Promise<ClaudeAccountsView>;
-  /** Start binding an organization (`reclaude org bind`, authorized in the browser). */
-  bindClaudeAccount(id: string): Promise<void>;
+  /** Bind one of the current user's organizations (`reclaude org bind`, authorized in the browser);
+   *  settles when the authorization finishes, with the new list. */
+  bindClaudeAccount(id: string): Promise<ClaudeAccountsView>;
+  /** Add another account (`reclaude login`, signed in to in the browser); settles with the new list. */
+  addClaudeAccount(): Promise<ClaudeAccountsView>;
+  /** Remove a binding that isn't the default (`reclaude logout --org`); answers with the new list. */
+  removeClaudeAccount(id: string): Promise<ClaudeAccountsView>;
   /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
   setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
 }

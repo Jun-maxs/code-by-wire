@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseOrgList, reclaudeCli } from "../src/main/reclaude-accounts";
+import {
+  mergeAccounts,
+  parseOrgList,
+  parseStatusBindings,
+  reclaudeCli,
+} from "../src/main/reclaude-accounts";
 
 describe("parseOrgList", () => {
   it("reads each organization row, the default one starred", () => {
@@ -35,5 +40,42 @@ describe("reclaudeCli", () => {
     expect(reclaudeCli("C:/x/bin/rec.exe")).toBe("C:/x/bin/reclaude.exe");
     expect(reclaudeCli("claude")).toBeNull();
     expect(reclaudeCli(undefined)).toBeNull();
+  });
+});
+
+describe("mergeAccounts", () => {
+  it("lists every local binding, even another reclaude user's, then unbound orgs", () => {
+    const status = parseStatusBindings(
+      JSON.stringify({
+        claude: {
+          bindings: [
+            {
+              device_id: 45797,
+              org_id: 189481,
+              org_name: "a@qq.com",
+              email: "a@qq.com",
+            },
+            {
+              device_id: 48389,
+              org_id: 419344,
+              org_name: "b@qq.com",
+              email: "b@qq.com",
+            },
+          ],
+          current: { device_id: 48389, org_id: 419344 },
+        },
+      }),
+    );
+    const listed = parseOrgList(
+      "* 419344\tb@qq.com\tpersonal\tme@example.com\tbound\n  77\tTeam X\tteam\tme@example.com\tnot bound",
+    );
+    const merged = mergeAccounts(status, listed, (device) =>
+      device === "45797" ? "other@example.com" : null,
+    );
+    expect(merged.map((o) => [o.id, o.email, o.bound, o.current])).toEqual([
+      ["189481", "other@example.com", true, false],
+      ["419344", "me@example.com", true, true],
+      ["77", "me@example.com", false, false],
+    ]);
   });
 });

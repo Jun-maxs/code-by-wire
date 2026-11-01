@@ -87,7 +87,16 @@ export const zh: Translations = {
       current: "使用中",
       use: "切换",
       bind: "绑定",
-      binding: "请在浏览器里完成授权，然后重新打开这个列表。",
+      binding: "已打开浏览器，登录并授权后会自动加进列表。",
+      add: "添加账号",
+      adding: "等待浏览器授权…",
+      added: "账号已加入。",
+      remove: "移除账号",
+      removeConfirm: "确认移除",
+      cancel: "取消",
+      removeNote:
+        "移除只退出这个账号的登录；会话记录和设置都保留，以后可以重新添加。",
+      removed: (name: string) => `已移除 ${name}。`,
       none: "没有使用 reclaude，没有可切换的账号。",
       empty: "没有找到组织。",
       note: "新建和恢复的会话会用选中的账号；正在运行的会话保持原账号，恢复后才切过去。会话记录和设置所有账号共用。",
@@ -452,8 +461,7 @@ export const zh: Translations = {
     mode: {
       managed: {
         label: "托管",
-        blurb:
-          "由 Jun-Code 启动并驱动。你可以在这里发送输入、中断或结束它。",
+        blurb: "由 Jun-Code 启动并驱动。你可以在这里发送输入、中断或结束它。",
       },
       observed: {
         label: "观察中",

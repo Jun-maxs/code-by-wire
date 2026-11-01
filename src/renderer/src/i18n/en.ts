@@ -106,7 +106,17 @@ export const en = {
       current: "In use",
       use: "Use",
       bind: "Bind",
-      binding: "Authorize in the browser, then reopen this list.",
+      binding:
+        "The browser is open; sign in and authorize, and the account joins this list.",
+      add: "Add account",
+      adding: "Waiting for the browser…",
+      added: "Account added.",
+      remove: "Remove account",
+      removeConfirm: "Remove",
+      cancel: "Cancel",
+      removeNote:
+        "Removing only logs this account out; sessions and settings stay, and you can add it again later.",
+      removed: (name: string) => `Removed ${name}.`,
       none: "reclaude is not in use, so there is no account to switch.",
       empty: "No organizations found.",
       note: "New sessions and resumed ones run on the chosen account; a running session keeps its account until you resume it. Sessions and settings are shared by every account.",

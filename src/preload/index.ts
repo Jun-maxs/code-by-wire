@@ -116,6 +116,8 @@ const api: AppApi = {
   listClaudeAccounts: () => ipcRenderer.invoke(IPC.claudeAccountsList),
   useClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsUse, id),
   bindClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsBind, id),
+  addClaudeAccount: () => ipcRenderer.invoke(IPC.claudeAccountsAdd),
+  removeClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsRemove, id),
   setHudSettings: (settings) =>
     ipcRenderer.invoke(IPC.hudSettingsSet, settings),
   readSubagentTranscript: async (id, agentId, sinceMtimeMs) =>

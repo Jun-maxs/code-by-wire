@@ -100,8 +100,10 @@ import {
 import type { StatisticsQuery as HudStatisticsQuery } from "@shared/hud-protocol";
 import { adoptReclaude, detectReclaude } from "./reclaude";
 import {
-  bindOrg,
-  listOrgs,
+  authorize,
+  bindingConfigDir,
+  listAccounts,
+  logoutOrg,
   reclaudeCli,
   reclaudeConfigDirs,
   useOrg,
@@ -549,30 +551,24 @@ app
     // account each. Switching makes another the default; the app then points CLAUDE_CONFIG_DIR at it
     // (sessions started after inherit it, and rec.exe launches them on that account) and wraps its
     // statusLine. Transcripts are shared by every binding, so no session is lost.
-    const claudeAccountsView = async (): Promise<ClaudeAccountsView> => {
+    const claudeAccountsView = async (
+      error?: string,
+    ): Promise<ClaudeAccountsView> => {
       if (!recCli) return { orgs: null };
       try {
-        return { orgs: await listOrgs(recCli) };
+        const orgs = await listAccounts(recCli, (device) =>
+          readAccountEmail(bindingConfigDir(device)),
+        );
+        return error ? { orgs, error } : { orgs };
       } catch (err) {
-        return { orgs: [], error: (err as Error).message };
+        return { orgs: [], error: error ?? (err as Error).message };
       }
     };
-    const orgId = (id: unknown): string | null =>
-      typeof id === "string" && /^\d+$/.test(id) ? id : null;
-    ipcMain.handle(IPC.claudeAccountsList, claudeAccountsView);
-    ipcMain.handle(IPC.claudeAccountsUse, async (_e, raw: unknown) => {
-      const id = orgId(raw);
-      if (!recCli || !id) return claudeAccountsView();
-      try {
-        await useOrg(recCli, id);
-      } catch (err) {
-        return {
-          ...(await claudeAccountsView()),
-          error: (err as Error).message,
-        };
-      }
+    // Point CLAUDE_CONFIG_DIR at reclaude's default binding (after a switch, or a login that made the
+    // new account the default) and wrap that dir's statusLine.
+    const followDefaultAccount = () => {
       const found = detectReclaude();
-      if (found) {
+      if (found && found.configDir !== process.env.CLAUDE_CONFIG_DIR) {
         process.env.CLAUDE_CONFIG_DIR = found.configDir;
         if (appSettings.read().statuslineEnabled ?? true) {
           try {
@@ -587,11 +583,60 @@ app
         }
       }
       emailCache = undefined;
+    };
+    const orgId = (id: unknown): string | null =>
+      typeof id === "string" && /^\d+$/.test(id) ? id : null;
+    const openAuthUrl = (url: string) => {
+      if (/^https:\/\//i.test(url)) void shell.openExternal(url);
+    };
+    ipcMain.handle(IPC.claudeAccountsList, () => claudeAccountsView());
+    ipcMain.handle(IPC.claudeAccountsUse, async (_e, raw: unknown) => {
+      const id = orgId(raw);
+      if (!recCli || !id) return claudeAccountsView();
+      try {
+        await useOrg(recCli, id);
+      } catch (err) {
+        return claudeAccountsView((err as Error).message);
+      }
+      followDefaultAccount();
       return claudeAccountsView();
     });
-    ipcMain.handle(IPC.claudeAccountsBind, (_e, raw: unknown) => {
+    // Binding and adding both wait for the browser authorization; the answer is the new list.
+    ipcMain.handle(IPC.claudeAccountsBind, async (_e, raw: unknown) => {
       const id = orgId(raw);
-      if (recCli && id) bindOrg(recCli, id);
+      if (!recCli || !id) return claudeAccountsView();
+      try {
+        await authorize(recCli, ["org", "bind", id], openAuthUrl);
+      } catch (err) {
+        return claudeAccountsView((err as Error).message);
+      }
+      followDefaultAccount();
+      return claudeAccountsView();
+    });
+    ipcMain.handle(IPC.claudeAccountsAdd, async () => {
+      if (!recCli) return claudeAccountsView();
+      try {
+        await authorize(recCli, ["login"], openAuthUrl);
+      } catch (err) {
+        return claudeAccountsView((err as Error).message);
+      }
+      followDefaultAccount();
+      return claudeAccountsView();
+    });
+    // Remove a binding that isn't the default (switch away first): its login goes, its config and the
+    // shared sessions stay.
+    ipcMain.handle(IPC.claudeAccountsRemove, async (_e, raw: unknown) => {
+      const id = orgId(raw);
+      if (!recCli || !id) return claudeAccountsView();
+      const view = await claudeAccountsView();
+      if (view.orgs?.find((o) => o.id === id)?.current) return view;
+      try {
+        await logoutOrg(recCli, id);
+      } catch (err) {
+        return claudeAccountsView((err as Error).message);
+      }
+      followDefaultAccount();
+      return claudeAccountsView();
     });
     // Account usage via the OAuth usage API: constructed once; refreshes are spawned inside
     // renderer polls only (window closed → polls stop → refreshes stop). net.fetch rides
