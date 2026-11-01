@@ -14,6 +14,8 @@ import { parseContextWindowSize } from "./models";
  *  crosses IPC cleanly. `null` fields are "the statusLine didn't report this", distinct from 0. */
 export interface StatusLineSample {
   sessionId: string;
+  /** The Claude config dir the capture came from (fork): with reclaude, one per account binding. */
+  configDir?: string;
   /** File mtime (ms) of the capture — its freshness, used to pick the account snapshot. */
   capturedMtimeMs: number;
   costUsd: number | null;

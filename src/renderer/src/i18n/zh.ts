@@ -97,6 +97,13 @@ export const zh: Translations = {
       removeNote:
         "移除只退出这个账号的登录；会话记录和设置都保留，以后可以重新添加。",
       removed: (name: string) => `已移除 ${name}。`,
+      sessionOn: (name: string) => `这个会话在用：${name}`,
+      staleHint:
+        "切换只对新建和恢复的会话生效。可以把这个会话结束后用当前账号恢复，对话记录不丢。",
+      staleBusy: "切换只对新建和恢复的会话生效；它正在运行，等它停下来再换。",
+      continueOnCurrent: "在当前账号上继续这个会话",
+      staleOutside:
+        "切换只对新建和恢复的会话生效；这个会话不是在 Jun-Code 里开的，在它自己的终端里退出后重开即可。",
       none: "没有使用 reclaude，没有可切换的账号。",
       empty: "没有找到组织。",
       note: "新建和恢复的会话会用选中的账号；正在运行的会话保持原账号，恢复后才切过去。会话记录和设置所有账号共用。",

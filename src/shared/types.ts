@@ -231,6 +231,9 @@ export interface Session {
   pinnedAtMs?: number;
   /** Fork feature: started with remote (claude-r → HAPI), so it can be continued from the phone. */
   remote?: boolean;
+  /** Fork (2026-11-01): the reclaude binding (device id) this session's latest statusLine capture
+   *  came from — the account it runs on. Absent without reclaude or without a capture. */
+  accountDevice?: string;
   currentTask?: string;
   waitingReason?: string;
 }

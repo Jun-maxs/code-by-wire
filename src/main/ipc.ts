@@ -444,7 +444,14 @@ export function registerIpc({
     const named = applyTitleOverrides(tasked, sessionTitles?.read() ?? {});
     const remoteIds = remoteSessions?.read() ?? {};
     const pinned = applyPinOverrides(named, sessionPins?.read() ?? {}).map(
-      (s) => (remoteIds[s.id] ? { ...s, remote: true } : s),
+      (s) => {
+        const withRemote = remoteIds[s.id] ? { ...s, remote: true } : s;
+        // Fork: which reclaude account the session runs on, from where its capture was written.
+        const device = /accounts[\\/](\d+)[\\/]config$/.exec(
+          byId.get(s.id)?.configDir ?? "",
+        )?.[1];
+        return device ? { ...withRemote, accountDevice: device } : withRemote;
+      },
     );
     // A6 last tier: fill the settings.json default only where no per-session source (capture or
     // transcript scan) answered. Claude-only — the default comes from claude's settings.json, so

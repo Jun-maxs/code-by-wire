@@ -124,6 +124,7 @@ export function mergeAccounts(
       kind: row?.kind ?? "",
       email: claudeEmail(b.deviceId) || row?.email || b.email,
       bound: true,
+      deviceId: b.deviceId,
       current: status.currentOrg
         ? b.orgId === status.currentOrg
         : row?.current === true,

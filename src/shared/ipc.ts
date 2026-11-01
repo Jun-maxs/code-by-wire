@@ -164,6 +164,8 @@ export interface ClaudeOrg {
   bound: boolean;
   /** The default binding: new sessions run on it. */
   current: boolean;
+  /** The binding's device id (its config dir is `~/.rec/claude/accounts/<id>/config`); bound only. */
+  deviceId?: string;
 }
 
 /** The account switcher's state: null `orgs` when reclaude isn't in use; `error` when listing failed. */

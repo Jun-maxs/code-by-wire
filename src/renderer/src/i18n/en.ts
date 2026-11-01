@@ -117,6 +117,14 @@ export const en = {
       removeNote:
         "Removing only logs this account out; sessions and settings stay, and you can add it again later.",
       removed: (name: string) => `Removed ${name}.`,
+      sessionOn: (name: string) => `This session runs on ${name}`,
+      staleHint:
+        "A switch reaches new and resumed sessions. End this one and resume it on the current account; nothing is lost.",
+      staleBusy:
+        "A switch reaches new and resumed sessions; this one is working, so move it once it stops.",
+      continueOnCurrent: "Continue this session on the current account",
+      staleOutside:
+        "A switch reaches new and resumed sessions; this one wasn't started in Jun-Code, so restart it in its own terminal.",
       none: "reclaude is not in use, so there is no account to switch.",
       empty: "No organizations found.",
       note: "New sessions and resumed ones run on the chosen account; a running session keeps its account until you resume it. Sessions and settings are shared by every account.",

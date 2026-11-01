@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ClaudeAccountsView, ClaudeOrg } from "@shared/ipc";
+import type { Session } from "@shared/types";
 import { Card } from "../shell/page-primitives";
 import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
@@ -53,7 +54,18 @@ function useClaudeAccounts() {
   return { view, busy, notice, use, bind, add, remove };
 }
 
-function AccountList({ compact = false }: { compact?: boolean }) {
+/** Fork (2026-11-01): ask App to end this session and resume it, so it picks up the default account
+ *  (App owns the terminal store that ending and resuming go through). */
+export const CONTINUE_ON_ACCOUNT_EVENT = "cbw:continue-on-account";
+
+function AccountList({
+  compact = false,
+  session,
+}: {
+  compact?: boolean;
+  /** The session the popover was opened from: says which account it runs on. */
+  session?: Session;
+}) {
   const { t } = useI18n();
   const a = t.settings.accounts;
   const { view, busy, notice, use, bind, add, remove } = useClaudeAccounts();
@@ -155,6 +167,58 @@ function AccountList({ compact = false }: { compact?: boolean }) {
           {a.failed(view.error)}
         </div>
       )}
+      {session?.accountDevice &&
+        (() => {
+          // A switch reaches new and resumed sessions only; say where this one runs, and offer to
+          // move it when that isn't the default any more.
+          const runsOn = view.orgs.find(
+            (o) => o.deviceId === session.accountDevice,
+          );
+          const current = view.orgs.find((o) => o.current);
+          const stale = !!current && runsOn?.id !== current.id;
+          const movable =
+            stale &&
+            session.management === "managed" &&
+            session.state !== "working";
+          return (
+            <div
+              className={cx(
+                "mx-1 mt-1 rounded-md border px-2 py-1.5 text-meta",
+                stale
+                  ? "border-(--ui-stroke-tertiary) text-fg-muted"
+                  : "border-transparent text-fg-faint",
+              )}
+            >
+              {a.sessionOn(runsOn ? runsOn.email || runsOn.name : "?")}
+              {stale && (
+                <>
+                  <div className="mt-0.5 text-fg-faint">
+                    {movable
+                      ? a.staleHint
+                      : session.management !== "managed"
+                        ? a.staleOutside
+                        : a.staleBusy}
+                  </div>
+                  {movable && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent(CONTINUE_ON_ACCOUNT_EVENT, {
+                            detail: session.id,
+                          }),
+                        )
+                      }
+                      className="mt-1 rounded-md border border-ink-700 px-2.5 py-1 text-meta text-fg hover:bg-ink-800"
+                    >
+                      {a.continueOnCurrent}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
       <div
         className={cx(
           "text-meta text-fg-faint",
@@ -179,7 +243,7 @@ export function ClaudeAccountsCard() {
 
 /** The Pressure panel's "switch account" button (Claude only): opens the list in a popover, for
  *  when the 5h / 7d window runs low. */
-export function ClaudeAccountSwitch() {
+export function ClaudeAccountSwitch({ session }: { session?: Session }) {
   const { t } = useI18n();
   // Where the popover sits: under the button, right-aligned to it. It is portaled to <body> because
   // the sidebar clips what overflows it.
@@ -227,7 +291,7 @@ export function ClaudeAccountSwitch() {
             style={{ top: at.top, right: at.right }}
             className="fixed z-50 w-80 max-w-[calc(100vw-16px)] rounded-md border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) shadow-(--shadow-md)"
           >
-            <AccountList compact />
+            <AccountList compact session={session} />
           </div>,
           document.body,
         )}

@@ -70,6 +70,7 @@ import { PersistentTerminal } from "./shell-terminal/persistent";
 import { installTerminalKeybind } from "./shell-terminal/keybinds";
 import { $activeSessionCwd, $terminalTakeover } from "./shell-terminal/store";
 import { UpdateDialog } from "./settings/UpdateDialog";
+import { CONTINUE_ON_ACCOUNT_EVENT } from "./settings/ClaudeAccounts";
 
 /** The middle column's sentinel for the inline new-session view (design spec §5), alongside
  *  `OVERVIEW_ID`/`SETTINGS_ID`: not a real session id (real ids come from `newSessionId()`, which
@@ -372,6 +373,34 @@ export function App() {
     setEnding((prev) => new Set(prev).add(id));
     window.api.terminal.kill(id);
   }
+
+  // Fork (2026-11-01): "continue this session on the current account" from the account popover. An
+  // account switch reaches new and resumed sessions only, so end it and resume it once its pty exits
+  // (a resume while the old pty lives would be refused); the transcript carries the conversation.
+  const sessionActions = useRef({ endSession, resumeSession });
+  sessionActions.current = { endSession, resumeSession };
+  useEffect(() => {
+    const onContinue = (event: Event) => {
+      const id = (event as CustomEvent<unknown>).detail;
+      if (typeof id !== "string") return;
+      let done = false;
+      const resume = () => {
+        if (done) return;
+        done = true;
+        off();
+        clearTimeout(timer);
+        void sessionActions.current.resumeSession(id).catch(() => undefined);
+      };
+      const off = window.api.terminal.onExit((exited) => {
+        if (exited === id) resume();
+      });
+      const timer = setTimeout(resume, 5000);
+      sessionActions.current.endSession(id);
+    };
+    window.addEventListener(CONTINUE_ON_ACCOUNT_EVENT, onContinue);
+    return () =>
+      window.removeEventListener(CONTINUE_ON_ACCOUNT_EVENT, onContinue);
+  }, []);
 
   // Persist a display-name override for a session and apply the fresh overview the main process returns.
   // Mirror the change into the draft overlay first so a not-yet-indexed draft (which main can't title)

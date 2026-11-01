@@ -25,7 +25,7 @@ export function ClaudePanels({
         contextWindow={session.contextWindow}
         account={account}
         rateLimits={session.rateLimits ?? null}
-        headingRight={<ClaudeAccountSwitch />}
+        headingRight={<ClaudeAccountSwitch session={session} />}
       />
       <SectionDivider />
       <SpendPanel

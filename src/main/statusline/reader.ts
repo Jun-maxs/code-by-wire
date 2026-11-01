@@ -143,7 +143,11 @@ export function createStatusLineReader(
 ): StatusLineReader {
   const own = resolveClaudeDir(deps.claudeDir);
   const now = deps.now ?? ((): number => Date.now());
-  const readDir = (dir: string, out: StatusLineSample[]): void => {
+  const readDir = (
+    dir: string,
+    out: StatusLineSample[],
+    configDir: string,
+  ): void => {
     let names: string[];
     try {
       names = readdirSync(dir);
@@ -170,7 +174,7 @@ export function createStatusLineReader(
           continue;
         }
         const sample = parseSample(readFileSync(path, "utf8"), mtimeMs);
-        if (sample) out.push(sample);
+        if (sample) out.push({ ...sample, configDir });
       } catch {
         // a file that vanished mid-scan or won't read — skip it, never sink the pass
       }
@@ -181,7 +185,7 @@ export function createStatusLineReader(
       const dirs = new Set(deps.claudeDirs?.() ?? []);
       dirs.add(own);
       const out: StatusLineSample[] = [];
-      for (const d of dirs) readDir(statusLineDir(d), out);
+      for (const d of dirs) readDir(statusLineDir(d), out, d);
       return out;
     },
   };
