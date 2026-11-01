@@ -269,7 +269,8 @@ export const en = {
     update: {
       title: "Software update",
       autoCheckLabel: "Automatically check for updates",
-      autoCheckDesc: "Check on launch and when you open About",
+      autoCheckDesc:
+        "Check on launch and every 4 hours; a new version downloads and asks you",
       upToDate: "Up to date",
       check: "Check for updates",
       checking: "Checking for updates…",
@@ -290,6 +291,19 @@ export const en = {
       retryDetail: (message: string) =>
         `${message} · will retry on next launch`,
       retry: "Retry",
+      dialogTitle: "A new Jun-Code is out",
+      whatsNew: "What's new",
+      noNotes: "This release has no notes.",
+      preparing: "Preparing the download…",
+      downloadingInBackground: (percent: number) =>
+        `Downloading in the background · ${percent}%`,
+      readyToRestart: "Downloaded; restart to use the new version.",
+      skipVersion: "Skip this version",
+      later: "Later",
+      restartToUpdate: "Restart to update",
+      downloadingShort: "Downloading…",
+      laterHint: "Later installs it the next time you quit Jun-Code.",
+      unskip: "You skipped this version · update anyway",
     },
   },
   shell: {

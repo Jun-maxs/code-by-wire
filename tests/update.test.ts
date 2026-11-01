@@ -3,7 +3,8 @@ import {
   initialUpdateState,
   isUpdatePending,
   nextUpdateState,
-  releaseNotesUrl,
+  offeredUpdate,
+  releaseNoteLines,
   shouldAutoCheck,
   UPDATE_AUTO_CHECK_THROTTLE_MS,
   type UpdateState,
@@ -21,14 +22,6 @@ describe("initialUpdateState", () => {
       currentVersion: "0.1.16",
       phase: { kind: "unsupported" },
     });
-  });
-});
-
-describe("releaseNotesUrl", () => {
-  it("builds the GitHub tag URL", () => {
-    expect(releaseNotesUrl("0.1.17")).toBe(
-      "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
-    );
   });
 });
 
@@ -72,8 +65,7 @@ describe("nextUpdateState", () => {
         kind: "available",
         version: "0.1.17",
         releaseDate: "2026-06-24",
-        notesUrl:
-          "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
+        notes: [],
         checkedAt: 1234,
       },
     });
@@ -104,6 +96,7 @@ describe("nextUpdateState", () => {
       phase: {
         kind: "downloading",
         version: "0.1.17",
+        notes: [],
         percent: 100,
         transferred: 60,
         total: 60,
@@ -191,8 +184,7 @@ describe("isUpdatePending", () => {
       isUpdatePending({
         kind: "available",
         version: "0.1.17",
-        notesUrl:
-          "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
+        notes: [],
         checkedAt: 1234,
       }),
     ).toBe(true);
@@ -214,8 +206,7 @@ describe("isUpdatePending", () => {
         prior: {
           kind: "available",
           version: "0.1.17",
-          notesUrl:
-            "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
+          notes: [],
           checkedAt: 1234,
         },
       }),
@@ -239,7 +230,7 @@ describe("shouldAutoCheck", () => {
   const available = {
     kind: "available" as const,
     version: "0.1.17",
-    notesUrl: "https://github.com/Jun-maxs/code-by-wire/releases/tag/v0.1.17",
+    notes: [],
     checkedAt: 1,
   };
 
@@ -307,5 +298,57 @@ describe("shouldAutoCheck", () => {
       shouldAutoCheck(idle, true, now - UPDATE_AUTO_CHECK_THROTTLE_MS, now),
     ).toBe(true);
     expect(shouldAutoCheck(idle, true, now + 1, now)).toBe(false);
+  });
+});
+
+describe("releaseNoteLines", () => {
+  it("turns markdown or HTML notes into plain lines", () => {
+    expect(releaseNoteLines("- 新增自动更新\n- 修复切换账号\n\n")).toEqual([
+      "新增自动更新",
+      "修复切换账号",
+    ]);
+    expect(releaseNoteLines("<ul><li>One</li><li>Two</li></ul>")).toEqual([
+      "One",
+      "Two",
+    ]);
+    expect(releaseNoteLines(null)).toEqual([]);
+  });
+});
+
+describe("offeredUpdate and skip", () => {
+  const found = nextUpdateState(initialUpdateState("0.1.50", true), {
+    type: "available",
+    version: "0.1.51",
+    notes: ["新增自动更新"],
+    at: 1,
+  });
+
+  it("keeps the notes through the download", () => {
+    const progress = nextUpdateState(found, {
+      type: "progress",
+      percent: 50,
+      transferred: 1,
+      total: 2,
+    });
+    const done = nextUpdateState(progress, {
+      type: "downloaded",
+      version: "0.1.51",
+    });
+    expect(offeredUpdate(done)).toEqual({
+      version: "0.1.51",
+      notes: ["新增自动更新"],
+    });
+  });
+
+  it("offers nothing for the skipped version, and skipping survives later events", () => {
+    const skipped = nextUpdateState(found, { type: "skip", version: "0.1.51" });
+    expect(offeredUpdate(skipped)).toBeNull();
+    const again = nextUpdateState(skipped, { type: "checking" });
+    expect(again.skippedVersion).toBe("0.1.51");
+    const unskipped = nextUpdateState(skipped, {
+      type: "skip",
+      version: undefined,
+    });
+    expect(offeredUpdate(unskipped)?.version).toBe("0.1.51");
   });
 });

@@ -15,6 +15,7 @@ const updaterMock = vi.hoisted(() => {
     checkForUpdates: vi.fn<() => Promise<void>>(),
     downloadUpdate: vi.fn<() => Promise<void>>(),
     quitAndInstall: vi.fn(),
+    setFeedURL: vi.fn(),
   };
 });
 
@@ -47,5 +48,25 @@ describe("createUpdater", () => {
 
     await expect(updater.check()).resolves.toEqual(before);
     expect(updater.getState()).toEqual(before);
+  });
+
+  it("downloads a found release in the background unless it is the skipped one", () => {
+    createUpdater({
+      send: vi.fn(),
+      isPackaged: true,
+      currentVersion: "0.1.50",
+    });
+    updaterMock.emit("update-available", { version: "0.1.51" });
+    expect(updaterMock.downloadUpdate).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    createUpdater({
+      send: vi.fn(),
+      isPackaged: true,
+      currentVersion: "0.1.50",
+      skippedVersion: "0.1.51",
+    });
+    updaterMock.emit("update-available", { version: "0.1.51" });
+    expect(updaterMock.downloadUpdate).not.toHaveBeenCalled();
   });
 });

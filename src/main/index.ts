@@ -366,6 +366,8 @@ app
       send: sendUpdate,
       isPackaged: app.isPackaged,
       currentVersion: app.getVersion(),
+      skippedVersion: appSettings.read().skippedUpdateVersion,
+      saveSkipped: (v) => appSettings.setSkippedUpdateVersion(v),
     });
     // One login-shell probe at startup: recover the real PATH and a rc-set CLAUDE_CONFIG_DIR that a
     // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout. Runs
@@ -779,6 +781,20 @@ app
         if (updater.getState().phase.kind === "idle") void updater.check();
       }, 3000);
     }
+    // Fork: the app stays open for days, so check again every 4 hours (the setting is re-read, so
+    // turning it off stops these too). A found release downloads and the dialog offers it.
+    if (app.isPackaged)
+      setInterval(
+        () => {
+          const kind = updater.getState().phase.kind;
+          if (
+            (appSettings.read().autoCheckUpdates ?? true) &&
+            (kind === "idle" || kind === "upToDate" || kind === "error")
+          )
+            void updater.check();
+        },
+        4 * 60 * 60 * 1000,
+      );
 
     try {
       await sync(); // incremental parse of ~/.claude → SQLite; the window's first overview() is served right after

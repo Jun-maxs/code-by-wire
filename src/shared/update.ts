@@ -1,5 +1,6 @@
-/** The repo whose GitHub releases electron-updater reads; used to build the release-notes link. */
-const RELEASES_BASE = "https://github.com/Jun-maxs/code-by-wire/releases/tag";
+/** Where Jun-Code's updates are published (latest.yml + the installer and its blockmap), on mysg;
+ *  `scripts/publish-update.sh` uploads there. CBW_UPDATE_FEED overrides it for testing. */
+export const UPDATE_FEED_URL = "https://hub.yuanhk.top/jun-code/";
 
 /** A release newer than the running app, including everything needed to keep rendering it while a
  *  re-check is in flight. Named separately so `checking.prior` does not make UpdatePhase recursive. */
@@ -7,7 +8,8 @@ export interface AvailableUpdatePhase {
   kind: "available";
   version: string;
   releaseDate?: string;
-  notesUrl: string;
+  /** The release notes, one line per change (empty when the release has none). */
+  notes: string[];
   checkedAt: number;
 }
 
@@ -22,17 +24,20 @@ export type UpdatePhase =
   | {
       kind: "downloading";
       version: string;
+      notes?: string[];
       percent: number;
       transferred: number;
       total: number;
     }
-  | { kind: "downloaded"; version: string }
+  | { kind: "downloaded"; version: string; notes?: string[] }
   | { kind: "error"; message: string };
 
-/** The whole update surface: the running version plus the current phase. */
+/** The whole update surface: the running version plus the current phase. `skippedVersion` is the
+ *  release the user chose to skip: it is neither downloaded, installed on quit, nor offered again. */
 export interface UpdateState {
   currentVersion: string;
   phase: UpdatePhase;
+  skippedVersion?: string;
 }
 
 /** About-open checks are intentionally sparse: a GitHub update check may use several requests. */
@@ -43,15 +48,54 @@ export const UPDATE_AUTO_CHECK_THROTTLE_MS = 5 * 60 * 1000;
  *  (never read inside the reducer), so tests can pin them. */
 export type UpdaterEvent =
   | { type: "checking" }
-  | { type: "available"; version: string; releaseDate?: string; at: number }
+  | {
+      type: "available";
+      version: string;
+      releaseDate?: string;
+      notes?: string[];
+      at: number;
+    }
   | { type: "not-available"; at: number }
   | { type: "progress"; percent: number; transferred: number; total: number }
   | { type: "downloaded"; version: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "skip"; version: string | undefined };
 
-/** The GitHub release-notes URL for a version (release tags are `v<version>`). */
-export function releaseNotesUrl(version: string): string {
-  return `${RELEASES_BASE}/v${version}`;
+/** electron-updater's `releaseNotes` (a string, possibly HTML or markdown, or one entry per version)
+ *  as plain lines: tags and list markers stripped, blank lines dropped. */
+export function releaseNoteLines(raw: unknown): string[] {
+  const text = Array.isArray(raw)
+    ? raw
+        .map((n: { note?: unknown }) =>
+          typeof n?.note === "string" ? n.note : "",
+        )
+        .join("\n")
+    : typeof raw === "string"
+      ? raw
+      : "";
+  return text
+    .replace(/<\/(p|li|div|h\d)>|<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "").trim())
+    .filter(Boolean);
+}
+
+/** The version (and notes) the update dialog is about, or null when there is nothing to offer:
+ *  no update in flight, or the update is the skipped one. */
+export function offeredUpdate(
+  state: UpdateState,
+): { version: string; notes: string[] } | null {
+  const p = state.phase.kind === "checking" ? state.phase.prior : state.phase;
+  if (
+    !p ||
+    (p.kind !== "available" &&
+      p.kind !== "downloading" &&
+      p.kind !== "downloaded")
+  )
+    return null;
+  if (!p.version || p.version === state.skippedVersion) return null;
+  return { version: p.version, notes: p.notes ?? [] };
 }
 
 /** Whether an update is pending — found, downloading, or awaiting restart. Drives the sidebar
@@ -122,6 +166,18 @@ function versionInFlight(prev: UpdateState): string {
   return "";
 }
 
+/** The notes carried with the version in flight, so the dialog keeps them through the download. */
+function notesInFlight(prev: UpdateState): string[] | undefined {
+  const p = prev.phase;
+  if (
+    p.kind === "available" ||
+    p.kind === "downloading" ||
+    p.kind === "downloaded"
+  )
+    return p.notes;
+  return undefined;
+}
+
 /** Pure reducer: fold one updater event into the next state. `unsupported` is sticky (a dev build never
  *  leaves it); `currentVersion` is always carried forward. */
 export function nextUpdateState(
@@ -129,8 +185,17 @@ export function nextUpdateState(
   ev: UpdaterEvent,
 ): UpdateState {
   if (prev.phase.kind === "unsupported") return prev;
-  const base = { currentVersion: prev.currentVersion };
+  const base = {
+    currentVersion: prev.currentVersion,
+    ...(prev.skippedVersion ? { skippedVersion: prev.skippedVersion } : {}),
+  };
   switch (ev.type) {
+    case "skip":
+      return {
+        currentVersion: prev.currentVersion,
+        phase: prev.phase,
+        ...(ev.version ? { skippedVersion: ev.version } : {}),
+      };
     case "checking":
       // A check firing mid-download (shouldn't happen) must not wipe progress.
       if (prev.phase.kind === "downloading") return prev;
@@ -148,7 +213,7 @@ export function nextUpdateState(
           kind: "available",
           version: ev.version,
           releaseDate: ev.releaseDate,
-          notesUrl: releaseNotesUrl(ev.version),
+          notes: ev.notes ?? [],
           checkedAt: ev.at,
         },
       };
@@ -160,13 +225,21 @@ export function nextUpdateState(
         phase: {
           kind: "downloading",
           version: versionInFlight(prev),
+          notes: notesInFlight(prev),
           percent: Math.max(0, Math.min(100, ev.percent)),
           transferred: ev.transferred,
           total: ev.total,
         },
       };
     case "downloaded":
-      return { ...base, phase: { kind: "downloaded", version: ev.version } };
+      return {
+        ...base,
+        phase: {
+          kind: "downloaded",
+          version: ev.version,
+          notes: notesInFlight(prev),
+        },
+      };
     case "error":
       if (prev.phase.kind === "checking" && prev.phase.prior)
         return { ...base, phase: prev.phase.prior };

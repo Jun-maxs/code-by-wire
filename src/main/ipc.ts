@@ -287,10 +287,12 @@ export function registerIpc({
     check: () => Promise.resolve(inertState),
     download: () => Promise.resolve(),
     quitAndInstall: () => {},
+    skip: () => {},
   };
   const settings: AppSettingsStore = appSettings ?? {
     read: () => ({}),
     setAutoCheckUpdates: () => {},
+    setSkippedUpdateVersion: () => {},
     setStatuslineEnabled: () => {},
     setAppTheme: () => {},
     setTerminalTheme: () => {},
@@ -1099,6 +1101,10 @@ export function registerIpc({
   ipcMain.handle(IPC.updateCheck, (): Promise<UpdateState> => upd.check());
   ipcMain.handle(IPC.updateDownload, (): Promise<void> => upd.download());
   ipcMain.handle(IPC.updateInstall, (): void => upd.quitAndInstall());
+  ipcMain.handle(IPC.updateSkip, (_e, version: unknown): UpdateState => {
+    upd.skip(typeof version === "string" && version ? version : undefined);
+    return upd.getState();
+  });
   ipcMain.handle(
     IPC.updateGetAutoCheck,
     (): boolean => settings.read().autoCheckUpdates ?? true,

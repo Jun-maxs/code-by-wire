@@ -82,6 +82,7 @@ export function useUpdate(): UpdateControls {
     maybeAutoCheck,
     download: () => void window.api.downloadUpdate(),
     install: () => window.api.installUpdate(),
+    skip: (version) => void window.api.skipUpdate(version).then(setState),
     setAutoCheck: (enabled) => {
       setAutoCheck(enabled);
       void window.api.setAutoCheckUpdates(enabled);

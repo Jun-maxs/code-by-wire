@@ -94,6 +94,7 @@ const api: AppApi = {
   installUpdate: () => {
     void ipcRenderer.invoke(IPC.updateInstall);
   },
+  skipUpdate: (version) => ipcRenderer.invoke(IPC.updateSkip, version),
   getAutoCheckUpdates: () => ipcRenderer.invoke(IPC.updateGetAutoCheck),
   setAutoCheckUpdates: (enabled) =>
     ipcRenderer.invoke(IPC.updateSetAutoCheck, enabled),

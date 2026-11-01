@@ -69,6 +69,7 @@ import { TerminalPaneChrome } from "./shell-terminal/chrome";
 import { PersistentTerminal } from "./shell-terminal/persistent";
 import { installTerminalKeybind } from "./shell-terminal/keybinds";
 import { $activeSessionCwd, $terminalTakeover } from "./shell-terminal/store";
+import { UpdateDialog } from "./settings/UpdateDialog";
 
 /** The middle column's sentinel for the inline new-session view (design spec §5), alongside
  *  `OVERVIEW_ID`/`SETTINGS_ID`: not a real session id (real ids come from `newSessionId()`, which
@@ -590,6 +591,7 @@ export function App() {
         onOpenSession={setSelectedId}
       >
         <BoardAutoInsight sessions={all} />
+        <UpdateDialog update={update} />
         <div className="app-bg flex h-screen flex-col text-fg">
           <PaneShell className="min-h-0 flex-1">
             <Pane

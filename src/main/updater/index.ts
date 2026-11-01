@@ -2,6 +2,8 @@ import { autoUpdater } from "electron-updater";
 import {
   initialUpdateState,
   nextUpdateState,
+  releaseNoteLines,
+  UPDATE_FEED_URL,
   type UpdateState,
   type UpdaterEvent,
 } from "@shared/update";
@@ -16,6 +18,8 @@ export interface Updater {
   download(): Promise<void>;
   /** Quit and install a downloaded update (the app quits). No-op in dev. */
   quitAndInstall(): void;
+  /** Skip a release (it is not downloaded, installed on quit, or offered again); undefined un-skips. */
+  skip(version: string | undefined): void;
 }
 
 /**
@@ -23,16 +27,25 @@ export interface Updater {
  * state to the renderer via `deps.send`. In dev (`isPackaged === false`) it never touches autoUpdater
  * (which throws when unpacked) and stays in the `unsupported` phase, so the renderer hides the card.
  *
- * Config: manual download (`autoDownload = false`) and install-on-next-quit
- * (`autoInstallOnAppQuit = true`) — once downloaded, the update applies whenever the app next quits;
- * `quitAndInstall()` applies it immediately. Stable channel only (`allowPrerelease = false`).
+ * Jun-Code reads its own feed (UPDATE_FEED_URL, a generic electron-builder feed on mysg; CBW_UPDATE_FEED
+ * overrides it). A found release downloads in the background straight away unless it is the skipped
+ * one, and installs on the next quit (`autoInstallOnAppQuit`); `quitAndInstall()` applies it now,
+ * silently, and relaunches. Stable channel only (`allowPrerelease = false`).
  */
 export function createUpdater(deps: {
   send: (state: UpdateState) => void;
   isPackaged: boolean;
   currentVersion: string;
+  skippedVersion?: string;
+  /** Persist a skip (or un-skip) so it holds across launches. */
+  saveSkipped?: (version: string | undefined) => void;
 }): Updater {
   let state = initialUpdateState(deps.currentVersion, deps.isPackaged);
+  if (deps.skippedVersion)
+    state = nextUpdateState(state, {
+      type: "skip",
+      version: deps.skippedVersion,
+    });
   const apply = (ev: UpdaterEvent): void => {
     state = nextUpdateState(state, ev);
     deps.send(state);
@@ -41,19 +54,34 @@ export function createUpdater(deps: {
   // pending, which TypeScript's local control-flow narrowing cannot otherwise observe.
   const checkIsInFlight = (): boolean => state.phase.kind === "checking";
 
+  const isSkipped = (version: string) => version === state.skippedVersion;
+  const download = async () => {
+    try {
+      await autoUpdater.downloadUpdate();
+    } catch (err) {
+      apply({ type: "error", message: friendlyError(err) });
+    }
+  };
+
   if (deps.isPackaged) {
+    autoUpdater.setFeedURL({
+      provider: "generic",
+      url: process.env.CBW_UPDATE_FEED || UPDATE_FEED_URL,
+    });
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.allowPrerelease = false;
     autoUpdater.on("checking-for-update", () => apply({ type: "checking" }));
-    autoUpdater.on("update-available", (info) =>
+    autoUpdater.on("update-available", (info) => {
       apply({
         type: "available",
         version: info.version,
         releaseDate: info.releaseDate,
+        notes: releaseNoteLines(info.releaseNotes),
         at: Date.now(),
-      }),
-    );
+      });
+      if (!isSkipped(info.version)) void download();
+    });
     autoUpdater.on("update-not-available", () =>
       apply({ type: "not-available", at: Date.now() }),
     );
@@ -65,9 +93,10 @@ export function createUpdater(deps: {
         total: p.total,
       }),
     );
-    autoUpdater.on("update-downloaded", (info) =>
-      apply({ type: "downloaded", version: info.version }),
-    );
+    autoUpdater.on("update-downloaded", (info) => {
+      autoUpdater.autoInstallOnAppQuit = !isSkipped(info.version);
+      apply({ type: "downloaded", version: info.version });
+    });
     autoUpdater.on("error", (err) =>
       apply({ type: "error", message: friendlyError(err) }),
     );
@@ -92,15 +121,22 @@ export function createUpdater(deps: {
     },
     download: async () => {
       if (!deps.isPackaged || state.phase.kind !== "available") return;
-      try {
-        await autoUpdater.downloadUpdate();
-      } catch (err) {
-        apply({ type: "error", message: friendlyError(err) });
-      }
+      await download();
     },
     quitAndInstall: () => {
+      // Silent (the one-click installer shows no wizard), then relaunch the new version.
       if (deps.isPackaged && state.phase.kind === "downloaded")
-        autoUpdater.quitAndInstall();
+        autoUpdater.quitAndInstall(true, true);
+    },
+    skip: (version) => {
+      apply({ type: "skip", version });
+      deps.saveSkipped?.(version);
+      if (!deps.isPackaged) return;
+      const p = state.phase;
+      if (p.kind === "downloaded")
+        autoUpdater.autoInstallOnAppQuit = !isSkipped(p.version);
+      // Un-skipping a release that was found but left alone: fetch it now.
+      if (p.kind === "available" && !isSkipped(p.version)) void download();
     },
   };
 }

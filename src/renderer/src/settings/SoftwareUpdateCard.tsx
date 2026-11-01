@@ -14,6 +14,8 @@ export interface UpdateControls {
   maybeAutoCheck: () => void;
   download: () => void;
   install: () => void;
+  /** Skip a release (or un-skip with no version). */
+  skip: (version?: string) => void;
   setAutoCheck: (enabled: boolean) => void;
 }
 
@@ -100,14 +102,24 @@ function StatusRow({ update }: { update: UpdateControls }) {
         )
       : t.settings.update.onVersion(state.currentVersion);
     extra = (
-      <button
-        type="button"
-        onClick={() => void window.api.openExternal(available.notesUrl)}
-        className="mt-1.5 inline-flex items-center gap-1 text-meta text-primary transition-colors hover:text-primary-bright"
-      >
-        {t.settings.update.releaseNotes}
-        <Icon name="arrow-up-right" size={11} />
-      </button>
+      <>
+        {available.notes.length > 0 && (
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-meta text-fg-muted">
+            {available.notes.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        )}
+        {available.version === state.skippedVersion && (
+          <button
+            type="button"
+            onClick={() => update.skip(undefined)}
+            className="mt-1.5 text-meta text-primary transition-colors hover:text-primary-bright"
+          >
+            {t.settings.update.unskip}
+          </button>
+        )}
+      </>
     );
     action = (
       <>

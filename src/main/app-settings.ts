@@ -13,6 +13,8 @@ export interface AppSettings {
   /** Whether to check for app updates on launch. Missing means on; the launch check reads
    *  `read().autoCheckUpdates ?? true`. */
   autoCheckUpdates?: boolean;
+  /** The release the user skipped in the update dialog (not downloaded, installed or offered again). */
+  skippedUpdateVersion?: string;
   /** Whether the statusLine capture wrapper is installed at launch and active. Missing means on;
    *  callers read `read().statuslineEnabled ?? true`. */
   statuslineEnabled?: boolean;
@@ -57,6 +59,7 @@ export function hudSettings(s: AppSettings): HudSettings {
 export interface AppSettingsStore {
   read(): AppSettings;
   setAutoCheckUpdates(enabled: boolean): void;
+  setSkippedUpdateVersion(version: string | undefined): void;
   setStatuslineEnabled(enabled: boolean): void;
   setAppTheme(theme: "dark" | "light"): void;
   setTerminalTheme(theme: "dark" | "light"): void;
@@ -97,6 +100,9 @@ export function createAppSettingsStore(
     read,
     setAutoCheckUpdates(enabled) {
       write({ ...read(), autoCheckUpdates: enabled });
+    },
+    setSkippedUpdateVersion(version) {
+      write({ ...read(), skippedUpdateVersion: version });
     },
     setStatuslineEnabled(enabled) {
       write({ ...read(), statuslineEnabled: enabled });

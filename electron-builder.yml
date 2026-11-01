@@ -53,14 +53,13 @@ nsis:
   # sees the other and both fall back to the default ...-Setup-${version}.exe — identical names
   # that clobber each other on upload and collide in latest.yml (electron-updater can't tell the
   # arches apart). Force the arch into the filename so the two installers stay distinct.
-  artifactName: ${productName}-Setup-${arch}.${ext}
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
 # This fork (Pi, relay usage, the HUD overlay) shares upstream's appId, so it installs over and
-# keeps the same data. Updates come from the fork's releases, never upstream's: an upstream build
-# would replace it and drop what the fork adds.
+# keeps the same data. Updates come from Jun-Code's own feed on mysg (scripts/publish-update.sh),
+# never upstream's releases: an upstream build would replace it and drop what the fork adds.
 publish:
-  provider: github
-  owner: Jun-maxs
-  repo: code-by-wire
+  provider: generic
+  url: https://hub.yuanhk.top/jun-code/

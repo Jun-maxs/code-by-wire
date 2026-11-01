@@ -117,6 +117,7 @@ export const IPC = {
   updateCheck: "update:check",
   updateDownload: "update:download",
   updateInstall: "update:install",
+  updateSkip: "update:skip",
   updateGetAutoCheck: "update:getAutoCheck",
   updateSetAutoCheck: "update:setAutoCheck",
   appearanceGetAppTheme: "appearance:getAppTheme",
@@ -479,6 +480,8 @@ export interface IpcApi {
   downloadUpdate(): Promise<void>;
   /** Quit and install a downloaded update — the app quits, so this never resolves. */
   installUpdate(): void;
+  /** Skip a release (or un-skip with no version); answers with the new state. */
+  skipUpdate(version?: string): Promise<UpdateState>;
   /** Whether the launch check is enabled (missing setting reads as true). */
   getAutoCheckUpdates(): Promise<boolean>;
   /** Persist the launch-check preference. */
