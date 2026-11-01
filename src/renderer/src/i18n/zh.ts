@@ -335,8 +335,8 @@ export const zh: Translations = {
           ? `组内 ${count} 个子代理 · ${active} 个活跃`
           : `组内 ${count} 个子代理`,
       detachedSubagent: "已脱离的子代理",
-      unsentTitle: "新会话 · 还没发消息",
       placeholderTitle: "未命名会话",
+      unsentTitle: "新会话",
       product: {
         domain: "域名",
         doing: "最近在做",
