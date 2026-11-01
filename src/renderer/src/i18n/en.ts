@@ -478,6 +478,7 @@ export const en = {
       starting: "Starting…",
     },
     middleHeader: {
+      siblingsLabel: "Other sessions on this topic",
       viewGroupLabel: "View",
       transcript: "Transcript",
     },

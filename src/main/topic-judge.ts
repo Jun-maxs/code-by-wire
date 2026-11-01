@@ -27,8 +27,10 @@ import type { ProductsData } from "@shared/products";
 export const JUDGE_MODEL = "claude-haiku-5.5";
 /** A session is judged at its first real prompt, then again after this many more. */
 export const REJUDGE_EVERY = 4;
-/** Sessions whose transcript moved within this window are considered. */
-const RECENT_MS = 24 * 60 * 60 * 1000;
+/** Sessions never judged here are considered when their transcript moved within this window (so the
+ *  last week's keyword guesses get corrected); judged ones only while active within RECHECK_MS. */
+const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
+const RECHECK_MS = 24 * 60 * 60 * 1000;
 /** At most this many model calls per tick, so a backlog drains over a few minutes. */
 const PER_TICK = 3;
 
@@ -207,7 +209,7 @@ export function createTopicJudge(deps: {
   };
 
   /** Recent transcripts, newest first. */
-  function recentTranscripts(): { sid: string; path: string }[] {
+  function recentTranscripts(): { sid: string; path: string; mtime: number }[] {
     const root = deps.projectsDir();
     const out: { sid: string; path: string; mtime: number }[] = [];
     let dirs: string[];
@@ -267,6 +269,7 @@ export function createTopicJudge(deps: {
       };
       for (const t of recentTranscripts()) {
         if (judged >= PER_TICK) break;
+        if (state[t.sid] && now() - t.mtime > RECHECK_MS) continue;
         let prompts: string[];
         try {
           prompts = extractPrompts(readFileSync(t.path, "utf8"));

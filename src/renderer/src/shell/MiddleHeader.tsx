@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SiblingTabs } from "./SiblingTabs";
 import type { Session } from "@shared/types";
 import { isMacPlatform } from "@shared/platform";
 import { AGENTS } from "@shared/agents";
@@ -86,6 +87,7 @@ export function MiddleHeader({
           <>
             {menu}
             <TaskChip sessionId={session.id} />
+            <SiblingTabs session={session} />
           </>
         ) : (
           <span className="truncate text-aux font-medium leading-none text-fg-muted">

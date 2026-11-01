@@ -429,6 +429,7 @@ export const zh: Translations = {
       starting: "启动中…",
     },
     middleHeader: {
+      siblingsLabel: "同主题的其他会话",
       viewGroupLabel: "视图",
       transcript: "记录",
     },
