@@ -11,7 +11,7 @@ set -euo pipefail
 export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 
 here=$(cd "$(dirname "$0")/.." && pwd)
-version=$(node -p "require('$here/package.json').version")
+version=$(cd "$here" && node -p "require('./package.json').version")
 exe="Jun-Code-Setup-${version}-x64.exe"
 rel="$here/release"
 [ -f "$rel/$exe" ] && [ -f "$rel/$exe.blockmap" ] && [ -f "$rel/latest.yml" ] ||
