@@ -298,9 +298,12 @@ export function App() {
   // Sidebar folder quick-add: spawn in the group's directory with the CLI's default model, no
   // form. Never rejects — a failure routes to the New session view with the directory kept and
   // the error shown (the app's only creation-error surface).
-  async function quickAddSession(cwd: string, agent: AgentId): Promise<void> {
+  async function quickAddSession(
+    cwd: string,
+    agent: AgentId,
+  ): Promise<string | null> {
     try {
-      await createSession(cwd, "default", agent);
+      return await createSession(cwd, "default", agent);
     } catch (e) {
       setQuickAddPrefill((p) => ({
         cwd,
@@ -309,6 +312,7 @@ export function App() {
         nonce: (p?.nonce ?? 0) + 1,
       }));
       setSelectedId(NEW_SESSION_ID);
+      return null;
     }
   }
 

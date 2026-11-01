@@ -18,14 +18,73 @@ export function isUnsentSession(session: Session): boolean {
   );
 }
 
+/** Fork (2026-11-01): the order a session sorts by. Waiting on you first, then running, then live but
+ *  idle, then ended. */
+export const STATE_RANK: Record<Session["state"], number> = {
+  waiting: 0,
+  working: 1,
+  idle: 2,
+  ended: 3,
+};
+
+/** Within one rank: waiting and running sessions keep their creation order (newest first), so a
+ *  running row doesn't hop on every tick of its activity clock; idle and ended ones go by when they
+ *  were last touched. */
+function compareRanked(
+  a: { rank: number; createdMs: number; lastActivityMs: number },
+  b: { rank: number; createdMs: number; lastActivityMs: number },
+): number {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  return a.rank <= STATE_RANK.working
+    ? b.createdMs - a.createdMs
+    : b.lastActivityMs - a.lastActivityMs;
+}
+
 export function sortSessions(sessions: Session[]): Session[] {
-  const active = sessions
-    .filter((s) => s.state !== "ended")
-    .sort((a, b) => b.createdMs - a.createdMs);
-  const ended = sessions
-    .filter((s) => s.state === "ended")
+  return [...sessions].sort((a, b) =>
+    compareRanked(
+      { ...a, rank: STATE_RANK[a.state] },
+      { ...b, rank: STATE_RANK[b.state] },
+    ),
+  );
+}
+
+/** A group's rank: its most urgent session's. Groups with someone waiting on you come first, then
+ *  groups with something running; a group of ended sessions sinks. */
+export function groupRank(sessions: Session[]): number {
+  return Math.min(...sessions.map((s) => STATE_RANK[s.state]));
+}
+
+/** Group order shared by folder and topic grouping: rank, then most recent activity. */
+function compareGroups(
+  a: { sessions: Session[] },
+  b: { sessions: Session[] },
+): number {
+  return (
+    groupRank(a.sessions) - groupRank(b.sessions) ||
+    Math.max(...b.sessions.map((s) => s.lastActivityMs)) -
+      Math.max(...a.sessions.map((s) => s.lastActivityMs))
+  );
+}
+
+/** Sessions waiting on you (a permission prompt or a question), newest first — the sidebar's top
+ *  strip. Composes after search, like the pinned list. */
+export function waitingSessions(sessions: Session[]): Session[] {
+  return sessions
+    .filter((s) => s.state === "waiting")
     .sort((a, b) => b.lastActivityMs - a.lastActivityMs);
-  return [...active, ...ended];
+}
+
+/** Titles that say nothing about the task: a slash command, a greeting, or two or three characters
+ *  ("/model", "hello", "lo", "测试"). The row shows them as an untitled session instead. */
+export function isPlaceholderTitle(title: string): boolean {
+  const t = title.trim();
+  if (t.startsWith("/")) return true;
+  // Two CJK characters or three Latin ones are too short to name a task ("lo", "测试").
+  if ([...t].length <= (/^[ -~]*$/.test(t) ? 3 : 2)) return true;
+  return /^(hi|hello|hey|test|testing|ok|你好|您好|测试|继续|在吗|嗨)[!！。.\s]*$/i.test(
+    t,
+  );
 }
 
 /** Case-insensitive substring match on title, project, or the folder's repo label (so searching a
@@ -92,6 +151,9 @@ export type SessionGroup = {
   hint?: string;
   /** Product color for product-keyed groups (fork feature); absent for folder groups. */
   color?: string;
+  /** The topic key of a topic group (fork); "" for the untagged group, absent for folder groups.
+   *  A session started from a topic group's "+" is filed under it. */
+  productKey?: string;
   sessions: Session[];
 };
 
@@ -152,20 +214,25 @@ export function filterGroups(
       (a, b) => latestMatchByGroup.get(b.key)! - latestMatchByGroup.get(a.key)!,
     );
   }
-  return matchingGroups.map((group) => ({
-    ...group,
-    sessions: filterSessionsWithAncestors(group.sessions, (session) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        sessionMatchesQuery(session, normalizedQuery, contentHits);
-      // Ended sessions are never filtered out (issue #431): a folder's own cap decides how much
-      // history it shows inline, so search and the agent preference are the only narrowing here.
-      return (
-        matchesQuery &&
-        (preferences.agent === "all" || session.agent === preferences.agent)
-      );
-    }),
-  }));
+  return (
+    matchingGroups
+      .map((group) => ({
+        ...group,
+        sessions: filterSessionsWithAncestors(group.sessions, (session) => {
+          const matchesQuery =
+            !normalizedQuery ||
+            sessionMatchesQuery(session, normalizedQuery, contentHits);
+          // Ended sessions are never filtered out (issue #431): a folder's own cap decides how much
+          // history it shows inline, so search and the agent preference are the only narrowing here.
+          return (
+            matchesQuery &&
+            (preferences.agent === "all" || session.agent === preferences.agent)
+          );
+        }),
+      }))
+      // Fork: a group the agent filter emptied would show a bare header with nothing under it.
+      .filter((group) => group.sessions.length > 0)
+  );
 }
 
 /** How many top-level entries one folder shows before the rest fall into its "Older (N)"
@@ -279,7 +346,7 @@ export function sessionForest(sessions: Session[]): SessionTreeNode[] {
   const roots: Session[] = [];
   const sortKeys = new WeakMap<
     SessionTreeNode,
-    { activeCreatedMs?: number; lastActivityMs: number }
+    { rank: number; createdMs: number; lastActivityMs: number }
   >();
 
   for (const session of sessions) {
@@ -295,17 +362,9 @@ export function sessionForest(sessions: Session[]): SessionTreeNode[] {
     else childrenById.set(parent.id, [session]);
   }
 
-  const compareNodes = (a: SessionTreeNode, b: SessionTreeNode): number => {
-    const aKeys = sortKeys.get(a)!;
-    const bKeys = sortKeys.get(b)!;
-    const aActive = aKeys.activeCreatedMs !== undefined;
-    const bActive = bKeys.activeCreatedMs !== undefined;
-    if (aActive !== bActive) return aActive ? -1 : 1;
-    if (aActive && bActive) {
-      return bKeys.activeCreatedMs! - aKeys.activeCreatedMs!;
-    }
-    return bKeys.lastActivityMs - aKeys.lastActivityMs;
-  };
+  // A family sorts by its most urgent member (fork, 2026-11-01): a waiting fork lifts its root.
+  const compareNodes = (a: SessionTreeNode, b: SessionTreeNode): number =>
+    compareRanked(sortKeys.get(a)!, sortKeys.get(b)!);
 
   const build = (session: Session): SessionTreeNode => {
     const children = (childrenById.get(session.id) ?? []).map(build);
@@ -327,21 +386,21 @@ export function sessionForest(sessions: Session[]): SessionTreeNode[] {
       descendantCount,
       activeDescendantCount,
     };
-    let activeCreatedMs =
-      session.state === "ended" ? undefined : session.createdMs;
+    let rank = STATE_RANK[session.state];
+    let createdMs = session.createdMs;
     let lastActivityMs = session.lastActivityMs;
     for (const child of children) {
       const childKeys = sortKeys.get(child)!;
       if (
-        childKeys.activeCreatedMs !== undefined &&
-        (activeCreatedMs === undefined ||
-          childKeys.activeCreatedMs > activeCreatedMs)
+        childKeys.rank < rank ||
+        (childKeys.rank === rank && childKeys.createdMs > createdMs)
       ) {
-        activeCreatedMs = childKeys.activeCreatedMs;
+        rank = childKeys.rank;
+        createdMs = childKeys.createdMs;
       }
       lastActivityMs = Math.max(lastActivityMs, childKeys.lastActivityMs);
     }
-    sortKeys.set(node, { activeCreatedMs, lastActivityMs });
+    sortKeys.set(node, { rank, createdMs, lastActivityMs });
     return node;
   };
 
@@ -427,7 +486,7 @@ export function groupSessionsByProduct(
   const byId = new Map(sessions.map((session) => [session.id, session]));
   const buckets = new Map<
     string,
-    { label: string; color?: string; sessions: Session[] }
+    { label: string; color?: string; productKey: string; sessions: Session[] }
   >();
   for (const s of sessions) {
     const product = productOf(relationshipRoot(s, byId));
@@ -438,22 +497,31 @@ export function groupSessionsByProduct(
       buckets.set(key, {
         label: product ? shortTopicName(product.name) : otherLabel,
         color: product?.color,
+        productKey: product?.key ?? "",
         sessions: [s],
       });
   }
   return [...buckets.entries()]
-    .map(([key, b]) => ({
-      key,
-      label: b.label,
-      ...(b.color ? { color: b.color } : {}),
-      sessions: sortSessions(b.sessions),
-    }))
+    .map(([key, b]) => {
+      // The "+" starts a session where this topic was last worked on (fork, 2026-11-01).
+      const latest = [...b.sessions].sort(
+        (x, y) => y.lastActivityMs - x.lastActivityMs,
+      )[0];
+      const cwd = sessionRepoRoot(latest);
+      return {
+        key,
+        label: b.label,
+        ...(b.color ? { color: b.color } : {}),
+        ...(cwd ? { cwd } : {}),
+        productKey: b.productKey,
+        sessions: sortSessions(b.sessions),
+      };
+    })
     .sort(
       (a, b) =>
         // Sessions with no topic are the leftovers; they never push a real topic down.
         Number(a.key === "product:-") - Number(b.key === "product:-") ||
-        Math.max(...b.sessions.map((s) => s.lastActivityMs)) -
-          Math.max(...a.sessions.map((s) => s.lastActivityMs)),
+        compareGroups(a, b),
     );
 }
 
@@ -500,9 +568,5 @@ export function groupSessionsByProject(
         ? { ...g, hint: parentHint(g.cwd, homeDir) }
         : g,
     )
-    .sort(
-      (a, b) =>
-        Math.max(...b.sessions.map((s) => s.lastActivityMs)) -
-        Math.max(...a.sessions.map((s) => s.lastActivityMs)),
-    );
+    .sort(compareGroups);
 }

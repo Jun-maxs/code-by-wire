@@ -9,7 +9,7 @@ import { useI18n } from "../i18n";
 import { useSessionMenu } from "./use-session-menu";
 import { SessionMenuDropdown } from "./SessionMenuDropdown";
 import { useSessionProduct } from "../products/products-context";
-import { isUnsentSession } from "./session-list-model";
+import { isPlaceholderTitle, isUnsentSession } from "./session-list-model";
 import { ProductHoverCard } from "../products/ProductHoverCard";
 import { shortTopicName } from "@shared/products";
 import { formatAgeShort } from "@shared/format";
@@ -78,7 +78,16 @@ export function SessionRow({
   const product = useSessionProduct(session);
   const displayTitle = isUnsentSession(session)
     ? t.shell.sessionRow.unsentTitle
-    : session.title;
+    : // Fork: "/model", "hello" and the like name nothing; the hover title keeps the original.
+      isPlaceholderTitle(session.title)
+      ? t.shell.sessionRow.placeholderTitle
+      : session.title;
+  // Fork (2026-11-01): how full the context is, as a hairline along the row's foot. Gray, and the
+  // danger red only from 85% — amber stays reserved for "waiting on you".
+  const contextPct =
+    Number.isFinite(session.contextPct) && session.contextPct > 0
+      ? Math.min(100, session.contextPct)
+      : 0;
   const hasChildren = descendantCount > 0 && onToggleChildren !== undefined;
   const cappedDepth = Math.min(depth, 2);
   const rowStyle =
@@ -137,6 +146,17 @@ export function SessionRow({
             className="pointer-events-none absolute -left-1.5 top-0 h-1/2 w-2 border-b border-l border-(--ui-stroke-tertiary)"
           />
         )}
+        {contextPct > 0 && (
+          <span
+            aria-hidden
+            className={cx(
+              "pointer-events-none absolute bottom-0 left-2 h-px rounded-full",
+              contextPct >= 85 ? "bg-danger" : "bg-fg-dim",
+              session.state === "ended" && "opacity-40",
+            )}
+            style={{ width: `calc((100% - 1rem) * ${contextPct / 100})` }}
+          />
+        )}
         <button
           type="button"
           onClick={onSelect}
@@ -158,14 +178,20 @@ export function SessionRow({
               "min-w-0 flex-1 truncate text-body leading-none text-fg-muted group-hover:text-fg",
               selected && "text-fg",
             )}
-            title={product ? `${product.name} · ${displayTitle}` : displayTitle}
+            title={[product?.name, session.title].filter(Boolean).join(" · ")}
           >
-            {/* Fork feature: the topic's name leads the title, in its color, so parallel
-             *  sessions on different products read apart at a glance. */}
+            {/* Fork feature: the topic leads the title so parallel sessions on different products
+             *  read apart. Its color sits only on a small square (2026-11-01): colored words
+             *  competed with the state colors and made the list hard to scan. */}
             {product && !hideProduct && (
-              <span className="font-medium" style={{ color: product.color }}>
+              <span className="text-fg-dim">
+                <span
+                  aria-hidden
+                  className="mr-1 inline-block size-1.5 -translate-y-px rounded-[1px] align-middle"
+                  style={{ background: product.color }}
+                />
                 {shortTopicName(product.name)}
-                <span className="text-fg-dim"> · </span>
+                <span> · </span>
               </span>
             )}
             {displayTitle}

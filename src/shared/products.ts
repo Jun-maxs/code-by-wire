@@ -178,20 +178,37 @@ export function productForSession(
   return guessed && data.products[guessed] ? guessed : null;
 }
 
-// Distinct, mid-saturation hues that read on both the light and dark sidebar.
+// Distinct, mid-saturation hues that read on both the light and dark sidebar. No amber, orange or
+// red (fork, 2026-11-01): amber means "waiting on you" and red means failure, so a topic in those
+// hues read as a state.
 const PALETTE = [
   "#3b82f6",
   "#10b981",
-  "#f59e0b",
-  "#ef4444",
   "#8b5cf6",
   "#ec4899",
-  "#14b8a6",
-  "#f97316",
+  "#06b6d4",
+  "#84cc16",
 ];
 
+/** Whether a #rrggbb color is a red, orange or amber — the hues the states own. */
+export function isStateHue(hex: string): boolean {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) return false;
+  const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max - min < 0.2) return false; // grays carry no hue
+  let hue: number;
+  if (max === r) hue = ((g - b) / (max - min)) % 6;
+  else if (max === g) hue = (b - r) / (max - min) + 2;
+  else hue = (r - g) / (max - min) + 4;
+  const deg = (hue * 60 + 360) % 360;
+  return deg < 55 || deg >= 340;
+}
+
 export function colorForProduct(key: string, explicit?: string): string {
-  if (explicit) return explicit;
+  // A card colored in a state's hue (学屿's amber, 桌面整理's red) gets a palette color instead.
+  if (explicit && !isStateHue(explicit)) return explicit;
   let h = 0;
   for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return PALETTE[h % PALETTE.length];

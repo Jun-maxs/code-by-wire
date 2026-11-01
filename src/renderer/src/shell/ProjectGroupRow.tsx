@@ -10,6 +10,7 @@ import { runProjectPlacementAction } from "./project-placement-action";
 export function ProjectGroupRow({
   group,
   collapsed,
+  sessionCount,
   placement,
   activeCount,
   activeSessionsBadge,
@@ -33,6 +34,8 @@ export function ProjectGroupRow({
 }: {
   group: SessionGroup;
   collapsed: boolean;
+  /** Every session in the group; shown beside a folded group's name so it isn't a blank row. */
+  sessionCount: number;
   placement: ProjectPlacement;
   /** Live sessions in this folder; 0 hides the badge entirely. */
   activeCount: number;
@@ -140,6 +143,12 @@ export function ProjectGroupRow({
               className="size-2 rounded-[2px]"
               style={{ background: group.color }}
             />
+          ) : group.productKey === "" ? (
+            // The untagged topic group: a hollow mark, so it reads as "no topic" rather than a folder.
+            <span
+              aria-hidden
+              className="size-2 rounded-[2px] border border-fg-dim"
+            />
           ) : (
             <Icon name={collapsed ? "folder" : "folder-open"} size={14} />
           )}
@@ -154,13 +163,19 @@ export function ProjectGroupRow({
             className={cx("transition-transform", !collapsed && "rotate-90")}
           />
         </span>
-        {activeCount > 0 && (
+        {activeCount > 0 ? (
           <span
             title={activeSessionsLabel}
             className="shrink-0 rounded-full bg-(--ui-control-active-background) px-1.5 text-tiny tabular-nums text-fg-faint"
           >
             {activeSessionsBadge}
           </span>
+        ) : (
+          collapsed && (
+            <span className="shrink-0 text-tiny tabular-nums text-fg-dim">
+              {sessionCount}
+            </span>
+          )
         )}
       </button>
       {cwd && (

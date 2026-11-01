@@ -1,5 +1,8 @@
 import { productForSession } from "@shared/products";
-import { ProductsContext } from "../products/products-context";
+import {
+  ProductsContext,
+  ProductsRefreshContext,
+} from "../products/products-context";
 import {
   useContext,
   useEffect,
@@ -29,8 +32,8 @@ import {
   projectGroupsForCollapse,
   isSessionFamilyCollapsed,
   sessionForest,
-  toggleProjectGroups,
   pinnedSessions,
+  waitingSessions,
   SESSIONS_PER_FOLDER,
   type SessionTreeNode,
 } from "./session-list-model";
@@ -53,6 +56,31 @@ import { defaultSpawnAgent, saveLastAgent } from "./agent-preference";
 
 /** How many hidden entries one "Older (N)" expansion (or one "Show more") reveals. */
 const OLDER_PAGE_SIZE = 10;
+
+/** Fork (2026-11-01): the groups the user opened or closed by hand, kept across launches. A group
+ *  nobody touched follows the default: open while it has a live session, folded once all of its
+ *  sessions have ended (so a folder unused for days stops taking rows from the work in hand). */
+const DISCLOSURE_STORAGE_KEY = "cbw.groupDisclosure.v1";
+
+function loadDisclosure(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(DISCLOSURE_STORAGE_KEY);
+    const v: unknown = raw ? JSON.parse(raw) : {};
+    return v && typeof v === "object" && !Array.isArray(v)
+      ? (v as Record<string, boolean>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDisclosure(value: Record<string, boolean>): void {
+  try {
+    window.localStorage.setItem(DISCLOSURE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // storage unavailable: the choice holds for this launch only
+  }
+}
 
 /**
  * The left sidebar's content (design spec §4): an empty draggable top strip — the traffic lights
@@ -88,8 +116,8 @@ export function LeftSidebar({
   onNew: () => void;
   /** Folder quick-add: spawns a session in `cwd` for the chosen agent with the default model.
    *  Never rejects — App surfaces failures in the New session view — so this only gates the
-   *  busy mark. */
-  onQuickAdd: (cwd: string, agent: AgentId) => Promise<void>;
+   *  busy mark. Answers the new session's id, or null when it didn't start. */
+  onQuickAdd: (cwd: string, agent: AgentId) => Promise<string | null>;
   /** Per-agent CLI gate: rows gate their Resume/Fork on their own agent; the folder "+" and agent
    *  picker stay usable as long as ANY agent can spawn. */
   canSpawnFor: (agent: AgentId) => boolean;
@@ -110,7 +138,17 @@ export function LeftSidebar({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // Fork: open/closed by hand, persisted; see DISCLOSURE_STORAGE_KEY.
+  const [disclosure, setDisclosureState] =
+    useState<Record<string, boolean>>(loadDisclosure);
+  const setDisclosure = (
+    update: (current: Record<string, boolean>) => Record<string, boolean>,
+  ) =>
+    setDisclosureState((current) => {
+      const next = update(current);
+      saveDisclosure(next);
+      return next;
+    });
   // Explicit per-parent overrides only. Families default collapsed and expand only from their
   // chevron; search and selection never change disclosure state implicitly.
   const [collapsedFamilies, setCollapsedFamilies] = useState<
@@ -140,6 +178,7 @@ export function LeftSidebar({
   // differs. filterGroups applies search + preferences together and retains ancestor context.
   // Fork feature: group by product card instead of folder when chosen (and cards are present).
   const products = useContext(ProductsContext);
+  const refreshProducts = useContext(ProductsRefreshContext);
   const byProduct = preferences.grouping !== "folder" && !!products;
   const groups = filterGroups(
     byProduct && products
@@ -183,19 +222,18 @@ export function LeftSidebar({
     hiddenProjects,
   );
   const hiddenCount = hiddenProjects.length;
+  // A group folds by default once nothing in it is live; while searching every match shows.
+  const isCollapsed = (g: (typeof groups)[number]): boolean =>
+    disclosure[g.key] ?? (capFolders && activeSessionCount(g.sessions) === 0);
+  const waiting = waitingSessions(searched);
   const allCollapsed =
-    collapsibleGroups.length > 0 &&
-    collapsibleGroups.every((g) => collapsed.has(g.key));
-  const toggleGroup = (key: string) => {
-    const expanding = collapsed.has(key);
+    collapsibleGroups.length > 0 && collapsibleGroups.every(isCollapsed);
+  const toggleGroup = (g: (typeof groups)[number]) => {
+    const key = g.key;
+    const expanding = isCollapsed(g);
     // Ephemeral by design (issue #431): an Older disclosure closes with its folder.
     if (!expanding) setOlderLimit(key, undefined);
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setDisclosure((current) => ({ ...current, [key]: !expanding }));
     setManuallyExpanded((prev) => {
       const next = new Set(prev);
       if (expanding) next.add(key);
@@ -212,14 +250,16 @@ export function LeftSidebar({
     if (quickAdding.has(key)) return;
     saveLastAgent(window.localStorage, agent);
     setQuickAdding((prev) => new Set(prev).add(key));
-    setCollapsed((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
+    setDisclosure((current) => ({ ...current, [key]: false }));
     try {
-      await onQuickAdd(cwd, agent);
+      const id = await onQuickAdd(cwd, agent);
+      // A session started from a topic group belongs to that topic from its first row (fork).
+      const topic = groups.find((g) => g.key === key)?.productKey;
+      if (id && topic)
+        void window.api
+          .assignSessionTopic(id, topic)
+          .then((next) => refreshProducts(next))
+          .catch(() => undefined);
     } finally {
       setQuickAdding((prev) => {
         const next = new Set(prev);
@@ -432,7 +472,8 @@ export function LeftSidebar({
       <div key={g.key}>
         <ProjectGroupRow
           group={g}
-          collapsed={collapsed.has(g.key)}
+          collapsed={isCollapsed(g)}
+          sessionCount={countFamilySessions(sessionForest(g.sessions))}
           placement={placement}
           activeCount={activeCount}
           activeSessionsBadge={t.shell.sidebar.activeSessionsBadge(activeCount)}
@@ -448,7 +489,7 @@ export function LeftSidebar({
           projectActionsLabel={t.shell.sidebar.projectActions}
           absolutePathLabel={t.shell.sidebar.absolutePath}
           copyPathLabel={t.shell.sidebar.copyPath}
-          onToggle={() => toggleGroup(g.key)}
+          onToggle={() => toggleGroup(g)}
           onQuickAdd={() => {
             if (!cwd) return;
             // One click spawns; the agent comes from the last spawn (issue #420). Switching
@@ -480,7 +521,7 @@ export function LeftSidebar({
           }
           onSetPlacement={(next) => onSetProjectPlacement(g.key, next)}
         />
-        {!collapsed.has(g.key) && (
+        {!isCollapsed(g) && (
           <>
             {visible.length === 0 ? (
               manuallyExpanded.has(g.key) && (
@@ -633,6 +674,39 @@ export function LeftSidebar({
         </div>
 
         <OverlayScroll className="min-h-0 flex-1" contentClassName="pb-2">
+          {/* Fork (2026-11-01): what waits on you — a permission prompt or a question — sits above
+            everything else, the only place the amber state shows as a list. The rows stay in their
+            groups too, so a session never loses its place. */}
+          {waiting.length > 0 && (
+            <div>
+              <div className="sticky top-0 z-10 flex items-center bg-(--ui-sidebar-surface-background) px-2.5 pb-1 pt-1.5">
+                <SidebarPanelLabel className="pl-2 text-accent">
+                  {t.shell.sidebar.waitingLabel(waiting.length)}
+                </SidebarPanelLabel>
+              </div>
+              <div className="flex flex-col gap-px px-2.5 pb-1">
+                {waiting.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    session={s}
+                    selected={s.id === selectedId}
+                    onSelect={() => onSelect(s.id)}
+                    canSpawn={canSpawnFor(s.agent)}
+                    onResume={onResume}
+                    onFork={onFork}
+                    onEnd={onEnd}
+                    onRename={onRename}
+                    onTogglePin={onTogglePin}
+                    showAgentIcon={preferences.showAgentIcons}
+                    depth={0}
+                    descendantCount={0}
+                    activeDescendantCount={0}
+                    childrenExpanded={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             {/* Fork: an empty Pinned section is hidden rather than spending two rows saying so. */}
             {pinned.length > 0 && (
@@ -671,9 +745,12 @@ export function LeftSidebar({
                   type="button"
                   onClick={() => {
                     // Expand-all is NOT a manual expand: empty folders open silently, no empty-state line.
-                    setCollapsed((current) =>
-                      toggleProjectGroups(current, collapsibleGroups),
-                    );
+                    setDisclosure((current) => {
+                      const next = { ...current };
+                      for (const g of collapsibleGroups)
+                        next[g.key] = !allCollapsed;
+                      return next;
+                    });
                     if (!allCollapsed) {
                       setManuallyExpanded(new Set());
                       // Collapsing every folder ends every Older errand, same as closing one by hand.
@@ -742,37 +819,40 @@ export function LeftSidebar({
               </div>
             </div>
           </div>
-          <div className="px-2.5">
-            <div className="mx-2 mt-1 border-t border-sidebar-border" />
-            <button
-              type="button"
-              onClick={() => setHiddenCollapsed((value) => !value)}
-              aria-expanded={!hiddenCollapsed}
-              className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-fg-dim hover:bg-(--ui-row-hover-background) hover:text-fg"
-            >
-              <span className="text-tiny font-semibold uppercase tracking-[0.12em]">
-                {t.shell.sidebar.hiddenLabel}
-              </span>
-              <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-tiny tabular-nums">
-                {hiddenCount}
-              </span>
-              <Icon
-                name={hiddenCollapsed ? "chevron-right" : "chevron-down"}
-                size={12}
-              />
-            </button>
-            {!hiddenCollapsed && (
-              <div className="flex flex-col gap-px">
-                {hiddenProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-aux text-fg-dim">
-                    {t.shell.sidebar.noHiddenProjects}
-                  </p>
-                ) : (
-                  hiddenProjects.map((g) => renderProjectGroup(g, "hidden"))
-                )}
-              </div>
-            )}
-          </div>
+          {/* Fork: with nothing hidden the section is noise. */}
+          {hiddenCount > 0 && (
+            <div className="px-2.5">
+              <div className="mx-2 mt-1 border-t border-sidebar-border" />
+              <button
+                type="button"
+                onClick={() => setHiddenCollapsed((value) => !value)}
+                aria-expanded={!hiddenCollapsed}
+                className="mt-1 flex h-6 w-full items-center gap-1 rounded-sm pl-2 text-fg-dim hover:bg-(--ui-row-hover-background) hover:text-fg"
+              >
+                <span className="text-tiny font-semibold uppercase tracking-[0.12em]">
+                  {t.shell.sidebar.hiddenLabel}
+                </span>
+                <span className="rounded-full bg-(--ui-control-active-background) px-1.5 text-tiny tabular-nums">
+                  {hiddenCount}
+                </span>
+                <Icon
+                  name={hiddenCollapsed ? "chevron-right" : "chevron-down"}
+                  size={12}
+                />
+              </button>
+              {!hiddenCollapsed && (
+                <div className="flex flex-col gap-px">
+                  {hiddenProjects.length === 0 ? (
+                    <p className="px-2 py-1 text-aux text-fg-dim">
+                      {t.shell.sidebar.noHiddenProjects}
+                    </p>
+                  ) : (
+                    hiddenProjects.map((g) => renderProjectGroup(g, "hidden"))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </OverlayScroll>
       </div>
       {agentMenu &&

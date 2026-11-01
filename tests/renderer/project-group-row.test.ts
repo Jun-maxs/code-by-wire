@@ -48,7 +48,7 @@ describe("ProjectGroupRow action isolation", () => {
 
   it("badges the chevron with the live-session count only when there is one", () => {
     expect(source).toMatch(
-      /activeCount > 0 && \(\s*<span[\s\S]*?\{activeSessionsBadge\}[\s\S]*?<\/span>\s*\)/,
+      /activeCount > 0 \? \(\s*<span[\s\S]*?\{activeSessionsBadge\}[\s\S]*?<\/span>\s*\)/,
     );
     // Spelled out ("3 live"), never a bare digit that could read as any other total. The words
     // are the accessible name too, so the pill needs no role/aria-label of its own.

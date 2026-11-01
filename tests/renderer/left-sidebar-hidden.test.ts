@@ -12,8 +12,8 @@ describe("LeftSidebar Hidden disclosure", () => {
     expect(source).toContain("const hiddenCount = hiddenProjects.length;");
   });
 
-  it("always renders, independent of hiddenCount, with an empty-state line", () => {
-    expect(source).not.toContain("{hiddenCount > 0 &&");
+  it("renders only when something is hidden (fork), keeping its empty-state line", () => {
+    expect(source).toContain("{hiddenCount > 0 &&");
     expect(source).toContain("t.shell.sidebar.noHiddenProjects");
   });
 

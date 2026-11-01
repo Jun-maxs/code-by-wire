@@ -12,6 +12,8 @@ import {
   filterGroups,
   partitionProjectGroups,
   SESSIONS_PER_FOLDER,
+  isPlaceholderTitle,
+  waitingSessions,
 } from "../../src/renderer/src/shell/session-list-model";
 import type { Session } from "@shared/types";
 
@@ -40,7 +42,7 @@ const mk = (o: Partial<Session>): Session => ({
 });
 
 describe("session list model", () => {
-  it("active (createdMs desc) before ended (lastActivityMs desc)", () => {
+  it("waiting, then working (createdMs desc), then idle and ended (lastActivityMs desc)", () => {
     const a = mk({
       id: "a",
       state: "working",
@@ -59,7 +61,51 @@ describe("session list model", () => {
       createdMs: 50,
       lastActivityMs: 300,
     });
-    expect(sortSessions([a, b, e]).map((s) => s.id)).toEqual(["b", "a", "e"]);
+    const w = mk({
+      id: "w",
+      state: "waiting",
+      createdMs: 10,
+      lastActivityMs: 10,
+    });
+    const i2 = mk({
+      id: "i2",
+      state: "idle",
+      createdMs: 300,
+      lastActivityMs: 120,
+    });
+    expect(sortSessions([a, b, e, w, i2]).map((s) => s.id)).toEqual([
+      "w",
+      "a",
+      "b",
+      "i2",
+      "e",
+    ]);
+  });
+
+  it("groups rank by their most urgent session, then recency", () => {
+    const groups = groupSessionsByProject([
+      mk({ id: "old", cwd: "/old", state: "ended", lastActivityMs: 900 }),
+      mk({ id: "run", cwd: "/run", state: "working", lastActivityMs: 100 }),
+      mk({ id: "ask", cwd: "/ask", state: "waiting", lastActivityMs: 50 }),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["/ask", "/run", "/old"]);
+  });
+
+  it("names placeholder titles", () => {
+    for (const t of ["/model", "hello", "lo", "测试", "继续。"])
+      expect(isPlaceholderTitle(t)).toBe(true);
+    for (const t of ["主题管理页", "Fix auth", "看板页"])
+      expect(isPlaceholderTitle(t)).toBe(false);
+  });
+
+  it("lists waiting sessions newest first", () => {
+    expect(
+      waitingSessions([
+        mk({ id: "a", state: "waiting", lastActivityMs: 1 }),
+        mk({ id: "b", state: "working" }),
+        mk({ id: "c", state: "waiting", lastActivityMs: 2 }),
+      ]).map((s) => s.id),
+    ).toEqual(["c", "a"]);
   });
   it("filters by title/project, case-insensitive", () => {
     const a = mk({ id: "a", title: "Auth", project: "web" });
@@ -113,7 +159,7 @@ describe("session list model", () => {
     expect(pinnedSessions([e]).map((s) => s.id)).toEqual(["e"]);
   });
 
-  it("filterGroups keeps ended sessions and preserves every group while applying the agent filter", () => {
+  it("filterGroups keeps ended sessions and drops a group the agent filter empties", () => {
     const groups = groupSessionsByProject([
       mk({ id: "ac", cwd: "/a", state: "working", agent: "claude" }),
       mk({ id: "ae", cwd: "/a", state: "ended", agent: "claude" }),
@@ -125,13 +171,11 @@ describe("session list model", () => {
       agent: "claude",
     });
 
-    expect(filtered).toHaveLength(groups.length);
-    expect(filtered.map((g) => g.key)).toEqual(groups.map((g) => g.key));
+    expect(filtered.map((g) => g.key)).toEqual(["/a"]);
     // Ended sessions survive: the folder cap, not a filter, decides what the sidebar shows.
     expect(
       filtered.find((g) => g.key === "/a")!.sessions.map((s) => s.id),
     ).toEqual(["ac", "ae"]);
-    expect(filtered.find((g) => g.key === "/b")!.sessions).toEqual([]);
   });
 
   it("a search query narrows to matches and still respects the agent filter", () => {
