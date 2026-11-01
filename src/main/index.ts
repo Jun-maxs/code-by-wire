@@ -61,6 +61,8 @@ import { createSessionTitleStore } from "./session-titles";
 import { createSessionPinStore } from "./session-pins";
 import { createBoardStore } from "./board-store";
 import { createJunAccount } from "./jun-account";
+import { createTopicJudge } from "./topic-judge";
+import { readProducts } from "./products";
 import { createLaunchArgsStore } from "./launch-args";
 import {
   createRemoteSessionStore,
@@ -725,6 +727,13 @@ app
       });
     };
     const caffeinate = createCaffeinate({ blocker: powerSaveBlocker });
+    // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
+    const productsDirs = () => {
+      const cardsDir =
+        process.env.CBW_PRODUCT_CARDS ??
+        "E:/0项目/平台整合规划/workbench/cards";
+      return { cardsDir, stateDir: join(cardsDir, "..", "data", "state") };
+    };
     const { sync, overview } = registerIpc({
       db,
       provider,
@@ -750,13 +759,7 @@ app
       contentSearch,
       board,
       junAccount,
-      productsDirs: () => {
-        // Fork feature: the workbench's product cards (override with CBW_PRODUCT_CARDS).
-        const cardsDir =
-          process.env.CBW_PRODUCT_CARDS ??
-          "E:/0项目/平台整合规划/workbench/cards";
-        return { cardsDir, stateDir: join(cardsDir, "..", "data", "state") };
-      },
+      productsDirs,
       launchPresets,
       projectState,
       updater,
@@ -770,6 +773,26 @@ app
         (sessions) => piProvider.overlaySessions(sessions),
       ],
     });
+
+    // Fork (2026-11-01): signed in, Jun-Code titles sessions and picks their topic itself (Claude Haiku
+    // through the hub account's relay) — see topic-judge.ts. A minute apart; nothing runs signed out.
+    {
+      const dirs = productsDirs();
+      const judge = createTopicJudge({
+        chat: (model, messages) => junAccount.chat(model, messages),
+        signedIn: () => junAccount.status().signedIn,
+        projectsDir: () =>
+          join(process.env.CLAUDE_CONFIG_DIR ?? claudeDir, "projects"),
+        cardsDir: dirs.cardsDir,
+        dataDir: join(dirs.stateDir, ".."),
+        readProducts: () => readProducts(dirs.cardsDir, dirs.stateDir),
+        stateFile: join(app.getPath("userData"), "topic-judge.json"),
+        log: (msg, err) => logError("topic-judge", msg, err),
+      });
+      const run = () => void judge.tick().catch(() => undefined);
+      setTimeout(run, 20_000);
+      setInterval(run, 60_000);
+    }
 
     // One-shot launch check: packaged only, and only when the user hasn't turned it off. Deferred so it
     // never blocks first paint (mirrors the setTimeout'd CLI check). No recurring timer — see the

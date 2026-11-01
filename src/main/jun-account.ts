@@ -182,6 +182,70 @@ export function createJunAccount(opts: {
       });
     },
 
+    /** One model reply through the account's chat relay (zz; its keys stay on the server). The relay
+     *  always streams, so the SSE deltas are joined here. Throws `status: 401` when signed out. */
+    async chat(
+      model: string,
+      messages: { role: "system" | "user"; content: string }[],
+      timeoutMs = 90_000,
+    ): Promise<string> {
+      const res = await doFetch(`${base}/api/chat/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...authed() },
+        body: JSON.stringify({ model, messages, incognito: true }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const text = await res.text();
+      if (!res.ok)
+        throw Object.assign(
+          new Error(`HTTP ${res.status} ${text.slice(0, 200)}`),
+          {
+            status: res.status,
+          },
+        );
+      let out = "";
+      for (const line of text.split("\n")) {
+        const data = line.startsWith("data:") ? line.slice(5).trim() : "";
+        if (!data || data === "[DONE]") continue;
+        try {
+          const chunk = JSON.parse(data) as {
+            choices?: { delta?: { content?: string } }[];
+          };
+          out += chunk.choices?.[0]?.delta?.content ?? "";
+        } catch {
+          // a keep-alive or a partial line: nothing to add
+        }
+      }
+      return out;
+    },
+
+    /** The shared prompt pool (Jun-Code's 共享池): list it, share/update or withdraw one of this
+     *  account's prompts, or note that one was copied. */
+    async shared(
+      action: "list" | "put" | "delete" | "copied",
+      arg?: { pid?: string; id?: string; title?: string; body?: string },
+    ): Promise<unknown> {
+      const pid = encodeURIComponent(arg?.pid ?? "");
+      if (action === "list")
+        return call("/api/prompts/shared", { headers: authed() });
+      if (action === "put")
+        return call(`/api/prompts/shared/${pid}`, {
+          method: "PUT",
+          headers: authed(),
+          body: JSON.stringify({ title: arg?.title, body: arg?.body }),
+        });
+      if (action === "delete")
+        return call(`/api/prompts/shared/${pid}`, {
+          method: "DELETE",
+          headers: authed(),
+        });
+      return call("/api/prompts/copied", {
+        method: "POST",
+        headers: authed(),
+        body: JSON.stringify({ id: arg?.id }),
+      });
+    },
+
     async storePut(key: string, value: unknown): Promise<number> {
       const res = await call<{ updatedAt: number }>(
         `/api/store/${encodeURIComponent(key)}`,

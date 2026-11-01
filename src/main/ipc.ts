@@ -867,6 +867,24 @@ export function registerIpc({
     if (!junAccount) throw new Error("hub account not wired");
     return junAccount.storePut(String(key), value);
   });
+  ipcMain.handle(IPC.junAccountShared, (_e, action: unknown, arg: unknown) => {
+    if (!junAccount) throw new Error("hub account not wired");
+    if (
+      action !== "list" &&
+      action !== "put" &&
+      action !== "delete" &&
+      action !== "copied"
+    )
+      throw new Error("bad action");
+    const a = (arg ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    return junAccount.shared(action, {
+      pid: str(a.pid),
+      id: str(a.id),
+      title: str(a.title),
+      body: str(a.body),
+    });
+  });
   ipcMain.handle(IPC.listSkills, () => listSkills());
   ipcMain.handle(IPC.checkSkill, (_e, name: string) =>
     checkSkill(String(name)),

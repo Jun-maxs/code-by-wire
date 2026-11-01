@@ -59,6 +59,8 @@ const api: AppApi = {
   junAccountStoreGet: (key) => ipcRenderer.invoke(IPC.junAccountStoreGet, key),
   junAccountStorePut: (key, value) =>
     ipcRenderer.invoke(IPC.junAccountStorePut, key, value),
+  junAccountShared: (action, arg) =>
+    ipcRenderer.invoke(IPC.junAccountShared, action, arg),
   testBoardAi: (ai) => ipcRenderer.invoke(IPC.testBoardAi, ai),
   listSkills: () => ipcRenderer.invoke(IPC.listSkills),
   checkSkill: (name) => ipcRenderer.invoke(IPC.checkSkill, name),

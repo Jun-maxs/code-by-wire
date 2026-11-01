@@ -99,6 +99,7 @@ export const IPC = {
   junAccountSignOut: "jun-account:sign-out",
   junAccountStoreGet: "jun-account:store-get",
   junAccountStorePut: "jun-account:store-put",
+  junAccountShared: "jun-account:shared",
   testBoardAi: "board:ai-test",
   listSkills: "skills:list",
   checkSkill: "skills:check",
@@ -432,6 +433,11 @@ export interface IpcApi {
   junAccountStoreGet<T = unknown>(key: string): Promise<JunStoreEntry<T>>;
   /** Write one key; resolves to the server's updatedAt. */
   junAccountStorePut(key: string, value: unknown): Promise<number>;
+  /** The shared prompt pool (共享池); see JunAccount.shared in main. */
+  junAccountShared(
+    action: "list" | "put" | "delete" | "copied",
+    arg?: { pid?: string; id?: string; title?: string; body?: string },
+  ): Promise<unknown>;
   /** Send a tiny prompt through an AI setting (saved or not) to check it answers. */
   testBoardAi(ai: BoardAi): Promise<AiTestResult>;
   /** Skills installed on this machine (every folder merged by name) and Claude Code plugins. */
