@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import type {
@@ -44,6 +45,7 @@ export function Workspace({
   onTogglePin,
   leftEdgeExposed,
   rightEdgeExposed,
+  leading,
 }: {
   session: Session;
   /** Whether the selected session's agent CLI is usable; gates Resume and Fork (both spawn it). */
@@ -60,6 +62,8 @@ export function Workspace({
   leftEdgeExposed: boolean;
   /** Whether the right pane isn't docked — the header clears the fixed right toggle cluster. */
   rightEdgeExposed: boolean;
+  /** Fork (2026-11-02): the header's Single ⇄ Split switch. */
+  leading?: ReactNode;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
@@ -101,6 +105,7 @@ export function Workspace({
         drilled={drill.length > 0}
         leftEdgeExposed={leftEdgeExposed}
         rightEdgeExposed={rightEdgeExposed}
+        leading={leading}
         menu={
           <SessionMenu
             session={s}
@@ -381,8 +386,9 @@ function CenterView({
   );
 }
 
-/** The scrolling transcript, shared by the Observed center and the Transcript side of the toggle. */
-function RenderedTranscript({
+/** The scrolling transcript, shared by the Observed center and the Transcript side of the toggle
+ *  (and each split-view pane's transcript side). */
+export function RenderedTranscript({
   session: s,
   doc,
   dispatchDrill,

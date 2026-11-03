@@ -13,8 +13,17 @@ import {
  * lays it out, and reports the new size to the pty. On unmount it DETACHES the wrapper (never disposes), so
  * returning to the session restores its full scrollback — the whole point of the store.
  */
-export function TerminalView({ sessionId }: { sessionId: string }) {
+export function TerminalView({
+  sessionId,
+  autoFocus = true,
+}: {
+  sessionId: string;
+  /** Focus the terminal when it mounts. Split view passes false for every pane but the focused one. */
+  autoFocus?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoFocusRef = useRef(autoFocus);
+  autoFocusRef.current = autoFocus;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -72,7 +81,7 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
       }
       sync();
       scheduleSync(); // re-run next frame in case the flex layout hasn't settled
-      handle.term.focus();
+      if (autoFocusRef.current) handle.term.focus();
     };
     if (!handle.opened) {
       // First open: warm the WebGL atlas's faces (and the font probe) before xterm

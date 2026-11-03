@@ -148,6 +148,7 @@ import type { ManagedRegistry } from "./managed-registry";
 import { AGENT_PROBES } from "./cli-status";
 import type { ContentSearch } from "./content-search";
 import type { JunAccount } from "./jun-account";
+import { readTurnActivity } from "./turn-activity";
 
 export interface IpcDeps {
   /** Fork: full-text index over session transcripts (sidebar search by content). */
@@ -991,6 +992,11 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.readTasks, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTasks(id, sinceMtimeMs),
+  );
+  ipcMain.handle(
+    IPC.readTurnActivity,
+    (_e, id: string, sinceMtimeMs?: number) =>
+      readTurnActivity(provider.resolveTranscriptPath(id), sinceMtimeMs),
   );
   ipcMain.handle(IPC.readShells, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readShells(id, sinceMtimeMs),

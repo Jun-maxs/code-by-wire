@@ -561,6 +561,20 @@ body {
   animation: bar-sweep 1s ease-in-out infinite alternate;
 }
 
+/* Fork (2026-11-02): the split-view strip's working state — a segment gliding along the track, so
+   unknown progress never reads as a full bar. */
+@keyframes strip-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(290%);
+  }
+}
+.animate-strip-slide {
+  animation: strip-slide 2.4s ease-in-out infinite;
+}
+
 @keyframes blink {
   0%,
   49% {

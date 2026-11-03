@@ -8,6 +8,7 @@
 export type IconName =
   | "activity"
   | "archive"
+  | "app-window"
   | "arrow-up-right"
   | "bot"
   | "chart-column"
@@ -37,7 +38,9 @@ export type IconName =
   | "globe"
   | "id-card"
   | "info"
+  | "layout-grid"
   | "loader-circle"
+  | "maximize"
   | "monitor"
   | "moon"
   | "palette"

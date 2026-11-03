@@ -29,6 +29,18 @@ import { applyTitleOverrides } from "@shared/title-override";
 import { isUpdatePending } from "@shared/update";
 import { useI18n } from "./i18n";
 import { Workspace } from "./workspace/Workspace";
+import { SplitWorkspace } from "./workspace/SplitWorkspace";
+import {
+  $split,
+  enterSplit,
+  neighborAfterRemove,
+  placeInSplit,
+  pruneSplit,
+  renameInSplit,
+  sessionDisplayTitle,
+  splitCandidates,
+} from "./shell/split-view";
+import { ViewModeSwitch } from "./shell/SplitControls";
 import { useMetrics } from "./workspace/use-metrics";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { spawnGateFor } from "./ui/cli-gating";
@@ -244,6 +256,8 @@ export function App() {
   useEffect(() => {
     return window.api.terminal.onRename((from, to) => {
       terminalStore.rename(from, to);
+      const split = $split.get();
+      $split.set({ ...split, ids: renameInSplit(split.ids, from, to) });
       setSessions((ss) => renameManaged(ss, from, to));
       setDrafts((ds) => renameManaged(ds, from, to));
       setResuming((prev) => renameResuming(prev, from, to));
@@ -537,6 +551,60 @@ export function App() {
     () => ({ sessions: all, select: (id: string) => setSelectedId(id) }),
     [all, setSelectedId],
   );
+
+  // Fork (2026-11-02): split view. While split, whichever session gets selected joins the grid
+  // (taking the previously focused pane's place once six are open); the grid shown this render
+  // already includes it, so the header and panes never disagree for a frame.
+  const split = useStore($split);
+  const prevSessionRef = useRef<string | null>(null);
+  const splitOn = split.mode === "split" && selected != null;
+  const gridIds =
+    splitOn && selected
+      ? placeInSplit(split.ids, selected.id, prevSessionRef.current)
+      : split.ids;
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const prev = prevSessionRef.current;
+    prevSessionRef.current = selectedSessionId;
+    const cur = $split.get();
+    if (cur.mode !== "split") return;
+    const next = placeInSplit(cur.ids, selectedSessionId, prev);
+    if (next !== cur.ids) $split.set({ ...cur, ids: next });
+  }, [selectedSessionId]);
+  const gridKey = gridIds.join(",");
+  const candidates = useMemo(
+    () => splitCandidates(all, gridIds),
+    // gridIds is rebuilt each render; its joined key is the stable identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [all, gridKey],
+  );
+  function showSplit(): void {
+    if (!selected) return;
+    $split.set({
+      mode: "split",
+      ids: enterSplit($split.get().ids, selected.id, all),
+    });
+  }
+  function showSingle(id?: string): void {
+    if (id) setSelectedId(id);
+    $split.set({ ...$split.get(), mode: "single" });
+  }
+  // A new session from the split view starts in the focused pane's folder (as the sidebar's
+  // folder "+" does), with its agent.
+  const newSessionDir = selected?.repoRoot ?? selected?.cwd;
+  const newSessionLabel = t.shell.split.newSession(
+    selected?.repoLabel ?? newSessionDir ?? "",
+  );
+  function newSessionInSplit(): void {
+    if (selected && newSessionDir)
+      void quickAddSession(newSessionDir, selected.agent);
+  }
+  function removeFromSplit(id: string): void {
+    const cur = $split.get();
+    if (cur.ids.length <= 1) return;
+    if (selectedId === id) setSelectedId(neighborAfterRemove(cur.ids, id));
+    $split.set({ ...cur, ids: cur.ids.filter((x) => x !== id) });
+  }
   const route = selectedId ?? "";
 
   const narrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
@@ -558,6 +626,13 @@ export function App() {
   // empties. Keyed on the id list so it can't loop on a fresh `all` each render; setting the same id is
   // a no-op.
   const ids = useMemo(() => all.map((s) => s.id).join(","), [all]);
+  useEffect(() => {
+    if (all.length === 0) return;
+    const cur = $split.get();
+    const kept = pruneSplit(cur.ids, new Set(all.map((s) => s.id)));
+    if (kept !== cur.ids)
+      $split.set({ mode: kept.length ? cur.mode : "single", ids: kept });
+  }, [ids]);
   useEffect(() => {
     if (all.length === 0) {
       // The pinned views (Overview, Settings) are valid even with no sessions (Overview shows the empty
@@ -582,6 +657,20 @@ export function App() {
   }, [selected?.cwd]);
 
   useEffect(() => installTerminalKeybind(), []);
+
+  const viewSwitch = (
+    <ViewModeSwitch
+      mode={splitOn ? "split" : "single"}
+      count={gridIds.length}
+      candidates={candidates}
+      onSingle={() => showSingle()}
+      onSplit={showSplit}
+      onAdd={setSelectedId}
+      onNewSession={newSessionInSplit}
+      newSessionLabel={newSessionLabel}
+      activeTitle={selected ? sessionDisplayTitle(selected, t) : ""}
+    />
+  );
 
   // The middle column's content, keyed on the current route: the inline new-session form, the
   // pinned Overview/Settings views (each wrapped in `MiddleNonSession` for its own plain-title
@@ -634,9 +723,33 @@ export function App() {
         update={update}
       />
     </MiddleNonSession>
+  ) : selected && splitOn ? (
+    <SplitWorkspace
+      panes={gridIds
+        .map((id) => all.find((s) => s.id === id))
+        .filter((s): s is Session => s !== undefined)}
+      active={selected}
+      candidates={candidates}
+      onNewSession={newSessionInSplit}
+      newSessionLabel={newSessionLabel}
+      leading={viewSwitch}
+      canSpawnFor={(s) => spawnGateFor(cliStatus, s.agent).canSpawn}
+      onActivate={setSelectedId}
+      onRemove={removeFromSplit}
+      onMaximize={showSingle}
+      onAdd={setSelectedId}
+      onResume={resumeSession}
+      onFork={forkSession}
+      onEnd={endSession}
+      onRename={(id, title) => void renameSession(id, title)}
+      onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
+      leftEdgeExposed={leftEdgeExposed}
+      rightEdgeExposed={rightEdgeExposed}
+    />
   ) : selected ? (
     <Workspace
       key={selected.id}
+      leading={viewSwitch}
       session={selected}
       canSpawn={spawnGateFor(cliStatus, selected.agent).canSpawn}
       onResume={resumeSession}

@@ -1,4 +1,5 @@
 import type { TrashResult } from "./session-trash";
+import type { TurnActivity } from "./turn-activity";
 import type {
   SessionCleanupSettings,
   SessionCleanupView,
@@ -59,6 +60,7 @@ export const IPC = {
   readTranscript: "transcript:read",
   readSubagentTranscript: "subagentTranscript:read",
   readTasks: "tasks:read",
+  readTurnActivity: "turnActivity:read",
   readShells: "shells:read",
   readShellOutput: "shellOutput:read",
   readMonitors: "monitors:read",
@@ -222,6 +224,11 @@ export type TaskRead =
   | { status: "changed"; mtimeMs: number; tasks: Task[] }
   | ReadSettled;
 
+/** Fork (2026-11-02): the current turn's activity, from the transcript tail (split-view panes). */
+export type TurnActivityRead =
+  | { status: "changed"; mtimeMs: number; activity: TurnActivity }
+  | ReadSettled;
+
 /** The result of a background-shells list read: the session's shells with a change token, or a shared
  *  settled outcome. The list omits each shell's output path; the log is read separately via readShellOutput. */
 export type ShellsRead =
@@ -312,6 +319,11 @@ export interface IpcApi {
   /** Read one session's task list from ~/.claude/tasks/<id>/. `sinceMtimeMs` is the change token from
    *  the caller's last read; when it still matches, the result is `unchanged`. */
   readTasks(id: string, sinceMtimeMs?: number): Promise<TaskRead>;
+  /** Fork: what the session's current turn is doing (prompt time, tool calls, the last one). */
+  readTurnActivity(
+    id: string,
+    sinceMtimeMs?: number,
+  ): Promise<TurnActivityRead>;
   /** List one session's background shells (compact metadata for the dock). `sinceMtimeMs` is the change
    *  token; an unchanged transcript skips the read. */
   readShells(id: string, sinceMtimeMs?: number): Promise<ShellsRead>;

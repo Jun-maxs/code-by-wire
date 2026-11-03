@@ -35,6 +35,8 @@ export function MiddleHeader({
   leftEdgeExposed,
   rightEdgeExposed,
   menu,
+  leading,
+  split = false,
 }: {
   title: string;
   session: Session | null;
@@ -53,6 +55,11 @@ export function MiddleHeader({
    *  otherwise). */
   rightEdgeExposed: boolean;
   menu: ReactNode;
+  /** Fork (2026-11-02): the Single ⇄ Split layout switch, at the very left of a session header. */
+  leading?: ReactNode;
+  /** Split view: each pane carries its own terminal ⇄ transcript toggle and the grid already shows
+   *  the other sessions, so the header drops its view switch and topic tabs. */
+  split?: boolean;
 }) {
   const { t } = useI18n();
   const isMac = isMacPlatform(window.api.platform);
@@ -69,10 +76,11 @@ export function MiddleHeader({
   // --ui-chat-surface-background, so fading to transparent there is already correct. Mirrors
   // Workspace.tsx's own hasLiveTerminal check (management === "managed" && state !== "ended").
   const terminalBelow =
-    !transcriptOn &&
-    session !== null &&
-    session.management === "managed" &&
-    session.state !== "ended";
+    split ||
+    (!transcriptOn &&
+      session !== null &&
+      session.management === "managed" &&
+      session.state !== "ended");
 
   return (
     <>
@@ -85,9 +93,10 @@ export function MiddleHeader({
       >
         {session ? (
           <>
+            {leading}
             {menu}
             <TaskChip sessionId={session.id} />
-            <SiblingTabs session={session} />
+            {!split && <SiblingTabs session={session} />}
           </>
         ) : (
           <span className="truncate text-aux font-medium leading-none text-fg-muted">
@@ -95,7 +104,7 @@ export function MiddleHeader({
           </span>
         )}
         <div className="no-drag ml-auto flex items-center gap-2">
-          {session && (
+          {session && !split && (
             <div
               role="group"
               aria-label={t.shell.middleHeader.viewGroupLabel}
@@ -145,7 +154,7 @@ export function MiddleHeader({
  *  Active gets the control-active fill; inactive is quiet text that brightens on hover. Clicking
  *  the active segment is a no-op (the caller's `onSelect` guard). `disabled` (with a `title`
  *  tooltip) is for a Transcript segment on an agent with no transcript capability. */
-function ViewSegment({
+export function ViewSegment({
   icon,
   label,
   active,

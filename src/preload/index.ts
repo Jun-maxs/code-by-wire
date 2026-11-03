@@ -134,6 +134,8 @@ const api: AppApi = {
     ),
   readTasks: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTasks, id, sinceMtimeMs),
+  readTurnActivity: (id, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readTurnActivity, id, sinceMtimeMs),
   readShells: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readShells, id, sinceMtimeMs),
   readShellOutput: (id, shellId, sinceMtimeMs) =>
