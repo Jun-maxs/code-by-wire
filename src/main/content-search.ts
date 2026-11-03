@@ -10,10 +10,15 @@ import { extractText } from "./content-text";
  * The index keeps the words people read (prompts, replies, the paths/commands/URLs a tool was given),
  * never tool output, so it stays a small fraction of the multi-gigabyte transcripts. It lives in its own
  * SQLite file with an FTS5 trigram table (CJK-friendly substring search). Files are read incrementally
- * from the last indexed byte, a few megabytes per step on a timer, so the main thread never stalls.
+ * from the last indexed byte in small steps on a timer, each cut off after STEP_MS, so the main thread
+ * never stalls: 2 MB steps (parse + trigram insert) held it for most of a second once a minute
+ * (measured 2026-11-03).
  */
 
-const STEP_BYTES = 2 * 1024 * 1024;
+const STEP_BYTES = 256 * 1024;
+/** A line longer than this is a pasted image or a huge tool result, never prose: skipped unread. */
+const LONG_LINE_BYTES = 2 * 1024 * 1024;
+const STEP_MS = 25;
 const STEP_DELAY_MS = 60;
 const IDLE_RECHECK_MS = 60_000;
 
@@ -73,8 +78,13 @@ export function createContentSearch(dbPath: string): ContentSearch {
   function step(): void {
     timer = null;
     if (closed) return;
+    const started = performance.now();
     let budget = STEP_BYTES;
-    while (budget > 0 && queue.length > 0) {
+    while (
+      budget > 0 &&
+      queue.length > 0 &&
+      performance.now() - started < STEP_MS
+    ) {
       const f = queue[0];
       const used = indexSome(f, budget);
       if (used < 0) queue.shift();
@@ -119,10 +129,14 @@ export function createContentSearch(dbPath: string): ContentSearch {
     } finally {
       closeSync(fd);
     }
-    // Only whole lines: stop at the last newline (a single line longer than the budget is taken whole).
+    // Only whole lines: stop at the last newline. A line longer than the budget is read whole in one
+    // step of its own, unless it is longer than LONG_LINE_BYTES.
     let end = buf.lastIndexOf(0x0a);
     if (end < 0) {
-      if (offset + len < st.size) return indexLongLine(f, offset, st);
+      if (offset + len < st.size) {
+        if (len >= LONG_LINE_BYTES) return indexLongLine(f, offset, st);
+        return indexSome(f, LONG_LINE_BYTES);
+      }
       end = len - 1;
     }
     const text = buf.subarray(0, end + 1).toString("utf8");
@@ -134,7 +148,7 @@ export function createContentSearch(dbPath: string): ContentSearch {
     return end + 1;
   }
 
-  /** A line bigger than one step (a pasted image, a huge tool result): skip it — it is never prose. */
+  /** A line bigger than LONG_LINE_BYTES (a pasted image, a huge tool result): skip it — it is never prose. */
   function indexLongLine(
     f: Tracked,
     offset: number,
