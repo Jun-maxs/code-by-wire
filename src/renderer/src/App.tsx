@@ -84,6 +84,8 @@ import { $activeSessionCwd, $terminalTakeover } from "./shell-terminal/store";
 import { UpdateDialog } from "./settings/UpdateDialog";
 import { SessionNavContext } from "./shell/session-nav";
 import { CONTINUE_ON_ACCOUNT_EVENT } from "./settings/ClaudeAccounts";
+import { $accounts } from "./settings/accounts-store";
+import { useSmartAccountSwitch } from "./settings/use-smart-account-switch";
 
 /** The middle column's sentinel for the inline new-session view (design spec §5), alongside
  *  `OVERVIEW_ID`/`SETTINGS_ID`: not a real session id (real ids come from `newSessionId()`, which
@@ -161,6 +163,7 @@ export function App() {
   function applyOverview(o: OverviewData): void {
     setSessions(o.sessions);
     setAccount(o.account);
+    $accounts.set(o.accounts ?? null);
     setCliStatus(o.cliStatus);
     setHomeDir(o.homeDir);
     setProjectState(o.projectState);
@@ -335,7 +338,10 @@ export function App() {
   // Resume an Ended session: resume it in-app under its own id. Stand the terminal up first (so the first
   // resume bytes land on a live handle), then optimistically mark it resuming — management flips to
   // Managed and the workspace swaps to the live terminal — until the next sync confirms it.
-  async function resumeSession(id: string): Promise<void> {
+  async function resumeSession(
+    id: string,
+    opts?: { select?: boolean },
+  ): Promise<void> {
     const agent = all.find((x) => x.id === id)?.agent ?? "claude";
     const gate = spawnGateFor(cliStatus, agent);
     if (!gate.canSpawn)
@@ -369,7 +375,7 @@ export function App() {
       // revived row now reads alive, which pruneEnding never clears (it only drops on Ended). Drop the stale
       // override here, or it would pin this now-live session to a phantom Ended for the rest of the run.
       setEnding((prev) => dropEnding(prev, id));
-      setSelectedId(id);
+      if (opts?.select !== false) setSelectedId(id);
     } catch (e) {
       terminalStore.dispose(id); // resume refused or failed → nothing will feed this handle; don't leak it
       setResuming((prev) => dropResuming(prev, id)); // and drop the optimistic override we set above
@@ -404,7 +410,11 @@ export function App() {
         done = true;
         off();
         clearTimeout(timer);
-        void sessionActions.current.resumeSession(id).catch(() => undefined);
+        // Stay where the user is: the session is either already open (the popover) or being moved
+        // in the background by smart switching.
+        void sessionActions.current
+          .resumeSession(id, { select: false })
+          .catch(() => undefined);
       };
       const off = window.api.terminal.onExit((exited) => {
         if (exited === id) resume();
@@ -572,6 +582,11 @@ export function App() {
     if (next !== cur.ids) $split.set({ ...cur, ids: next });
   }, [selectedSessionId]);
   const gridKey = gridIds.join(",");
+  const splitPanes = gridIds
+    .map((id) => all.find((s) => s.id === id))
+    .filter((s): s is Session => s !== undefined);
+  // Smart account switching: the sessions on screen are moved more cautiously.
+  useSmartAccountSwitch(splitOn ? gridIds : selected ? [selected.id] : []);
   const candidates = useMemo(
     () => splitCandidates(all, gridIds),
     // gridIds is rebuilt each render; its joined key is the stable identity.
@@ -725,9 +740,7 @@ export function App() {
     </MiddleNonSession>
   ) : selected && splitOn ? (
     <SplitWorkspace
-      panes={gridIds
-        .map((id) => all.find((s) => s.id === id))
-        .filter((s): s is Session => s !== undefined)}
+      panes={splitPanes}
       active={selected}
       candidates={candidates}
       onNewSession={newSessionInSplit}
@@ -868,6 +881,11 @@ export function App() {
                     session={selected}
                     metrics={metrics}
                     account={account}
+                    split={
+                      splitOn
+                        ? { panes: splitPanes, onActivate: setSelectedId }
+                        : undefined
+                    }
                   />
                 )}
               </Pane>

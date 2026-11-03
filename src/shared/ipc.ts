@@ -1,3 +1,8 @@
+import type {
+  AccountsOverview,
+  MoveCandidate,
+  SmartSwitchPrefs,
+} from "./account-switch";
 import type { TrashResult } from "./session-trash";
 import type { TurnActivity } from "./turn-activity";
 import type {
@@ -141,6 +146,9 @@ export const IPC = {
   claudeAccountsBind: "claudeAccounts:bind",
   claudeAccountsAdd: "claudeAccounts:add",
   claudeAccountsRemove: "claudeAccounts:remove",
+  accountSwitchTick: "accountSwitch:tick",
+  accountSwitchSetPrefs: "accountSwitch:setPrefs",
+  accountSwitchMoved: "accountSwitch:moved",
   hudSettingsSet: "hud:settingsSet",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
@@ -216,6 +224,16 @@ export interface OverviewData extends IndexOverview {
   /** The user's home directory (os.homedir()), for ~-abbreviating paths in the renderer (the
    *  sidebar's group hints). Rides the overview so no separate IPC round trip is needed. */
   homeDir: string;
+  /** Fork (2026-11-03): the reclaude accounts with their 5h / 7d windows and the smart switch state;
+   *  null without reclaude bindings. */
+  accounts?: AccountsOverview | null;
+}
+
+/** Fork (2026-11-03): the smart switch's periodic answer — the accounts, and the idle sessions still
+ *  on a full account (the renderer decides which of them to move now). */
+export interface AccountSwitchTick {
+  accounts: AccountsOverview | null;
+  candidates: MoveCandidate[];
 }
 
 /** The result of an on-demand tasks read: a fresh list with a change token the caller echoes back as
@@ -555,6 +573,13 @@ export interface IpcApi {
   addClaudeAccount(): Promise<ClaudeAccountsView>;
   /** Remove a binding that isn't the default (`reclaude logout --org`); answers with the new list. */
   removeClaudeAccount(id: string): Promise<ClaudeAccountsView>;
+  /** Smart account switching: switch the default when due; the accounts and the sessions to move. */
+  accountSwitchTick(): Promise<AccountSwitchTick>;
+  setAccountSwitchPrefs(
+    prefs: SmartSwitchPrefs,
+  ): Promise<AccountsOverview | null>;
+  /** A session was ended and resumed on the new default account. */
+  accountSwitchMoved(): Promise<void>;
   /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
   setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ClaudeAccountsView, ClaudeOrg } from "@shared/ipc";
 import type { Session } from "@shared/types";
@@ -6,6 +6,9 @@ import { Card } from "../shell/page-primitives";
 import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
 import { useI18n } from "../i18n";
+import { useStore } from "@nanostores/react";
+import { $accounts } from "./accounts-store";
+import { AccountBadge, quotaSummary, SmartSwitchControl } from "./AccountBadge";
 
 /** reclaude's bindings and the switch/bind/add/remove actions, shared by the Settings card and the
  *  Pressure panel's popover. Reads the list when mounted; every action answers with the new list.
@@ -16,9 +19,14 @@ function useClaudeAccounts() {
   const [view, setView] = useState<ClaudeAccountsView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Read again whenever the default account changes underneath (smart switching, fork 2026-11-03),
+  // so "in use" never points at the account just switched away from.
+  const currentDevice = useStore($accounts)?.accounts.find(
+    (q) => q.current,
+  )?.deviceId;
   useEffect(() => {
     void window.api.listClaudeAccounts().then(setView);
-  }, []);
+  }, [currentDevice]);
   const act = async (
     key: string,
     call: () => Promise<ClaudeAccountsView>,
@@ -69,6 +77,12 @@ function AccountList({
   const { t } = useI18n();
   const a = t.settings.accounts;
   const { view, busy, notice, use, bind, add, remove } = useClaudeAccounts();
+  // Fork (2026-11-03): each bound account's badge and 5h / 7d use, once there are two to tell apart.
+  const quotas = useStore($accounts);
+  const quotaOf = (org: ClaudeOrg) =>
+    quotas && quotas.accounts.length >= 2 && org.deviceId
+      ? quotas.accounts.find((q) => q.deviceId === org.deviceId)
+      : undefined;
   // The row whose removal waits for a second click.
   const [confirming, setConfirming] = useState<string | null>(null);
   if (!view)
@@ -86,15 +100,24 @@ function AccountList({
           className={cx(
             "flex items-center justify-between gap-3",
             compact ? "rounded-md px-2 py-1.5" : "px-4 py-3",
-            org.current && compact && "bg-(--ui-row-active-background)",
+            org.current && compact && "bg-(--ui-row-hover-background)",
           )}
         >
-          <div className="min-w-0">
-            <div className="truncate text-body text-fg">
-              {org.email || org.name}
-            </div>
-            <div className="truncate text-meta text-fg-faint">
-              {[org.name, org.kind, `#${org.id}`].filter(Boolean).join(" · ")}
+          <div className="flex min-w-0 items-start gap-2">
+            {quotaOf(org) && (
+              <AccountBadge account={quotaOf(org)!} className="mt-[3px]" />
+            )}
+            <div className="min-w-0">
+              <div className="truncate text-body text-fg">
+                {org.email || org.name}
+              </div>
+              <div className="truncate text-meta text-fg-faint">
+                {quotaOf(org)
+                  ? quotaSummary(quotaOf(org)!, t)
+                  : [org.name, org.kind, `#${org.id}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+              </div>
             </div>
           </div>
           {org.current ? (
@@ -167,6 +190,17 @@ function AccountList({
           {a.failed(view.error)}
         </div>
       )}
+      {quotas && quotas.accounts.length >= 2 && (
+        <div
+          className={cx(
+            compact
+              ? "mx-1 mt-1 border-t border-ink-850 px-1 pt-1"
+              : "border-t border-ink-800",
+          )}
+        >
+          <SmartSwitchControl full={!compact} />
+        </div>
+      )}
       {session?.accountDevice &&
         (() => {
           // A switch reaches new and resumed sessions only; say where this one runs, and offer to
@@ -189,7 +223,14 @@ function AccountList({
                   : "border-transparent text-fg-faint",
               )}
             >
-              {a.sessionOn(runsOn ? runsOn.email || runsOn.name : "?")}
+              <span className="flex min-w-0 items-center gap-1.5">
+                {runsOn && quotaOf(runsOn) && (
+                  <AccountBadge account={quotaOf(runsOn)!} />
+                )}
+                <span className="min-w-0 truncate">
+                  {a.sessionOn(runsOn ? runsOn.email || runsOn.name : "?")}
+                </span>
+              </span>
               {stale && (
                 <>
                   <div className="mt-0.5 text-fg-faint">
@@ -219,14 +260,16 @@ function AccountList({
             </div>
           );
         })()}
-      <div
-        className={cx(
-          "text-meta text-fg-faint",
-          compact ? "px-2 pt-1 pb-1" : "border-t border-ink-800 px-4 py-3",
-        )}
-      >
-        {confirming ? a.removeNote : (notice ?? a.note)}
-      </div>
+      {(!compact || confirming || notice) && (
+        <div
+          className={cx(
+            "text-meta text-fg-faint",
+            compact ? "px-2 pt-1 pb-1" : "border-t border-ink-800 px-4 py-3",
+          )}
+        >
+          {confirming ? a.removeNote : (notice ?? a.note)}
+        </div>
+      )}
     </div>
   );
 }
@@ -243,7 +286,15 @@ export function ClaudeAccountsCard() {
 
 /** The Pressure panel's "switch account" button (Claude only): opens the list in a popover, for
  *  when the 5h / 7d window runs low. */
-export function ClaudeAccountSwitch({ session }: { session?: Session }) {
+export function ClaudeAccountSwitch({
+  session,
+  mark,
+}: {
+  session?: Session;
+  /** Fork (2026-11-03): what leads the label — the session's account badge, nothing (null), or by
+   *  default the account icon. */
+  mark?: ReactNode | null;
+}) {
   const { t } = useI18n();
   // Where the popover sits: under the button, right-aligned to it. It is portaled to <body> because
   // the sidebar clips what overflows it.
@@ -280,7 +331,7 @@ export function ClaudeAccountSwitch({ session }: { session?: Session }) {
         onClick={toggle}
         className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-aux text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg-muted"
       >
-        <Icon name="circle-user" size={12} />
+        {mark === undefined ? <Icon name="circle-user" size={12} /> : mark}
         {t.settings.accounts.switch}
       </button>
       {at &&
@@ -289,7 +340,7 @@ export function ClaudeAccountSwitch({ session }: { session?: Session }) {
           <div
             ref={pop}
             style={{ top: at.top, right: at.right }}
-            className="fixed z-50 w-80 max-w-[calc(100vw-16px)] rounded-md border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) shadow-(--shadow-md)"
+            className="fixed z-50 w-80 max-w-[calc(100vw-16px)] rounded-md border border-ink-800 bg-ink-900 shadow-(--shadow-md)"
           >
             <AccountList compact session={session} />
           </div>,

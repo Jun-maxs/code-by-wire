@@ -78,6 +78,7 @@ export function PressurePanel({
   windowRowsWhenFetchedOnly,
   relayUsage,
   headingRight,
+  hideRates = false,
 }: {
   live: ContextBreakdown | null;
   context: ContextBreakdown | null;
@@ -94,6 +95,8 @@ export function PressurePanel({
   relayUsage?: RelayUsage | null;
   /** Beside the heading: Claude's account switcher. */
   headingRight?: ReactNode;
+  /** Leave out the rate-limit rows (the split view's sidebar shows every account's above). */
+  hideRates?: boolean;
 }) {
   const { t } = useI18n();
   const view = useMemo(
@@ -171,28 +174,30 @@ export function PressurePanel({
         <p className="text-aux text-fg-dim">{t.dock.pressure.noContext}</p>
       )}
       <div className="mt-1 space-y-1.5">
-        {showRateRow(fetchedOnly, windowsFetched, rateLimits?.fiveHour) && (
-          <RateRow
-            label={windowsLoading ? "-" : t.dock.pressure.windowFiveHour}
-            window={fiveHour}
-            now={now}
-          />
-        )}
-        {showRateRow(fetchedOnly, windowsFetched, rateLimits?.sevenDay) && (
-          <RateRow
-            label={windowsLoading ? "-" : t.dock.pressure.windowSevenDay}
-            window={sevenDay}
-            now={now}
-          />
-        )}
-        {sevenDaySonnet && (
+        {!hideRates &&
+          showRateRow(fetchedOnly, windowsFetched, rateLimits?.fiveHour) && (
+            <RateRow
+              label={windowsLoading ? "-" : t.dock.pressure.windowFiveHour}
+              window={fiveHour}
+              now={now}
+            />
+          )}
+        {!hideRates &&
+          showRateRow(fetchedOnly, windowsFetched, rateLimits?.sevenDay) && (
+            <RateRow
+              label={windowsLoading ? "-" : t.dock.pressure.windowSevenDay}
+              window={sevenDay}
+              now={now}
+            />
+          )}
+        {!hideRates && sevenDaySonnet && (
           <RateRow
             label={t.dock.pressure.windowSevenDaySonnet}
             window={sevenDaySonnet}
             now={now}
           />
         )}
-        {sevenDayOpus && (
+        {!hideRates && sevenDayOpus && (
           <RateRow
             label={t.dock.pressure.windowSevenDayOpus}
             window={sevenDayOpus}

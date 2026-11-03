@@ -121,6 +121,10 @@ const api: AppApi = {
   bindClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsBind, id),
   addClaudeAccount: () => ipcRenderer.invoke(IPC.claudeAccountsAdd),
   removeClaudeAccount: (id) => ipcRenderer.invoke(IPC.claudeAccountsRemove, id),
+  accountSwitchTick: () => ipcRenderer.invoke(IPC.accountSwitchTick),
+  setAccountSwitchPrefs: (prefs) =>
+    ipcRenderer.invoke(IPC.accountSwitchSetPrefs, prefs),
+  accountSwitchMoved: () => ipcRenderer.invoke(IPC.accountSwitchMoved),
   setHudSettings: (settings) =>
     ipcRenderer.invoke(IPC.hudSettingsSet, settings),
   readSubagentTranscript: async (id, agentId, sinceMtimeMs) =>

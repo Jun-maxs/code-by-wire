@@ -31,6 +31,9 @@ import { useTasks } from "./use-tasks";
 import { useTranscript } from "./use-transcript";
 import { useTurnActivity } from "./use-turn-activity";
 import { PaneTaskCard } from "./PaneTaskCard";
+import { useStore } from "@nanostores/react";
+import { $accounts, badgeAccount } from "../settings/accounts-store";
+import { AccountBadge } from "../settings/AccountBadge";
 
 /** Marks a pane's own buttons, so pressing one doesn't first focus that pane. */
 const PANE_ACTION = "data-pane-action";
@@ -207,6 +210,9 @@ function SplitPane({
   // unchanged token — the task card still lists its history).
   const activity = useTurnActivity(s.id, s.agent === "claude");
   const line = paneLine(s, progress, activity, now, t);
+  // Fork (2026-11-03): which account the pane runs on, once there are two to tell apart.
+  const accounts = useStore($accounts);
+  const account = badgeAccount(accounts, s.accountDevice);
 
   // Focused from elsewhere (Ctrl+Tab, the sidebar, the HUD): put the keyboard in this pane's terminal.
   const showsTerminal = !transcriptOn && hasLiveTerminal;
@@ -267,6 +273,12 @@ function SplitPane({
           <span className="grid size-3.5 shrink-0 place-items-center">
             <Lamp state={s.state} management={s.management} />
           </span>
+          {account && (
+            <AccountBadge
+              account={account}
+              className={s.state === "ended" ? "opacity-50" : undefined}
+            />
+          )}
           {s.agent !== "claude" && (
             <AgentIcon agent={s.agent} size={12} className="shrink-0" />
           )}

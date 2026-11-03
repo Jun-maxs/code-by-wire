@@ -84,7 +84,7 @@ export const zh: Translations = {
     accounts: {
       title: "Claude 账号",
       switch: "切换账号",
-      current: "使用中",
+      current: "新会话用",
       use: "切换",
       bind: "绑定",
       binding: "已打开浏览器，登录并授权后会自动加进列表。",
@@ -97,7 +97,7 @@ export const zh: Translations = {
       removeNote:
         "移除只退出这个账号的登录；会话记录和设置都保留，以后可以重新添加。",
       removed: (name: string) => `已移除 ${name}。`,
-      sessionOn: (name: string) => `这个会话在用：${name}`,
+      sessionOn: (name: string) => `本会话：${name}`,
       staleHint:
         "切换只对新建和恢复的会话生效。可以把这个会话结束后用当前账号恢复，对话记录不丢。",
       staleBusy: "切换只对新建和恢复的会话生效；它正在运行，等它停下来再换。",
@@ -106,10 +106,33 @@ export const zh: Translations = {
         "切换只对新建和恢复的会话生效；这个会话不是在 Jun-Code 里开的，在它自己的终端里退出后重开即可。",
       none: "没有使用 reclaude，没有可切换的账号。",
       empty: "没有找到组织。",
-      note: "新建和恢复的会话会用选中的账号；正在运行的会话保持原账号，恢复后才切过去。会话记录和设置所有账号共用。",
+      note: "新建和恢复的会话用标着「新会话用」的账号；正在运行的会话保持原账号，恢复后才切过去。",
       switched: (name: string) => `新会话已改用 ${name}。`,
       failed: (e: string) => `reclaude：${e}`,
       loading: "正在读取账号…",
+      badge: (n: number, email: string) => `账号 ${n} · ${email}`,
+      smartTitle: "智能切换",
+      smartDesc:
+        "5 小时额度到切换点时换到余量最多的账号，空闲会话随后跟过去，对话不丢。",
+      switchAt: (pct: number) => `切换点 ${pct}%`,
+      smartShort: (pct: number) =>
+        `5 小时用到 ${pct}% 自动换号 · 空闲会话跟过去`,
+      smartNeedsTwo: "至少要有两个已登录的账号。",
+      smartOff: "已关闭，只在你手动切换时换号。",
+      smartThreshold: "切换点",
+      smartStuck: "所有账号的 5 小时额度都快满了，暂时没有可换的账号。",
+      smartLast: (
+        time: string,
+        from: number,
+        to: number,
+        pct: number,
+        moved: number,
+      ) =>
+        `${time} 账号 ${from} 用到 ${pct}%，已换到账号 ${to}` +
+        (moved ? `，${moved} 个会话已跟过去` : ""),
+      notSeen: "还没用过",
+      windowFive: "5h",
+      windowSeven: "7d",
     },
     system: {
       title: "系统",
@@ -466,6 +489,11 @@ export const zh: Translations = {
       tasksNone: "这个会话还没有任务",
       tasksMore: (n) => `还有 ${n} 条`,
       boardTask: (title, done, total) => `看板：${title} · ${done}/${total}`,
+      panesHeading: "分屏",
+      accountsHeading: "账号额度",
+      currentPane: "当前格",
+      focusPane: (title) => `切到「${title}」`,
+      contextShort: "上下文",
     },
     footer: {
       keepAwake: "防止电脑休眠",

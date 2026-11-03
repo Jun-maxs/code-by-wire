@@ -10,6 +10,9 @@ import { cx } from "../ui/atoms";
 import { Icon, type IconName } from "../ui/icons";
 import { PromptsPage } from "./sidebar-pages/PromptsPage";
 import { SkillsPage } from "./sidebar-pages/SkillsPage";
+import { SplitSidebar, type SplitSidebarProps } from "./SplitSidebar";
+import { useStore } from "@nanostores/react";
+import { $accounts, withAccountWindows } from "../settings/accounts-store";
 
 type Page = "metrics" | "prompts" | "skills";
 const PAGES: { id: Page; icon: IconName; zh: string; en: string }[] = [
@@ -46,14 +49,21 @@ export function RightSidebar({
   session,
   metrics,
   account,
+  split,
 }: {
   session: Session;
   metrics: MetricsState;
   account: Account | null;
+  /** Fork (2026-11-03): set while the middle column is split — the metrics page then leads with
+   *  every pane and every account before the selected pane's own panels. */
+  split?: SplitSidebarProps;
 }) {
   const { t, locale } = useI18n();
   const doc = useTranscript(session.id);
   const Panels = SIDEBAR_PANELS[session.agent];
+  // The 5h / 7d rows read the session's account, freshest capture first (fork, 2026-11-03).
+  const accounts = useStore($accounts);
+  const shown = withAccountWindows(session, accounts);
   const [page, setPageState] = useState<Page>(storedPage);
   const setPage = (p: Page) => {
     setPageState(p);
@@ -103,13 +113,23 @@ export function RightSidebar({
         <OverlayScroll className="min-h-0 flex-1">
           <SkillsPage />
         </OverlayScroll>
+      ) : split ? (
+        <OverlayScroll className="min-h-0 flex-1">
+          <SplitSidebar
+            {...split}
+            session={shown}
+            metrics={metrics}
+            account={account}
+            doc={doc}
+          />
+        </OverlayScroll>
       ) : AGENTS[session.agent].capabilities.hasTelemetry ? (
         /* px-1.5 on top of PanelSection's own px-2.5 ≈ the left sidebar's ~16px content inset,
             scoped here so the Activity dock's PanelSections keep their tighter fit. */
         <OverlayScroll className="min-h-0 flex-1">
           <div className="flex flex-col px-1.5 pb-2">
             <Panels
-              session={session}
+              session={shown}
               metrics={metrics}
               account={account}
               doc={doc}

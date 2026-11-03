@@ -95,11 +95,33 @@ function safeReaddir(dir: string): string[] {
   }
 }
 
+/**
+ * The `sessions/` registries to read. Fork (2026-11-03): with reclaude, every account binding is its
+ * own config dir (`~/.rec/claude/accounts/<id>/config`) with its own registry, while all of them
+ * share the transcripts — so a session running on another account (after a switch, smart or by
+ * hand) is just as live and must not read as Ended. Any other config dir reads only its own.
+ */
+export function sessionRegistryDirs(claudeDir: string): string[] {
+  const own = join(claudeDir, "sessions");
+  const m =
+    /^(.*[\\/]\.rec[\\/]claude[\\/]accounts)[\\/][^\\/]+[\\/]config[\\/]?$/.exec(
+      claudeDir,
+    );
+  if (!m) return [own];
+  const siblings = safeReaddir(m[1]).map((name) =>
+    join(m[1], name, "config", "sessions"),
+  );
+  return siblings.includes(own) ? siblings : [own, ...siblings];
+}
+
 /** Read every well-formed `sessions/*.json`, skipping malformed files. */
 export function readSessionFiles(claudeDir: string): RawSessionFile[] {
-  const dir = join(claudeDir, "sessions");
-
   const out: RawSessionFile[] = [];
+  for (const dir of sessionRegistryDirs(claudeDir)) readRegistry(dir, out);
+  return out;
+}
+
+function readRegistry(dir: string, out: RawSessionFile[]): void {
   for (const name of readRoot(dir)) {
     if (!name.endsWith(".json")) continue;
     try {
@@ -124,7 +146,6 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
       // skip malformed session file
     }
   }
-  return out;
 }
 
 /**

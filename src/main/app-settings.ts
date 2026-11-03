@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
 import type { Locale } from "../shared/locale";
 import type { HudSettings } from "../shared/ipc";
+import type { SmartSwitchPrefs } from "../shared/account-switch";
 import type {
   CleanupRun,
   SessionCleanupSettings,
@@ -36,6 +37,8 @@ export interface AppSettings {
   sessionCleanup?: Partial<SessionCleanupSettings>;
   /** The last cleanup run, for the Settings card. */
   lastCleanup?: CleanupRun;
+  /** Fork (2026-11-03): smart account switching; read through normalizePrefs (missing = on, 85%). */
+  smartAccountSwitch?: Partial<SmartSwitchPrefs>;
 }
 
 /** Agent HUD's General page: the HUD windows' appearance and language, and whether quota reads as
@@ -68,6 +71,7 @@ export interface AppSettingsStore {
   setHudPanel(patch: HudPanelSettings): void;
   setSessionCleanup(next: SessionCleanupSettings): void;
   setLastCleanup(run: CleanupRun): void;
+  setSmartAccountSwitch(prefs: SmartSwitchPrefs): void;
 }
 
 export interface AppSettingsDeps {
@@ -128,6 +132,9 @@ export function createAppSettingsStore(
     },
     setLastCleanup(run) {
       write({ ...read(), lastCleanup: run });
+    },
+    setSmartAccountSwitch(prefs) {
+      write({ ...read(), smartAccountSwitch: prefs });
     },
   };
 }

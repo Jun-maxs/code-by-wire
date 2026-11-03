@@ -15,6 +15,9 @@ export interface SidebarPanelsProps {
   metrics: MetricsState;
   account: Account | null;
   doc: DocState;
+  /** Fork (2026-11-03): the split view's sidebar shows every account's rate windows above, so the
+   *  pane's own Pressure panel leaves them out (and the account switcher moves up with them). */
+  ratesElsewhere?: boolean;
 }
 
 /** agent → its sidebar panel stack. Capability flags decide WHETHER the sidebar renders

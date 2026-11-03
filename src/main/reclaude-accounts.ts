@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ClaudeOrg } from "@shared/ipc";
@@ -143,12 +143,35 @@ export async function listAccounts(
   claudeEmail: (deviceId: string) => string | null,
 ): Promise<ClaudeOrg[]> {
   const [status, listed] = await Promise.all([
-    run(cli, ["status", "--json", "--check"]).then(parseStatusBindings),
+    // `--check` verifies the logins online and now and then exits non-zero (its JSON on stdout);
+    // the offline status still lists every binding.
+    run(cli, ["status", "--json", "--check"])
+      .catch(() => run(cli, ["status", "--json"]))
+      .then(parseStatusBindings),
     // The current user's organizations; a binding whose login lapsed can make this fail, and the
     // local bindings are still worth showing then.
     run(cli, ["org", "list"]).then(parseOrgList, () => [] as ClaudeOrg[]),
   ]);
   return mergeAccounts(status, listed, claudeEmail);
+}
+
+/** Every local binding (`reclaude status --json`, offline), for smart account switching. */
+export const readBindings = (cli: string): Promise<ReclaudeBinding[]> =>
+  run(cli, ["status", "--json"]).then(
+    (text) => parseStatusBindings(text).bindings,
+  );
+
+/** The default binding's device id: the name in `~/.rec/claude/current`. */
+export function currentDevice(home: string = homedir()): string | null {
+  try {
+    const id = readFileSync(
+      join(home, ".rec", "claude", "current"),
+      "utf8",
+    ).trim();
+    return /^\d+$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 export const useOrg = (cli: string, id: string): Promise<string> =>

@@ -104,12 +104,16 @@ import { adoptReclaude, detectReclaude } from "./reclaude";
 import {
   authorize,
   bindingConfigDir,
+  currentDevice,
   listAccounts,
   logoutOrg,
+  readBindings,
   reclaudeCli,
   reclaudeConfigDirs,
   useOrg,
 } from "./reclaude-accounts";
+import { createAccountSwitcher, type AccountSwitcher } from "./account-switch";
+import { normalizePrefs } from "@shared/account-switch";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import {
   IPC,
@@ -593,6 +597,24 @@ app
     const openAuthUrl = (url: string) => {
       if (/^https:\/\//i.test(url)) void shell.openExternal(url);
     };
+    // Fork (2026-11-03): smart account switching — with two or more bindings, the default moves to
+    // the account with the most 5h room before the current one runs out (account-switch.ts).
+    const accountSwitcher: AccountSwitcher | undefined = recCli
+      ? createAccountSwitcher({
+          readBindings: () => readBindings(recCli),
+          currentDevice: () => currentDevice(),
+          claudeEmail: (device) => readAccountEmail(bindingConfigDir(device)),
+          switchTo: async (id) => {
+            await useOrg(recCli, id);
+            followDefaultAccount();
+          },
+          prefs: () => normalizePrefs(appSettings.read().smartAccountSwitch),
+          savePrefs: (prefs) => appSettings.setSmartAccountSwitch(prefs),
+          statePath: join(app.getPath("userData"), "account-quotas.json"),
+          log: (msg, err) => logError("account-switch", msg, err),
+        })
+      : undefined;
+    void accountSwitcher?.refresh();
     ipcMain.handle(IPC.claudeAccountsList, () => claudeAccountsView());
     ipcMain.handle(IPC.claudeAccountsUse, async (_e, raw: unknown) => {
       const id = orgId(raw);
@@ -603,6 +625,7 @@ app
         return claudeAccountsView((err as Error).message);
       }
       followDefaultAccount();
+      accountSwitcher?.noteManualSwitch();
       return claudeAccountsView();
     });
     // Binding and adding both wait for the browser authorization; the answer is the new list.
@@ -615,6 +638,7 @@ app
         return claudeAccountsView((err as Error).message);
       }
       followDefaultAccount();
+      void accountSwitcher?.refresh();
       return claudeAccountsView();
     });
     ipcMain.handle(IPC.claudeAccountsAdd, async () => {
@@ -625,6 +649,7 @@ app
         return claudeAccountsView((err as Error).message);
       }
       followDefaultAccount();
+      void accountSwitcher?.refresh();
       return claudeAccountsView();
     });
     // Remove a binding that isn't the default (switch away first): its login goes, its config and the
@@ -640,6 +665,7 @@ app
         return claudeAccountsView((err as Error).message);
       }
       followDefaultAccount();
+      void accountSwitcher?.refresh();
       return claudeAccountsView();
     });
     // Account usage via the OAuth usage API: constructed once; refreshes are spawned inside
@@ -768,6 +794,7 @@ app
       statuslineLaunchFault,
       caffeinate,
       usage,
+      accountSwitcher,
       sessionOverlays: [
         (sessions) => codexProvider.overlaySessions(sessions),
         (sessions) => piProvider.overlaySessions(sessions),

@@ -1,3 +1,5 @@
+import type { AccountSwitcher } from "./account-switch";
+import { normalizePrefs } from "@shared/account-switch";
 import { join } from "node:path";
 import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
 import {
@@ -26,6 +28,7 @@ import { writeFile } from "node:fs/promises";
 import {
   IPC,
   type OverviewData,
+  type AccountSwitchTick,
   type StatsRead,
   type OpenInTarget,
   type UpdateState,
@@ -224,6 +227,8 @@ export interface IpcDeps {
   /** Per-agent session overlays applied in overviewNow after the claude statusline overlay —
    *  the generic seam a provider uses to attach non-persisted fields (codex telemetry today). */
   sessionOverlays?: Array<(sessions: Session[]) => Session[]>;
+  /** Fork (2026-11-03): smart account switching over the reclaude bindings. Absent without reclaude. */
+  accountSwitcher?: AccountSwitcher;
 }
 
 export function attachCliStatus<T extends object>(
@@ -268,6 +273,7 @@ export function registerIpc({
   caffeinate,
   usage,
   sessionOverlays,
+  accountSwitcher,
 }: IpcDeps): { sync: () => Promise<void>; overview: () => OverviewData } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -302,6 +308,7 @@ export function registerIpc({
     setHudPanel: () => {},
     setSessionCleanup: () => {},
     setLastCleanup: () => {},
+    setSmartAccountSwitch: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
@@ -406,7 +413,9 @@ export function registerIpc({
   const overviewNow = (): OverviewData => {
     const now = Date.now();
     const base = getOverview(db);
-    const byId = freshestBySession(reader.read());
+    const samples = reader.read();
+    accountSwitcher?.observe(samples);
+    const byId = freshestBySession(samples);
     // deriveAccount owns the whole billing decision: subscription (API response or rate_limits
     // evidence) vs api. usage.read() is sync and non-blocking; a stale read spawns the refresh
     // that the NEXT poll picks up — no timers in main.
@@ -494,6 +503,7 @@ export function registerIpc({
         account,
         homeDir: homedir(),
         projectState: projectState?.read() ?? {},
+        accounts: accountSwitcher?.view() ?? null,
       },
       (agent) => cli.get(agent),
     );
@@ -585,6 +595,21 @@ export function registerIpc({
   });
 
   ipcMain.handle(IPC.overview, () => overviewNow());
+  // Fork (2026-11-03): smart account switching, ticked by the renderer.
+  ipcMain.handle(
+    IPC.accountSwitchTick,
+    (): AccountSwitchTick =>
+      accountSwitcher?.tick(overviewNow().sessions) ?? {
+        accounts: null,
+        candidates: [],
+      },
+  );
+  ipcMain.handle(IPC.accountSwitchSetPrefs, (_e, raw: unknown) =>
+    accountSwitcher ? accountSwitcher.setPrefs(normalizePrefs(raw)) : null,
+  );
+  ipcMain.handle(IPC.accountSwitchMoved, () => {
+    accountSwitcher?.noteMoved();
+  });
   ipcMain.handle(IPC.refresh, async () => {
     try {
       await sync();

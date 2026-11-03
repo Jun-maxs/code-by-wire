@@ -7,6 +7,7 @@ import {
 import type { OsKind } from "@shared/platform";
 import { tNow } from "../i18n";
 import { editSequence } from "./key-bindings";
+import { noteTerminalInput } from "./input-activity";
 import { clipboardKeyAction } from "../xterm/clipboard-keys";
 import { deferToKeypress } from "../xterm/ime-punctuation";
 import {
@@ -224,7 +225,10 @@ export function createTerminalStore({
         reattaching: false,
       };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.
-      handle.term.onData((data) => api.write(handle.id, data));
+      handle.term.onData((data) => {
+        noteTerminalInput(handle.id);
+        api.write(handle.id, data);
+      });
       // Keys xterm must not process itself: the clipboard combos (win/linux copy/paste — mac
       // rides the native menu, see clipboard-keys), then the keystrokes the Claude Code prompt
       // understands but xterm won't emit (see key-bindings): Shift+Enter → newline everywhere,

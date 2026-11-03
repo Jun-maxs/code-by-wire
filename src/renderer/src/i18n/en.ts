@@ -103,7 +103,7 @@ export const en = {
     accounts: {
       title: "Claude account",
       switch: "Switch account",
-      current: "In use",
+      current: "New sessions",
       use: "Use",
       bind: "Bind",
       binding:
@@ -117,7 +117,7 @@ export const en = {
       removeNote:
         "Removing only logs this account out; sessions and settings stay, and you can add it again later.",
       removed: (name: string) => `Removed ${name}.`,
-      sessionOn: (name: string) => `This session runs on ${name}`,
+      sessionOn: (name: string) => `This session: ${name}`,
       staleHint:
         "A switch reaches new and resumed sessions. End this one and resume it on the current account; nothing is lost.",
       staleBusy:
@@ -127,10 +127,34 @@ export const en = {
         "A switch reaches new and resumed sessions; this one wasn't started in Jun-Code, so restart it in its own terminal.",
       none: "reclaude is not in use, so there is no account to switch.",
       empty: "No organizations found.",
-      note: "New sessions and resumed ones run on the chosen account; a running session keeps its account until you resume it. Sessions and settings are shared by every account.",
+      note: "New and resumed sessions run on the account marked New sessions; a running session keeps its account until you resume it.",
       switched: (name: string) => `New sessions now use ${name}.`,
       failed: (e: string) => `reclaude: ${e}`,
       loading: "Reading accounts…",
+      badge: (n: number, email: string) => `Account ${n} · ${email}`,
+      smartTitle: "Smart switching",
+      smartDesc:
+        "At the switch point of the 5-hour limit, move to the account with the most room; idle sessions follow, conversation intact.",
+      switchAt: (pct: number) => `Switch point ${pct}%`,
+      smartShort: (pct: number) =>
+        `Switches at ${pct}% of 5h · idle sessions follow`,
+      smartNeedsTwo: "Needs at least two signed-in accounts.",
+      smartOff: "Off: accounts change only when you switch them.",
+      smartThreshold: "Switch at",
+      smartStuck:
+        "Every account is close to its 5-hour limit; there is nowhere to switch to yet.",
+      smartLast: (
+        time: string,
+        from: number,
+        to: number,
+        pct: number,
+        moved: number,
+      ) =>
+        `${time}: account ${from} reached ${pct}%, switched to account ${to}` +
+        (moved ? `; ${moved} session${moved === 1 ? "" : "s"} moved` : ""),
+      notSeen: "Not used yet",
+      windowFive: "5h",
+      windowSeven: "7d",
     },
     system: {
       title: "System",
@@ -519,6 +543,11 @@ export const en = {
       tasksMore: (n: number) => `${n} more`,
       boardTask: (title: string, done: number, total: number) =>
         `Board: ${title} · ${done}/${total}`,
+      panesHeading: "Panes",
+      accountsHeading: "Accounts",
+      currentPane: "Selected pane",
+      focusPane: (title: string) => `Go to “${title}”`,
+      contextShort: "ctx",
     },
     footer: {
       keepAwake: "Keep computer awake",
