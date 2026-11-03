@@ -17,7 +17,10 @@ import { remoteStatus } from "./remote-status";
  *
  * - The page reports the rectangles it draws in (`hud_report_regions`). The window ignores the mouse
  *   everywhere else, so the apps beneath stay usable; a cursor poll flips that per position and
- *   sends `hud:pointer`, which drives the strip's hover and the panel's open/close.
+ *   sends `hud:pointer`, which drives the strip's hover and the panel's open/close. Never
+ *   `setIgnoreMouseEvents(true, { forward: true })`: on Windows, forwarding installs a WH_MOUSE_LL
+ *   hook on main's thread, and every mouse event on the system then waits for main — a busy main
+ *   froze the cursor for up to a second (2026-11-03, once a minute during the content-index sweep).
  * - Data rides `native_request`, which the page polls (main runs no data timer).
  * - Geometry is the canvas this window covers on its display: full height, along the edge the page
  *   reports (`hud_place`, from Settings → Display), placed the way Agent HUD's host planned it.
@@ -164,7 +167,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       if (inside !== o.pointer.inside) {
         // Over the HUD the window takes the mouse; elsewhere clicks fall through to the apps.
         if (!o.win.isDestroyed())
-          o.win.setIgnoreMouseEvents(!inside && !o.focused, { forward: true });
+          o.win.setIgnoreMouseEvents(!inside && !o.focused);
       }
       if (inside !== o.pointer.inside || moved) {
         o.pointer = { ...outside(o.screenId), inside, point };
@@ -235,7 +238,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     }
     send(o, "hud:drag-end", { screenId: o.screenId, cancelled: !dropped });
     o.pointer = outside(o.screenId);
-    o.win.setIgnoreMouseEvents(!o.focused, { forward: true });
+    o.win.setIgnoreMouseEvents(!o.focused);
     poll();
   };
 
@@ -367,7 +370,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
     markHudWindow(win);
     win.setAlwaysOnTop(true, "screen-saver");
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    win.setIgnoreMouseEvents(true, { forward: true });
+    win.setIgnoreMouseEvents(true);
     const o: Overlay = {
       screenId: screenIdOf(d),
       display: d,
@@ -434,7 +437,7 @@ export function createHudOverlay(deps: HudOverlayDeps) {
       if (next) {
         o.win.hide();
         o.pointer = outside(o.screenId);
-        o.win.setIgnoreMouseEvents(true, { forward: true });
+        o.win.setIgnoreMouseEvents(true);
         send(o, "hud:pointer", o.pointer);
       } else {
         o.win.showInactive();
