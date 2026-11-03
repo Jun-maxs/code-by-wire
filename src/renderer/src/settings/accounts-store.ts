@@ -1,5 +1,9 @@
 import { atom } from "nanostores";
-import type { AccountQuota, AccountsOverview } from "@shared/account-switch";
+import {
+  pendingAccount,
+  type AccountQuota,
+  type AccountsOverview,
+} from "@shared/account-switch";
 import type { Session } from "@shared/types";
 
 /**
@@ -16,6 +20,25 @@ export function badgeAccount(
 ): AccountQuota | null {
   if (!view || view.accounts.length < 2 || !deviceId) return null;
   return view.accounts.find((a) => a.deviceId === deviceId) ?? null;
+}
+
+/** The account a session runs on and, when it is to move — a running one once its turn ends, an
+ *  ended one when resumed (only when it was given an account of its own) — the one it moves to.
+ *  Null when there is nothing to tell apart. */
+export function sessionMarks(
+  view: AccountsOverview | null,
+  session: Session,
+): { on: AccountQuota | null; to: AccountQuota | null } | null {
+  if (session.agent !== "claude") return null;
+  const on = badgeAccount(view, session.accountDevice);
+  const next =
+    session.state === "ended"
+      ? session.accountWant !== session.accountDevice
+        ? session.accountWant
+        : undefined
+      : (pendingAccount(session) ?? undefined);
+  const to = badgeAccount(view, next);
+  return on || to ? { on, to } : null;
 }
 
 /** A Claude session with its account's freshest 5h / 7d windows: the account's newest capture

@@ -32,8 +32,9 @@ import { useTranscript } from "./use-transcript";
 import { useTurnActivity } from "./use-turn-activity";
 import { PaneTaskCard } from "./PaneTaskCard";
 import { useStore } from "@nanostores/react";
-import { $accounts, badgeAccount } from "../settings/accounts-store";
-import { AccountBadge } from "../settings/AccountBadge";
+import { $accounts, sessionMarks } from "../settings/accounts-store";
+import { SessionAccountMark } from "../settings/AccountBadge";
+import { ClaudeAccountSwitch } from "../settings/ClaudeAccounts";
 
 /** Marks a pane's own buttons, so pressing one doesn't first focus that pane. */
 const PANE_ACTION = "data-pane-action";
@@ -210,9 +211,10 @@ function SplitPane({
   // unchanged token — the task card still lists its history).
   const activity = useTurnActivity(s.id, s.agent === "claude");
   const line = paneLine(s, progress, activity, now, t);
-  // Fork (2026-11-03): which account the pane runs on, once there are two to tell apart.
+  // Fork (2026-11-03): which account the pane runs on, once there are two to tell apart — and, as a
+  // button, where this pane alone moves to another account.
   const accounts = useStore($accounts);
-  const account = badgeAccount(accounts, s.accountDevice);
+  const marks = sessionMarks(accounts, s);
 
   // Focused from elsewhere (Ctrl+Tab, the sidebar, the HUD): put the keyboard in this pane's terminal.
   const showsTerminal = !transcriptOn && hasLiveTerminal;
@@ -263,6 +265,20 @@ function SplitPane({
           active ? "bg-ink-900" : "bg-ink-950",
         )}
       >
+        <span className="grid size-3.5 shrink-0 place-items-center">
+          <Lamp state={s.state} management={s.management} />
+        </span>
+        {marks && (
+          <span className="flex shrink-0" {...{ [PANE_ACTION]: "" }}>
+            <ClaudeAccountSwitch
+              session={s}
+              compact
+              mark={
+                <SessionAccountMark marks={marks} ended={s.state === "ended"} />
+              }
+            />
+          </span>
+        )}
         <PaneTaskCard
           session={s}
           activity={activity}
@@ -270,15 +286,6 @@ function SplitPane({
           boardTask={boardTask}
           now={now}
         >
-          <span className="grid size-3.5 shrink-0 place-items-center">
-            <Lamp state={s.state} management={s.management} />
-          </span>
-          {account && (
-            <AccountBadge
-              account={account}
-              className={s.state === "ended" ? "opacity-50" : undefined}
-            />
-          )}
           {s.agent !== "claude" && (
             <AgentIcon agent={s.agent} size={12} className="shrink-0" />
           )}

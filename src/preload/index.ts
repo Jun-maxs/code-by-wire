@@ -124,7 +124,8 @@ const api: AppApi = {
   accountSwitchTick: () => ipcRenderer.invoke(IPC.accountSwitchTick),
   setAccountSwitchPrefs: (prefs) =>
     ipcRenderer.invoke(IPC.accountSwitchSetPrefs, prefs),
-  accountSwitchMoved: () => ipcRenderer.invoke(IPC.accountSwitchMoved),
+  setSessionAccount: (id, device, by) =>
+    ipcRenderer.invoke(IPC.accountSwitchSetSession, id, device, by),
   setHudSettings: (settings) =>
     ipcRenderer.invoke(IPC.hudSettingsSet, settings),
   readSubagentTranscript: async (id, agentId, sinceMtimeMs) =>

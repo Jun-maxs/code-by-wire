@@ -45,6 +45,9 @@ export interface SpawnRequest {
   /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
    *  Claude only; ignored for other agents. */
   remote?: boolean;
+  /** Fork (2026-11-03): variables set on top of the child env — RECLAUDE_ORG when the session has
+   *  its own reclaude account (see session-accounts.ts). */
+  env?: Record<string, string>;
   cols: number;
   rows: number;
 }
@@ -64,6 +67,9 @@ export interface ResumeSpawn {
   /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
    *  Claude only; ignored for other agents. */
   remote?: boolean;
+  /** Fork (2026-11-03): variables set on top of the child env — RECLAUDE_ORG when the session has
+   *  its own reclaude account (see session-accounts.ts). */
+  env?: Record<string, string>;
   cols: number;
   rows: number;
 }
@@ -86,6 +92,9 @@ export interface ForkSpawn {
   /** Fork feature: start through the remote command (claude-r → HAPI) so the phone can continue it.
    *  Claude only; ignored for other agents. */
   remote?: boolean;
+  /** Fork (2026-11-03): variables set on top of the child env — RECLAUDE_ORG when the session has
+   *  its own reclaude account (see session-accounts.ts). */
+  env?: Record<string, string>;
   cols: number;
   rows: number;
 }
@@ -234,6 +243,7 @@ export function createTerminalManager(
     agent: AgentId,
     model?: Family,
     claimedRollout?: string,
+    extraEnv?: Record<string, string>,
   ): void {
     if (terms.has(id)) return; // idempotent — a double start of one id is a no-op
     if (!statDir(cwd)) {
@@ -264,6 +274,7 @@ export function createTerminalManager(
       env: {
         ...scrubInheritedEnv(deps.env?.() ?? process.env),
         COLORTERM: "truecolor",
+        ...extraEnv,
       },
       cols,
       rows,
@@ -347,6 +358,8 @@ export function createTerminalManager(
       req.rows,
       req.agent,
       req.model === "default" ? undefined : req.model,
+      undefined,
+      req.env,
     );
   }
 
@@ -376,6 +389,7 @@ export function createTerminalManager(
       req.agent,
       undefined,
       req.claimedRollout,
+      req.env,
     );
   }
 
@@ -406,6 +420,8 @@ export function createTerminalManager(
       req.rows,
       "claude",
       req.model,
+      undefined,
+      req.env,
     );
   }
 

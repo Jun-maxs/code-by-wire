@@ -3,8 +3,9 @@ import type { RateLimit, Session } from "./types";
 /**
  * Fork (2026-11-03): smart account switching. With two or more reclaude bindings, the app watches
  * each account's 5-hour window (from the statusLine captures written under that account's config
- * dir) and, before the default account runs out, makes the account with the most room the default;
- * idle sessions still on the full account are then ended and resumed on it. Pure decisions live
+ * dir) and, before the default account runs out, makes the account with the most room the default
+ * for new sessions; each idle session on a full account is then ended and resumed on the account
+ * with the most room, on its own (a session account, see SessionAccountPin). Pure decisions live
  * here; main/account-switch.ts owns the state and the reclaude calls.
  */
 
@@ -31,6 +32,21 @@ export interface AccountQuota {
   sevenDay?: RateLimit;
   /** When these windows were captured (ms); absent when none was ever seen. */
   seenAt?: number;
+}
+
+/**
+ * A session's own account (fork, 2026-11-03): set when the user moves one session to an account
+ * ("manual") or smart switching moves it ("auto"). Every later launch of the session — resume, and
+ * forks of it — starts there (reclaude's RECLAUDE_ORG), whatever the default is; sessions without
+ * one start on the default, as before.
+ */
+export interface SessionAccountPin {
+  /** Device id of the binding (its config dir name). */
+  device: string;
+  /** Its organization id, what RECLAUDE_ORG takes. */
+  org: string;
+  by: "manual" | "auto";
+  at: number;
 }
 
 /** The last automatic switch. */
@@ -109,15 +125,17 @@ export function numberAccounts<T extends { deviceId: string }>(
     .map((b, i) => ({ ...b, n: i + 1 }));
 }
 
-/** The account to move to: the one with the least 5h use among those with room under the
- *  threshold (an account never seen counts as unused), or null when none has room. */
+/** The account to move to from `from` (a device id; the default account when omitted): the one with
+ *  the least 5h use among the others with room under the threshold (an account never seen counts
+ *  as unused), or null when none has room. */
 export function pickTarget(
   accounts: AccountQuota[],
   threshold: number,
   now: number,
+  from?: string,
 ): AccountQuota | null {
   const rows = accounts
-    .filter((a) => !a.current)
+    .filter((a) => (from === undefined ? !a.current : a.deviceId !== from))
     .map((a) => ({
       a,
       five: windowPct(a.fiveHour, now) ?? 0,
@@ -155,46 +173,104 @@ export function decideSwitch(
   return to ? { to, from: hot.account, pct: hot.pct } : null;
 }
 
-/** A session that could move to the default account now, and how long it has sat idle. */
+/** A session that could move to another account now, how long it has sat idle, and where to. */
 export interface MoveCandidate {
   id: string;
   idleMs: number;
+  /** Device id of the account to move it to. */
+  to: string;
 }
 
+/** Whether a pin still holds the session where the user put it: a hand-picked account is left
+ *  alone for half an hour, as a hand-picked default is. */
+export const manualHold = (
+  pin: SessionAccountPin | undefined,
+  now: number,
+): boolean => pin?.by === "manual" && now - pin.at < MANUAL_QUIET_MS;
+
 /**
- * Sessions to end and resume on the default account: Claude sessions this app runs, idle between
- * turns (never mid-turn or waiting on a permission), on an account over the threshold while the
- * default is not. Remote (phone) sessions stay where they are.
+ * Sessions to end and resume on another account, each on its own: Claude sessions this app runs,
+ * idle between turns (never mid-turn or waiting on a permission), on an account at or over the
+ * threshold, while some other account has room (the one with the most, per session). Remote
+ * (phone) sessions stay where they are, as do sessions the user moved by hand in the last half hour
+ * and ones whose own move is still pending.
  */
 export function moveCandidates(
   sessions: Session[],
   view: AccountsOverview,
   now: number,
+  pinOf: (id: string) => SessionAccountPin | undefined = () => undefined,
 ): MoveCandidate[] {
   const { smart, accounts } = view;
   if (!smart.enabled || !smart.available) return [];
-  const cur = accounts.find((a) => a.current);
-  if (!cur || hotCurrent(accounts, smart.threshold, now)) return [];
-  const full = new Set(
-    accounts
-      .filter(
-        (a) =>
-          !a.current && (windowPct(a.fiveHour, now) ?? 0) >= smart.threshold,
-      )
-      .map((a) => a.deviceId),
-  );
-  if (full.size === 0) return [];
-  return sessions
-    .filter(
-      (s) =>
-        s.agent === "claude" &&
-        s.management === "managed" &&
-        s.state === "idle" &&
-        !s.remote &&
-        s.accountDevice !== undefined &&
-        full.has(s.accountDevice),
+  const out: MoveCandidate[] = [];
+  for (const s of sessions) {
+    if (
+      s.agent !== "claude" ||
+      s.management !== "managed" ||
+      s.state !== "idle" ||
+      s.remote ||
+      s.accountDevice === undefined ||
+      pendingAccount(s) !== null ||
+      manualHold(pinOf(s.id), now)
     )
-    .map((s) => ({ id: s.id, idleMs: Math.max(0, now - s.lastActivityMs) }));
+      continue;
+    const on = accounts.find((a) => a.deviceId === s.accountDevice);
+    if (!on || (windowPct(on.fiveHour, now) ?? 0) < smart.threshold) continue;
+    const to = pickTarget(accounts, smart.threshold, now, on.deviceId);
+    if (to)
+      out.push({
+        id: s.id,
+        idleMs: Math.max(0, now - s.lastActivityMs),
+        to: to.deviceId,
+      });
+  }
+  return out;
+}
+
+/**
+ * Where a pinned session starts now: its own account, unless smart switching is on, that account
+ * is at the switch point and another has room — then that one, and the pin moves with it. A pin
+ * the user set in the last half hour is kept. Null when the pinned account is gone.
+ */
+export function launchAccount(
+  pin: SessionAccountPin,
+  view: AccountsOverview,
+  now: number,
+): { account: AccountQuota; moved: boolean } | null {
+  const own = view.accounts.find((a) => a.deviceId === pin.device);
+  if (!own) return null;
+  const { smart, accounts } = view;
+  if (
+    !smart.enabled ||
+    !smart.available ||
+    manualHold(pin, now) ||
+    (windowPct(own.fiveHour, now) ?? 0) < smart.threshold
+  )
+    return { account: own, moved: false };
+  const to = pickTarget(accounts, smart.threshold, now, own.deviceId);
+  return to ? { account: to, moved: true } : { account: own, moved: false };
+}
+
+/** Sessions ready to carry out a move the user asked for: idle between turns, still on the old
+ *  account. */
+export function pendingMoves(sessions: Session[]): string[] {
+  return sessions
+    .filter((s) => s.state === "idle" && pendingAccount(s) !== null)
+    .map((s) => s.id);
+}
+
+/** The account a running session was asked to move to and hasn't yet (it restarts there once it
+ *  is idle), or null. */
+export function pendingAccount(s: Session): string | null {
+  return s.agent === "claude" &&
+    s.management === "managed" &&
+    s.state !== "ended" &&
+    s.accountWant !== undefined &&
+    s.accountDevice !== undefined &&
+    s.accountWant !== s.accountDevice
+    ? s.accountWant
+    : null;
 }
 
 /** The renderer's last word on a candidate: the session the user is looking at waits longer, and

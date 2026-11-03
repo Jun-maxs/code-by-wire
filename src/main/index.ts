@@ -70,6 +70,11 @@ import {
   type RemoteSessionStore,
 } from "./remote-sessions";
 import type { LaunchArgsStore } from "./launch-args";
+import {
+  createSessionAccountStore,
+  createTerminalAccounts,
+  type TerminalAccounts,
+} from "./session-accounts";
 import { createLaunchPresetStore } from "./launch-presets";
 import { createProjectStateStore } from "./project-state";
 import { createCliStatusController } from "./cli-check";
@@ -113,7 +118,7 @@ import {
   useOrg,
 } from "./reclaude-accounts";
 import { createAccountSwitcher, type AccountSwitcher } from "./account-switch";
-import { normalizePrefs } from "@shared/account-switch";
+import { normalizePrefs, type AccountsOverview } from "@shared/account-switch";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import {
   IPC,
@@ -165,6 +170,7 @@ function createWindow(
   agentOf: (id: string) => AgentId,
   launchArgs: LaunchArgsStore,
   remoteSessions: RemoteSessionStore,
+  accounts: TerminalAccounts,
   registerRename: (rename: (from: string, to: string) => void) => void,
   shellEnv: () => NodeJS.ProcessEnv,
   appTheme: "dark" | "light",
@@ -239,6 +245,7 @@ function createWindow(
     launchArgs,
     remoteSessions,
     remoteCommand: () => remoteCommand(),
+    accounts,
     posixShell: { isExecutable: isExecutableFile, findOnPath },
   });
   registerRename(rename);
@@ -343,6 +350,17 @@ app
     const remoteSessions = createRemoteSessionStore({
       dir: app.getPath("userData"),
     });
+    // Fork (2026-11-03): each session's own reclaude account. Launches read the accounts' windows
+    // through `accountView`, which the account switcher (wired further down) fills in.
+    const sessionAccounts = createSessionAccountStore({
+      dir: app.getPath("userData"),
+    });
+    let accountView: () => AccountsOverview | null = () => null;
+    const terminalAccounts = createTerminalAccounts(
+      sessionAccounts,
+      () => accountView(),
+      { log: (msg, err) => logError("session-account", msg, err) },
+    );
     // Fork feature: the sidebar's search-by-content index, in its own file beside the others.
     const contentSearch = createContentSearch(
       join(app.getPath("userData"), "content-search.db"),
@@ -355,6 +373,7 @@ app
         (id) => services.agentOf?.(id) ?? "claude",
         launchArgs,
         remoteSessions,
+        terminalAccounts,
         registerRename,
         shellTermEnv,
         appSettings.read().appTheme ?? "dark",
@@ -611,10 +630,12 @@ app
           prefs: () => normalizePrefs(appSettings.read().smartAccountSwitch),
           savePrefs: (prefs) => appSettings.setSmartAccountSwitch(prefs),
           statePath: join(app.getPath("userData"), "account-quotas.json"),
+          pinOf: (id) => sessionAccounts.get(id),
           log: (msg, err) => logError("account-switch", msg, err),
         })
       : undefined;
     void accountSwitcher?.refresh();
+    if (accountSwitcher) accountView = () => accountSwitcher.view();
     ipcMain.handle(IPC.claudeAccountsList, () => claudeAccountsView());
     ipcMain.handle(IPC.claudeAccountsUse, async (_e, raw: unknown) => {
       const id = orgId(raw);
@@ -713,6 +734,15 @@ app
               err,
             );
           }
+          try {
+            sessionAccounts.follow(from, to);
+          } catch (err) {
+            logError(
+              "session-account-follow-failed",
+              "could not carry the session's account to the rotated session id",
+              err,
+            );
+          }
         },
         { read: () => readParentMap(), seen: checkedUnderPtys },
       );
@@ -782,6 +812,7 @@ app
       sessionTitles,
       sessionPins,
       remoteSessions,
+      sessionAccounts,
       contentSearch,
       board,
       junAccount,

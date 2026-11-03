@@ -8,10 +8,12 @@ import {
   MANUAL_QUIET_MS,
   moveCandidates,
   numberAccounts,
+  pendingMoves,
   pickTarget,
   type AccountQuota,
   type AccountsOverview,
   type MoveCandidate,
+  type SessionAccountPin,
   type SmartSwitchPrefs,
   type SwitchEvent,
 } from "@shared/account-switch";
@@ -29,15 +31,17 @@ export interface AccountSwitcher {
   observe(samples: StatusLineSample[]): void;
   /** The accounts with their windows and the switch state; null without reclaude bindings. */
   view(): AccountsOverview | null;
-  /** Switch the default when it is due; answers with the accounts and the sessions to move. */
+  /** Switch the default when it is due; answers with the accounts and the sessions to move, each
+   *  to the account with the most room. */
   tick(sessions: Session[]): {
     accounts: AccountsOverview | null;
     candidates: MoveCandidate[];
+    pending: string[];
   };
   setPrefs(prefs: SmartSwitchPrefs): AccountsOverview | null;
   /** The user picked an account by hand: hold automatic switching for a while. */
   noteManualSwitch(): void;
-  /** A session was moved onto the new default. */
+  /** Smart switching moved a session to another account. */
   noteMoved(): void;
   /** Re-read the bindings (after a login, removal or switch). */
   refresh(): Promise<void>;
@@ -56,6 +60,9 @@ export interface AccountSwitcherDeps {
   savePrefs: (prefs: SmartSwitchPrefs) => void;
   /** Where the windows and the last switch are kept. */
   statePath: string;
+  /** A session's own account, if it has one (session-accounts.ts): a hand-picked one holds the
+   *  session for a while. */
+  pinOf?: (id: string) => SessionAccountPin | undefined;
   now?: () => number;
   log?: (message: string, err?: unknown) => void;
 }
@@ -125,7 +132,12 @@ export function createAccountSwitcher(
         emails = new Map(
           list.map((b) => [
             b.deviceId,
-            deps.claudeEmail(b.deviceId) || b.email || b.orgName,
+            // One spelling everywhere: Claude rewrites the login's case now and then.
+            (
+              deps.claudeEmail(b.deviceId) ||
+              b.email ||
+              b.orgName
+            ).toLowerCase(),
           ]),
         );
       })
@@ -195,7 +207,7 @@ export function createAccountSwitcher(
     tick(sessions) {
       if (!refreshing && now() - bindingsAt > BINDINGS_TTL_MS) void refresh();
       const v = view();
-      if (!v) return { accounts: null, candidates: [] };
+      if (!v) return { accounts: null, candidates: [], pending: [] };
       const due = switching ? null : decideSwitch(v, now(), quietUntil);
       if (due) {
         switching = true;
@@ -221,7 +233,11 @@ export function createAccountSwitcher(
             switching = false;
           });
       }
-      return { accounts: v, candidates: moveCandidates(sessions, v, now()) };
+      return {
+        accounts: v,
+        candidates: moveCandidates(sessions, v, now(), deps.pinOf),
+        pending: pendingMoves(sessions),
+      };
     },
     setPrefs(prefs) {
       deps.savePrefs(prefs);

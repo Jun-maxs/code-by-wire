@@ -103,6 +103,8 @@ export const en = {
     accounts: {
       title: "Claude account",
       switch: "Switch account",
+      switchSession: "Move this session",
+      manage: "Manage",
       current: "New sessions",
       use: "Use",
       bind: "Bind",
@@ -117,27 +119,47 @@ export const en = {
       removeNote:
         "Removing only logs this account out; sessions and settings stay, and you can add it again later.",
       removed: (name: string) => `Removed ${name}.`,
-      sessionOn: (name: string) => `This session: ${name}`,
-      staleHint:
-        "A switch reaches new and resumed sessions. End this one and resume it on the current account; nothing is lost.",
-      staleBusy:
-        "A switch reaches new and resumed sessions; this one is working, so move it once it stops.",
-      continueOnCurrent: "Continue this session on the current account",
-      staleOutside:
-        "A switch reaches new and resumed sessions; this one wasn't started in Jun-Code, so restart it in its own terminal.",
+      sessionHeading: "This session",
+      thisSession: "This session",
+      onResume: "On resume",
+      moveHere: "Move here",
+      useOnResume: "Use on resume",
+      moving: "Moving…",
+      afterTurn: "After this turn",
+      afterBackground: "After background work",
+      resetsIn: (d: string) => `resets in ${d}`,
+      allHeading: "All sessions",
+      moveFailed: "Not moved: the accounts aren't read yet; try again shortly.",
+      hintIdle:
+        "Moving reopens this session on the picked account, conversation kept. Only this session moves; other sessions and the default for new ones stay put.",
+      hintBusy:
+        "This session is working; the move waits for this turn to end, conversation kept. Only this session moves.",
+      hintEnded:
+        "This session resumes on the checked account. Only this session moves.",
+      hintBackground:
+        "This session still has background work running; the move waits for it to finish rather than stop it, conversation kept. Only this session moves.",
+      hintOutside:
+        "This session wasn't started in Jun-Code, so it can't be moved here; restart it in its own terminal.",
+      hintRemote:
+        "A phone-remote session's account comes from the remote command; it can't be moved on its own.",
+      defaultTitle: "New sessions",
+      defaultHint: "New sessions start on it; existing ones stay put",
+      markPending: (n: number) =>
+        `Moves to account ${n} once this turn and its background work end`,
+      markOnResume: (n: number) => `Resumes on account ${n}`,
       none: "reclaude is not in use, so there is no account to switch.",
       empty: "No organizations found.",
-      note: "New and resumed sessions run on the account marked New sessions; a running session keeps its account until you resume it.",
+      note: "New sessions start on the account marked New sessions. One session can move on its own: click the account number in the right sidebar or on a split pane's title bar.",
       switched: (name: string) => `New sessions now use ${name}.`,
       failed: (e: string) => `reclaude: ${e}`,
       loading: "Reading accounts…",
       badge: (n: number, email: string) => `Account ${n} · ${email}`,
       smartTitle: "Smart switching",
       smartDesc:
-        "At the switch point of the 5-hour limit, move to the account with the most room; idle sessions follow, conversation intact.",
+        "At the switch point of the 5-hour limit, new sessions move to the account with the most room, and idle sessions on the full one each move to an account with room, conversation intact.",
       switchAt: (pct: number) => `Switch point ${pct}%`,
       smartShort: (pct: number) =>
-        `Switches at ${pct}% of 5h · idle sessions follow`,
+        `At ${pct}% of 5h, new and idle sessions move to an account with room; a session you moved stays put for half an hour`,
       smartNeedsTwo: "Needs at least two signed-in accounts.",
       smartOff: "Off: accounts change only when you switch them.",
       smartThreshold: "Switch at",
@@ -150,7 +172,7 @@ export const en = {
         pct: number,
         moved: number,
       ) =>
-        `${time}: account ${from} reached ${pct}%, switched to account ${to}` +
+        `Last at ${time}: account ${from} reached ${pct}%, switched to account ${to}` +
         (moved ? `; ${moved} session${moved === 1 ? "" : "s"} moved` : ""),
       notSeen: "Not used yet",
       windowFive: "5h",

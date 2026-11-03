@@ -231,9 +231,14 @@ export interface Session {
   pinnedAtMs?: number;
   /** Fork feature: started with remote (claude-r → HAPI), so it can be continued from the phone. */
   remote?: boolean;
-  /** Fork (2026-11-01): the reclaude binding (device id) this session's latest statusLine capture
-   *  came from — the account it runs on. Absent without reclaude or without a capture. */
+  /** Fork (2026-11-01): the reclaude binding (device id) the session runs on — the account its pty
+   *  was started on this run, else the one its latest statusLine capture came from, whichever is
+   *  newer. Absent without reclaude or when neither is known. */
   accountDevice?: string;
+  /** Fork (2026-11-03): the session's own account (a SessionAccountPin's device id), where its next
+   *  launch starts; differs from accountDevice while a move waits for the session to go idle. Absent
+   *  for sessions that follow the default account. */
+  accountWant?: string;
   currentTask?: string;
   waitingReason?: string;
 }

@@ -9,6 +9,7 @@ export type IconName =
   | "activity"
   | "archive"
   | "app-window"
+  | "arrow-right"
   | "arrow-up-right"
   | "bot"
   | "chart-column"

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   decideSwitch,
+  launchAccount,
+  MANUAL_QUIET_MS,
   moveCandidates,
+  pendingAccount,
   normalizePrefs,
   numberAccounts,
   pickTarget,
@@ -9,6 +12,7 @@ import {
   windowPct,
   type AccountQuota,
   type AccountsOverview,
+  type SessionAccountPin,
 } from "../../src/shared/account-switch";
 import type { Session } from "../../src/shared/types";
 
@@ -151,10 +155,50 @@ describe("moveCandidates", () => {
       after,
       NOW,
     );
-    expect(out).toEqual([{ id: "a", idleMs: 30_000 }]);
+    expect(out).toEqual([{ id: "a", idleMs: 30_000, to: "2" }]);
   });
 
-  it("moves nothing while the default itself is full or switching is off", () => {
+  it("moves each session to the account with the most room, not just the default", () => {
+    const three = view([
+      acct("1", 90, { current: true }),
+      acct("2", 60),
+      acct("3", 10),
+    ]);
+    const out = moveCandidates(
+      [session("a"), session("b", { accountDevice: "2" })],
+      three,
+      NOW,
+    );
+    // a sits on a full account (even though it is the default); b's account still has room.
+    expect(out).toEqual([{ id: "a", idleMs: 30_000, to: "3" }]);
+  });
+
+  it("leaves a session the user moved by hand a moment ago, and one whose move is pending", () => {
+    const pins: Record<string, SessionAccountPin> = {
+      hand: { device: "1", org: "o1", by: "manual", at: NOW - 60_000 },
+      old: {
+        device: "1",
+        org: "o1",
+        by: "manual",
+        at: NOW - MANUAL_QUIET_MS - 1,
+      },
+      auto: { device: "1", org: "o1", by: "auto", at: NOW - 60_000 },
+    };
+    const out = moveCandidates(
+      [
+        session("hand"),
+        session("old"),
+        session("auto"),
+        session("pending", { accountWant: "2" }),
+      ],
+      after,
+      NOW,
+      (id) => pins[id],
+    );
+    expect(out.map((c) => c.id)).toEqual(["old", "auto"]);
+  });
+
+  it("moves nothing when no other account has room, or switching is off", () => {
     const stuck = view([acct("1", 90), acct("2", 92, { current: true })]);
     expect(moveCandidates([session("a")], stuck, NOW)).toEqual([]);
     const off = { ...after, smart: { ...after.smart, enabled: false } };
@@ -162,14 +206,72 @@ describe("moveCandidates", () => {
   });
 });
 
+describe("launchAccount", () => {
+  const pin = (
+    device: string,
+    extra: Partial<SessionAccountPin> = {},
+  ): SessionAccountPin => ({
+    device,
+    org: `o${device}`,
+    by: "auto",
+    at: NOW - 2 * MANUAL_QUIET_MS,
+    ...extra,
+  });
+
+  it("starts a session on its own account while that has room", () => {
+    const v = view([acct("1", 40, { current: true }), acct("2", 50)]);
+    expect(launchAccount(pin("2"), v, NOW)).toEqual({
+      account: v.accounts[1],
+      moved: false,
+    });
+  });
+
+  it("starts it where there is room once its account is at the switch point", () => {
+    const v = view([acct("1", 20, { current: true }), acct("2", 88)]);
+    expect(launchAccount(pin("2"), v, NOW)?.account.deviceId).toBe("1");
+    expect(launchAccount(pin("2"), v, NOW)?.moved).toBe(true);
+  });
+
+  it("keeps a fresh hand-picked account, a full one with nowhere to go, and one when switching is off", () => {
+    const v = view([acct("1", 20, { current: true }), acct("2", 88)]);
+    expect(
+      launchAccount(pin("2", { by: "manual", at: NOW - 1000 }), v, NOW)?.moved,
+    ).toBe(false);
+    const full = view([acct("1", 80, { current: true }), acct("2", 88)]);
+    expect(launchAccount(pin("2"), full, NOW)?.account.deviceId).toBe("2");
+    const off = view([acct("1", 20), acct("2", 88)], { enabled: false });
+    expect(launchAccount(pin("2"), off, NOW)?.account.deviceId).toBe("2");
+  });
+
+  it("has no answer when the account is gone", () => {
+    expect(launchAccount(pin("9"), view([acct("1", 0)]), NOW)).toBeNull();
+  });
+});
+
+describe("pendingAccount", () => {
+  it("is the account a running managed session waits to move to", () => {
+    expect(pendingAccount(session("a", { accountWant: "2" }))).toBe("2");
+    expect(pendingAccount(session("a", { accountWant: "1" }))).toBeNull();
+    expect(pendingAccount(session("a"))).toBeNull();
+    expect(
+      pendingAccount(session("a", { accountWant: "2", state: "ended" })),
+    ).toBeNull();
+    expect(
+      pendingAccount(
+        session("a", { accountWant: "2", management: "observed" }),
+      ),
+    ).toBeNull();
+  });
+});
+
 describe("readyToMove", () => {
-  const c = { id: "a", idleMs: 30_000 };
+  const c = { id: "a", idleMs: 30_000, to: "2" };
   it("waits longer for a session on screen and leaves a typed-into one alone", () => {
     const quiet = { sinceInputMs: Infinity, sinceTriedMs: Infinity };
     expect(readyToMove(c, { ...quiet, focused: false })).toBe(true);
     expect(readyToMove(c, { ...quiet, focused: true })).toBe(false);
     expect(
-      readyToMove({ id: "a", idleMs: 90_000 }, { ...quiet, focused: true }),
+      readyToMove({ ...c, idleMs: 90_000 }, { ...quiet, focused: true }),
     ).toBe(true);
     expect(
       readyToMove(c, {

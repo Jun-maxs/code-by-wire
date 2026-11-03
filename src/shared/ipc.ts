@@ -148,7 +148,7 @@ export const IPC = {
   claudeAccountsRemove: "claudeAccounts:remove",
   accountSwitchTick: "accountSwitch:tick",
   accountSwitchSetPrefs: "accountSwitch:setPrefs",
-  accountSwitchMoved: "accountSwitch:moved",
+  accountSwitchSetSession: "accountSwitch:setSession",
   hudSettingsSet: "hud:settingsSet",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
@@ -234,6 +234,9 @@ export interface OverviewData extends IndexOverview {
 export interface AccountSwitchTick {
   accounts: AccountsOverview | null;
   candidates: MoveCandidate[];
+  /** Fork (2026-11-03): idle sessions whose move the user asked for and that haven't moved yet
+   *  (restarted on their own account by the renderer, also while the window is hidden). */
+  pending: string[];
 }
 
 /** The result of an on-demand tasks read: a fresh list with a change token the caller echoes back as
@@ -578,8 +581,15 @@ export interface IpcApi {
   setAccountSwitchPrefs(
     prefs: SmartSwitchPrefs,
   ): Promise<AccountsOverview | null>;
-  /** A session was ended and resumed on the new default account. */
-  accountSwitchMoved(): Promise<void>;
+  /** Fork (2026-11-03): give one Claude session its own account (a device id from the accounts
+   *  view): its next launch starts there. "manual" is the user's pick, "auto" smart switching's
+   *  (counted on the last switch). The caller restarts a running session to apply it. False when
+   *  the session or the account isn't known. */
+  setSessionAccount(
+    id: string,
+    device: string,
+    by: "manual" | "auto",
+  ): Promise<boolean>;
   /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
   setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
 }

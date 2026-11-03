@@ -84,6 +84,8 @@ export const zh: Translations = {
     accounts: {
       title: "Claude 账号",
       switch: "切换账号",
+      switchSession: "给这个会话换号",
+      manage: "管理",
       current: "新会话用",
       use: "切换",
       bind: "绑定",
@@ -97,26 +99,44 @@ export const zh: Translations = {
       removeNote:
         "移除只退出这个账号的登录；会话记录和设置都保留，以后可以重新添加。",
       removed: (name: string) => `已移除 ${name}。`,
-      sessionOn: (name: string) => `本会话：${name}`,
-      staleHint:
-        "切换只对新建和恢复的会话生效。可以把这个会话结束后用当前账号恢复，对话记录不丢。",
-      staleBusy: "切换只对新建和恢复的会话生效；它正在运行，等它停下来再换。",
-      continueOnCurrent: "在当前账号上继续这个会话",
-      staleOutside:
-        "切换只对新建和恢复的会话生效；这个会话不是在 Jun-Code 里开的，在它自己的终端里退出后重开即可。",
+      sessionHeading: "这个会话",
+      thisSession: "本会话",
+      onResume: "恢复时用",
+      moveHere: "换到这里",
+      useOnResume: "恢复时用这个",
+      moving: "正在换…",
+      afterTurn: "等本轮结束",
+      afterBackground: "等后台任务",
+      resetsIn: (d: string) => `${d}后重置`,
+      allHeading: "所有会话",
+      moveFailed: "没换成：账号列表还没读到，稍后再试。",
+      hintIdle:
+        "换号会在选中的号上重开这个会话，对话保留。只影响这个会话，其他会话和新会话默认不变。",
+      hintBusy:
+        "这个会话正在运行，换号会等这一轮结束，对话保留。只影响这个会话。",
+      hintEnded: "恢复这个会话时用打勾的号。只影响这个会话。",
+      hintBackground:
+        "这个会话还有后台任务在跑，换号会等它们结束，免得停掉，对话保留。只影响这个会话。",
+      hintOutside:
+        "这个会话不是在 Jun-Code 里开的，不能在这里换号；在它自己的终端里退出后重开。",
+      hintRemote: "手机远程会话的账号由远程命令决定，不能单独换号。",
+      defaultTitle: "新会话默认",
+      defaultHint: "新建的会话用它，已有会话不受影响",
+      markPending: (n: number) => `等这一轮和后台任务结束后换到账号 ${n}`,
+      markOnResume: (n: number) => `恢复时用账号 ${n}`,
       none: "没有使用 reclaude，没有可切换的账号。",
       empty: "没有找到组织。",
-      note: "新建和恢复的会话用标着「新会话用」的账号；正在运行的会话保持原账号，恢复后才切过去。",
+      note: "新建的会话用标着「新会话用」的账号。单个会话可以单独换号：点右栏或分屏格子标题栏上的账号号码。",
       switched: (name: string) => `新会话已改用 ${name}。`,
       failed: (e: string) => `reclaude：${e}`,
       loading: "正在读取账号…",
       badge: (n: number, email: string) => `账号 ${n} · ${email}`,
       smartTitle: "智能切换",
       smartDesc:
-        "5 小时额度到切换点时换到余量最多的账号，空闲会话随后跟过去，对话不丢。",
+        "5 小时额度到切换点时，新会话改用余量最多的账号；那个号上的空闲会话各自换到有余量的号，对话不丢。",
       switchAt: (pct: number) => `切换点 ${pct}%`,
       smartShort: (pct: number) =>
-        `5 小时用到 ${pct}% 自动换号 · 空闲会话跟过去`,
+        `5 小时额度到 ${pct}% 时，新会话和空闲会话换到有余量的号；手动换过的会话半小时内不动`,
       smartNeedsTwo: "至少要有两个已登录的账号。",
       smartOff: "已关闭，只在你手动切换时换号。",
       smartThreshold: "切换点",
@@ -128,8 +148,8 @@ export const zh: Translations = {
         pct: number,
         moved: number,
       ) =>
-        `${time} 账号 ${from} 用到 ${pct}%，已换到账号 ${to}` +
-        (moved ? `，${moved} 个会话已跟过去` : ""),
+        `上次 ${time}：账号 ${from} 到 ${pct}%，换到账号 ${to}` +
+        (moved ? `，挪了 ${moved} 个会话` : ""),
       notSeen: "还没用过",
       windowFive: "5h",
       windowSeven: "7d",

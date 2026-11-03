@@ -1,4 +1,5 @@
 import type { AccountSwitcher } from "./account-switch";
+import type { SessionAccountStore } from "./session-accounts";
 import { normalizePrefs } from "@shared/account-switch";
 import { join } from "node:path";
 import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
@@ -198,6 +199,9 @@ export interface IpcDeps {
   sessionPins?: SessionPinStore;
   /** Fork feature: sessions started with remote; stamped onto the overview so the sidebar can mark them. */
   remoteSessions?: { read(): Record<string, true> };
+  /** Fork (2026-11-03): each session's own reclaude account and where this run's ptys started;
+   *  stamped onto the overview as accountWant / accountDevice. */
+  sessionAccounts?: Pick<SessionAccountStore, "read" | "set" | "launchOf">;
   /** Where the workbench keeps product cards and per-session hook state (sidebar product tags).
    *  Absent → products:read serves null. */
   productsDirs?: () => { cardsDir: string; stateDir: string };
@@ -260,6 +264,7 @@ export function registerIpc({
   sessionTitles,
   sessionPins,
   remoteSessions,
+  sessionAccounts,
   contentSearch,
   productsDirs,
   board,
@@ -453,14 +458,28 @@ export function registerIpc({
       : agentOverlaid;
     const named = applyTitleOverrides(tasked, sessionTitles?.read() ?? {});
     const remoteIds = remoteSessions?.read() ?? {};
+    const accountPins = sessionAccounts?.read() ?? {};
     const pinned = applyPinOverrides(named, sessionPins?.read() ?? {}).map(
       (s) => {
         const withRemote = remoteIds[s.id] ? { ...s, remote: true } : s;
-        // Fork: which reclaude account the session runs on, from where its capture was written.
-        const device = /accounts[\\/](\d+)[\\/]config$/.exec(
-          byId.get(s.id)?.configDir ?? "",
+        // Fork: which reclaude account the session runs on — where its capture was written, unless
+        // its pty was started (on a known account) after that capture: a session just moved to
+        // another account reads as moved before its first capture there.
+        const capture = byId.get(s.id);
+        const captured = /accounts[\\/](\d+)[\\/]config$/.exec(
+          capture?.configDir ?? "",
         )?.[1];
-        return device ? { ...withRemote, accountDevice: device } : withRemote;
+        const launch = sessionAccounts?.launchOf(s.id);
+        const device =
+          launch && (!captured || launch.at >= (capture?.capturedMtimeMs ?? 0))
+            ? launch.device
+            : captured;
+        const want = accountPins[s.id]?.device;
+        return {
+          ...withRemote,
+          ...(device ? { accountDevice: device } : {}),
+          ...(want ? { accountWant: want } : {}),
+        };
       },
     );
     // A6 last tier: fill the settings.json default only where no per-session source (capture or
@@ -602,14 +621,37 @@ export function registerIpc({
       accountSwitcher?.tick(overviewNow().sessions) ?? {
         accounts: null,
         candidates: [],
+        pending: [],
       },
   );
   ipcMain.handle(IPC.accountSwitchSetPrefs, (_e, raw: unknown) =>
     accountSwitcher ? accountSwitcher.setPrefs(normalizePrefs(raw)) : null,
   );
-  ipcMain.handle(IPC.accountSwitchMoved, () => {
-    accountSwitcher?.noteMoved();
-  });
+  // Fork (2026-11-03): one session's own account, picked by the user or by smart switching.
+  ipcMain.handle(
+    IPC.accountSwitchSetSession,
+    (_e, id: unknown, device: unknown, by: unknown): boolean => {
+      const account = accountSwitcher
+        ?.view()
+        ?.accounts.find((a) => a.deviceId === device);
+      if (
+        typeof id !== "string" ||
+        !id ||
+        !account ||
+        !sessionAccounts ||
+        (by !== "manual" && by !== "auto")
+      )
+        return false;
+      sessionAccounts.set(id, {
+        device: account.deviceId,
+        org: account.orgId,
+        by,
+        at: Date.now(),
+      });
+      if (by === "auto") accountSwitcher?.noteMoved();
+      return true;
+    },
+  );
   ipcMain.handle(IPC.refresh, async () => {
     try {
       await sync();

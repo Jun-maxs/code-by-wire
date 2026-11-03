@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ClaudeAccountsView, ClaudeOrg } from "@shared/ipc";
+import {
+  accountColor,
+  windowPct,
+  type AccountQuota,
+  type AccountsOverview,
+} from "@shared/account-switch";
 import type { Session } from "@shared/types";
 import { Card } from "../shell/page-primitives";
 import { Icon } from "../ui/icons";
@@ -9,6 +15,12 @@ import { useI18n } from "../i18n";
 import { useStore } from "@nanostores/react";
 import { $accounts } from "./accounts-store";
 import { AccountBadge, quotaSummary, SmartSwitchControl } from "./AccountBadge";
+import {
+  accountSwitchKind,
+  backgroundBusy,
+  moveSessionAccount,
+} from "./session-account";
+import { sessionDisplayTitle } from "../shell/split-view";
 
 /** reclaude's bindings and the switch/bind/add/remove actions, shared by the Settings card and the
  *  Pressure panel's popover. Reads the list when mounted; every action answers with the new list.
@@ -62,18 +74,9 @@ function useClaudeAccounts() {
   return { view, busy, notice, use, bind, add, remove };
 }
 
-/** Fork (2026-11-01): ask App to end this session and resume it, so it picks up the default account
- *  (App owns the terminal store that ending and resuming go through). */
-export const CONTINUE_ON_ACCOUNT_EVENT = "cbw:continue-on-account";
-
-function AccountList({
-  compact = false,
-  session,
-}: {
-  compact?: boolean;
-  /** The session the popover was opened from: says which account it runs on. */
-  session?: Session;
-}) {
+/** Every binding with its default switch, bind, remove and add actions: Settings, and the popover
+ *  while there is no second account to move a session to. */
+function AccountList({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
   const a = t.settings.accounts;
   const { view, busy, notice, use, bind, add, remove } = useClaudeAccounts();
@@ -171,20 +174,11 @@ function AccountList({
           )}
         </div>
       ))}
-      <button
-        type="button"
-        disabled={busy !== null}
-        onClick={() => void add()}
-        className={cx(
-          "flex items-center gap-1.5 text-left text-meta text-fg-muted hover:bg-ink-800 hover:text-fg disabled:opacity-50",
-          compact
-            ? "rounded-md px-2 py-1.5"
-            : "border-t border-ink-800 px-4 py-3",
-        )}
-      >
-        <Icon name="plus" size={12} />
-        {busy === "add" ? a.adding : a.add}
-      </button>
+      <AddAccountButton
+        compact={compact}
+        busy={busy}
+        onAdd={() => void add()}
+      />
       {view.error && (
         <div className="px-4 py-2 text-meta text-danger">
           {a.failed(view.error)}
@@ -201,65 +195,6 @@ function AccountList({
           <SmartSwitchControl full={!compact} />
         </div>
       )}
-      {session?.accountDevice &&
-        (() => {
-          // A switch reaches new and resumed sessions only; say where this one runs, and offer to
-          // move it when that isn't the default any more.
-          const runsOn = view.orgs.find(
-            (o) => o.deviceId === session.accountDevice,
-          );
-          const current = view.orgs.find((o) => o.current);
-          const stale = !!current && runsOn?.id !== current.id;
-          const movable =
-            stale &&
-            session.management === "managed" &&
-            session.state !== "working";
-          return (
-            <div
-              className={cx(
-                "mx-1 mt-1 rounded-md border px-2 py-1.5 text-meta",
-                stale
-                  ? "border-(--ui-stroke-tertiary) text-fg-muted"
-                  : "border-transparent text-fg-faint",
-              )}
-            >
-              <span className="flex min-w-0 items-center gap-1.5">
-                {runsOn && quotaOf(runsOn) && (
-                  <AccountBadge account={quotaOf(runsOn)!} />
-                )}
-                <span className="min-w-0 truncate">
-                  {a.sessionOn(runsOn ? runsOn.email || runsOn.name : "?")}
-                </span>
-              </span>
-              {stale && (
-                <>
-                  <div className="mt-0.5 text-fg-faint">
-                    {movable
-                      ? a.staleHint
-                      : session.management !== "managed"
-                        ? a.staleOutside
-                        : a.staleBusy}
-                  </div>
-                  {movable && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent(CONTINUE_ON_ACCOUNT_EVENT, {
-                            detail: session.id,
-                          }),
-                        )
-                      }
-                      className="mt-1 rounded-md border border-ink-700 px-2.5 py-1 text-meta text-fg hover:bg-ink-800"
-                    >
-                      {a.continueOnCurrent}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })()}
       {(!compact || confirming || notice) && (
         <div
           className={cx(
@@ -274,6 +209,276 @@ function AccountList({
   );
 }
 
+function AddAccountButton({
+  compact,
+  busy,
+  onAdd,
+}: {
+  compact: boolean;
+  busy: string | null;
+  onAdd: () => void;
+}) {
+  const { t } = useI18n();
+  const a = t.settings.accounts;
+  return (
+    <button
+      type="button"
+      disabled={busy !== null}
+      onClick={onAdd}
+      className={cx(
+        "flex items-center gap-1.5 text-left text-meta text-fg-muted hover:bg-ink-800 hover:text-fg disabled:opacity-50",
+        compact
+          ? "rounded-md px-2 py-1.5"
+          : "border-t border-ink-800 px-4 py-3",
+      )}
+    >
+      <Icon name="plus" size={12} />
+      {busy === "add" ? a.adding : a.add}
+    </button>
+  );
+}
+
+/**
+ * Fork (2026-11-03): the popover opened from a Claude session, once there are two accounts. The
+ * rows act on this session alone — "move here" gives it that account as its own and restarts it
+ * there (after this turn when it is working; on resume when it has ended) — while the default for
+ * new sessions is its own small choice below, so moving one session never moves the others.
+ */
+function SessionAccounts({
+  session,
+  view,
+}: {
+  session: Session;
+  view: AccountsOverview;
+}) {
+  const { t } = useI18n();
+  const a = t.settings.accounts;
+  // The account just picked here, until the next sync carries it as the session's own.
+  const [picked, setPicked] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const kind = accountSwitchKind(session);
+  // Background work still running (read once per opening): a move then waits for it.
+  const [background, setBackground] = useState(false);
+  useEffect(() => {
+    if (kind === "live")
+      void backgroundBusy(session.id).then((busy) => setBackground(busy));
+  }, [kind, session.id]);
+  const defaultDevice = view.accounts.find((x) => x.current)?.deviceId;
+  // Where it runs now (a live session not yet seen anywhere was started on the default), and where
+  // it is to run: its own account, else — when it has ended — the default its resume would take.
+  const running =
+    session.accountDevice ?? (kind === "live" ? defaultDevice : undefined);
+  const want =
+    picked ??
+    session.accountWant ??
+    (kind === "ended" ? defaultDevice : running);
+  const pending =
+    kind === "live" && want !== undefined && want !== running ? want : null;
+  const movable = kind === "live" || kind === "ended";
+
+  const move = async (account: AccountQuota) => {
+    setBusy(account.deviceId);
+    setError(null);
+    const ok = await moveSessionAccount(session, account.deviceId);
+    setBusy(null);
+    if (ok) setPicked(account.deviceId);
+    else setError(a.moveFailed);
+    if (ok && kind === "live") setBackground(await backgroundBusy(session.id));
+  };
+  const makeDefault = async (account: AccountQuota) => {
+    if (account.current) return;
+    setBusy("default");
+    setError(null);
+    const next = await window.api.useClaudeAccount(account.orgId);
+    setBusy(null);
+    if (next.error) return setError(a.failed(next.error));
+    // Mirror it now; the smart switch's next tick confirms it.
+    $accounts.set({
+      ...view,
+      accounts: view.accounts.map((x) => ({
+        ...x,
+        current: x.deviceId === account.deviceId,
+      })),
+    });
+  };
+  const add = async () => {
+    setBusy("add");
+    setError(null);
+    const next = await window.api.addClaudeAccount();
+    setBusy(null);
+    if (next.error) setError(a.failed(next.error));
+  };
+
+  const hint =
+    kind === "remote"
+      ? a.hintRemote
+      : kind === "outside"
+        ? a.hintOutside
+        : kind === "ended"
+          ? a.hintEnded
+          : background
+            ? a.hintBackground
+            : pending || session.state !== "idle"
+              ? a.hintBusy
+              : a.hintIdle;
+  // While a move waits: for the turn to end, or for the background work; else it is under way.
+  // Each row's use, with the 5h reset time the popover is opened to judge by.
+  const rowMeta = (acc: AccountQuota) => {
+    const now = Date.now();
+    const five = windowPct(acc.fiveHour, now);
+    const seven = windowPct(acc.sevenDay, now);
+    if (five === null && seven === null) return quotaSummary(acc, t);
+    return [
+      five !== null && `${a.windowFive} ${Math.round(five)}%`,
+      acc.fiveHour &&
+        five &&
+        a.resetsIn(t.time.countdown(acc.fiveHour.resetsAt, now)),
+      seven !== null && `${a.windowSeven} ${Math.round(seven)}%`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
+  const waitingLabel =
+    session.state !== "idle"
+      ? a.afterTurn
+      : background
+        ? a.afterBackground
+        : a.moving;
+
+  return (
+    <div className="flex flex-col p-1.5">
+      <div className="flex min-w-0 items-baseline gap-1.5 px-2 pt-1 pb-1.5">
+        <span className="shrink-0 text-meta text-fg-faint">
+          {a.sessionHeading}
+        </span>
+        <span className="min-w-0 truncate text-aux text-fg-muted">
+          {sessionDisplayTitle(session, t)}
+        </span>
+      </div>
+      {view.accounts.map((acc) => {
+        const here =
+          kind === "ended" ? acc.deviceId === want : acc.deviceId === running;
+        const target = acc.deviceId === pending;
+        return (
+          <div
+            key={acc.deviceId}
+            className={cx(
+              "flex items-center justify-between gap-3 rounded-md px-2 py-1.5",
+              here && "bg-(--ui-row-hover-background)",
+            )}
+            style={
+              target
+                ? { boxShadow: `inset 2px 0 0 ${accountColor(acc.n)}` }
+                : undefined
+            }
+          >
+            <div className="flex min-w-0 items-start gap-2">
+              <AccountBadge account={acc} className="mt-[3px]" />
+              <div className="min-w-0">
+                <div title={acc.email} className="truncate text-body text-fg">
+                  {acc.email}
+                </div>
+                <div
+                  title={rowMeta(acc)}
+                  className="truncate text-meta text-fg-faint"
+                >
+                  {rowMeta(acc)}
+                </div>
+              </div>
+            </div>
+            {target ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-meta text-fg-muted">{waitingLabel}</span>
+                {waitingLabel !== a.moving && running && (
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      const back = view.accounts.find(
+                        (x) => x.deviceId === running,
+                      );
+                      if (back) void move(back);
+                    }}
+                    className="rounded-md px-1.5 py-1 text-meta text-fg-faint hover:bg-ink-800 hover:text-fg disabled:opacity-50"
+                  >
+                    {a.cancel}
+                  </button>
+                )}
+              </div>
+            ) : here ? (
+              <span className="flex shrink-0 items-center gap-1 text-meta text-primary">
+                <Icon name="check" size={12} />
+                {kind === "ended" ? a.onResume : a.thisSession}
+              </span>
+            ) : movable ? (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void move(acc)}
+                className="shrink-0 rounded-md border border-ink-700 px-2.5 py-1 text-meta text-fg hover:bg-ink-800 disabled:opacity-50"
+              >
+                {busy === acc.deviceId
+                  ? "…"
+                  : kind === "ended"
+                    ? a.useOnResume
+                    : a.moveHere}
+              </button>
+            ) : null}
+          </div>
+        );
+      })}
+      <div
+        className={cx(
+          "px-2 pt-1 pb-1.5 text-meta",
+          error ? "text-danger" : "text-fg-faint",
+        )}
+      >
+        {error ?? hint}
+      </div>
+      <div className="mx-1 mt-1 border-t border-ink-800 px-1 pt-2 text-meta text-fg-faint">
+        {a.allHeading}
+      </div>
+      <div className="mx-1 flex items-center justify-between gap-3 px-1 py-1.5">
+        <div className="min-w-0">
+          <div className="text-aux text-fg">{a.defaultTitle}</div>
+          <div className="text-meta text-fg-faint">{a.defaultHint}</div>
+        </div>
+        <div
+          role="radiogroup"
+          aria-label={a.defaultTitle}
+          className="flex shrink-0 items-center rounded-sm border border-(--ui-stroke-tertiary) p-[2px]"
+        >
+          {view.accounts.map((acc) => (
+            <button
+              key={acc.deviceId}
+              type="button"
+              role="radio"
+              aria-checked={acc.current}
+              aria-label={a.badge(acc.n, acc.email)}
+              title={a.badge(acc.n, acc.email)}
+              disabled={busy !== null}
+              onClick={() => void makeDefault(acc)}
+              className={cx(
+                "grid h-6 w-7 place-items-center rounded-[3px] transition-colors",
+                acc.current
+                  ? "bg-ink-700 ring-1 ring-ink-600 ring-inset"
+                  : "hover:bg-ink-850",
+              )}
+            >
+              <AccountBadge account={acc} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mx-1 px-1">
+        <SmartSwitchControl />
+      </div>
+      <AddAccountButton compact busy={busy} onAdd={() => void add()} />
+    </div>
+  );
+}
+
 /** Settings → Appearance: the "Claude account" card. */
 export function ClaudeAccountsCard() {
   const { t } = useI18n();
@@ -284,21 +489,35 @@ export function ClaudeAccountsCard() {
   );
 }
 
-/** The Pressure panel's "switch account" button (Claude only): opens the list in a popover, for
- *  when the 5h / 7d window runs low. */
+/** The width of the popover, for keeping a left-aligned one on screen. */
+const POPOVER_W = 320;
+
+/** The account switcher's button and popover (Claude only): from a session it moves that session
+ *  (once there are two accounts), otherwise it lists the accounts. `mark` leads the label — the
+ *  session's account badge, nothing (null), or by default the account icon; `compact` drops the
+ *  label so the mark alone is the button (a split pane's title bar), with the popover opening to
+ *  its right instead of its left. */
 export function ClaudeAccountSwitch({
   session,
   mark,
+  compact = false,
 }: {
+  /** The session it moves; without one it manages the accounts (the default, adding, removing). */
   session?: Session;
   /** Fork (2026-11-03): what leads the label — the session's account badge, nothing (null), or by
    *  default the account icon. */
   mark?: ReactNode | null;
+  compact?: boolean;
 }) {
   const { t } = useI18n();
-  // Where the popover sits: under the button, right-aligned to it. It is portaled to <body> because
-  // the sidebar clips what overflows it.
-  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const quotas = useStore($accounts);
+  // Where the popover sits: under the button, aligned to its right edge (left edge when compact).
+  // It is portaled to <body> because the sidebar and the panes clip what overflows them.
+  const [at, setAt] = useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -319,30 +538,67 @@ export function ClaudeAccountSwitch({
   const toggle = () => {
     if (at) return setAt(null);
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    if (!r) return;
+    setAt(
+      compact
+        ? {
+            top: r.bottom + 4,
+            left: Math.max(
+              8,
+              Math.min(r.left, window.innerWidth - POPOVER_W - 8),
+            ),
+          }
+        : { top: r.bottom + 4, right: window.innerWidth - r.right },
+    );
   };
+  const forSession =
+    session?.agent === "claude" && quotas && quotas.accounts.length >= 2
+      ? { session, view: quotas }
+      : null;
+  // Named for what it acts on: this session, or every account.
+  const label = forSession
+    ? t.settings.accounts.switchSession
+    : session
+      ? t.settings.accounts.switch
+      : t.settings.accounts.manage;
   return (
     <>
       <button
         ref={button}
         type="button"
         aria-expanded={at !== null}
-        title={t.settings.accounts.switch}
+        aria-label={compact ? label : undefined}
+        title={label}
         onClick={toggle}
-        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-aux text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg-muted"
+        className={cx(
+          "flex items-center gap-1 rounded-md text-aux text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg-muted",
+          compact ? "-mx-0.5 px-0.5 py-0.5" : "px-1.5 py-0.5",
+          at && "bg-(--ui-control-hover-background)",
+        )}
       >
         {mark === undefined ? <Icon name="circle-user" size={12} /> : mark}
-        {t.settings.accounts.switch}
+        {compact ? (
+          <Icon name="chevron-down" size={10} className="text-fg-faint" />
+        ) : (
+          label
+        )}
       </button>
       {at &&
         createPortal(
           // Remounted on each open, so the list is read fresh every time.
           <div
             ref={pop}
-            style={{ top: at.top, right: at.right }}
+            style={{ top: at.top, left: at.left, right: at.right }}
             className="fixed z-50 w-80 max-w-[calc(100vw-16px)] rounded-md border border-ink-800 bg-ink-900 shadow-(--shadow-md)"
           >
-            <AccountList compact session={session} />
+            {forSession ? (
+              <SessionAccounts
+                session={forSession.session}
+                view={forSession.view}
+              />
+            ) : (
+              <AccountList compact />
+            )}
           </div>,
           document.body,
         )}

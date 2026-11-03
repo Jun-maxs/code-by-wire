@@ -83,7 +83,10 @@ import { installTerminalKeybind } from "./shell-terminal/keybinds";
 import { $activeSessionCwd, $terminalTakeover } from "./shell-terminal/store";
 import { UpdateDialog } from "./settings/UpdateDialog";
 import { SessionNavContext } from "./shell/session-nav";
-import { CONTINUE_ON_ACCOUNT_EVENT } from "./settings/ClaudeAccounts";
+import {
+  CONTINUE_ON_ACCOUNT_EVENT,
+  usePendingAccountMoves,
+} from "./settings/session-account";
 import { $accounts } from "./settings/accounts-store";
 import { useSmartAccountSwitch } from "./settings/use-smart-account-switch";
 
@@ -395,9 +398,10 @@ export function App() {
     window.api.terminal.kill(id);
   }
 
-  // Fork (2026-11-01): "continue this session on the current account" from the account popover. An
-  // account switch reaches new and resumed sessions only, so end it and resume it once its pty exits
-  // (a resume while the old pty lives would be refused); the transcript carries the conversation.
+  // Fork (2026-11-01): move a running session to another account (the account popover, a pending
+  // move, smart switching). An account applies when a session starts, so end it and resume it once
+  // its pty exits (a resume while the old pty lives would be refused); the resume starts on the
+  // session's own account (or the default), and the transcript carries the conversation.
   const sessionActions = useRef({ endSession, resumeSession });
   sessionActions.current = { endSession, resumeSession };
   useEffect(() => {
@@ -587,6 +591,8 @@ export function App() {
     .filter((s): s is Session => s !== undefined);
   // Smart account switching: the sessions on screen are moved more cautiously.
   useSmartAccountSwitch(splitOn ? gridIds : selected ? [selected.id] : []);
+  // Moves the user asked of running sessions, carried out once each is idle.
+  usePendingAccountMoves(all);
   const candidates = useMemo(
     () => splitCandidates(all, gridIds),
     // gridIds is rebuilt each render; its joined key is the stable identity.

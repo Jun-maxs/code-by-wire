@@ -2,16 +2,20 @@ import { useEffect, useRef } from "react";
 import { readyToMove } from "@shared/account-switch";
 import { sinceTerminalInput } from "../terminal/input-activity";
 import { $accounts } from "./accounts-store";
-import { CONTINUE_ON_ACCOUNT_EVENT } from "./ClaudeAccounts";
+import {
+  backgroundBusy,
+  restartOnAccount,
+  restartPendingMoves,
+} from "./session-account";
 
 const TICK_MS = 15_000;
 
 /**
  * Fork (2026-11-03): drives smart account switching. Every 15 seconds — also while the window is
  * hidden, since the user is often away in a game while sessions run — main checks the default
- * account's 5h window and switches when it is due; this then moves at most one idle session still
- * on the full account onto the new default (ended and resumed, like "continue on the current
- * account"). Sessions on screen wait longer, and one typed into recently is left alone.
+ * account's 5h window and switches when it is due; this then moves at most one idle session off a
+ * full account, to the account main picked for it (it gets that account as its own, then is ended
+ * and resumed there). Sessions on screen wait longer, and one typed into recently is left alone.
  */
 export function useSmartAccountSwitch(visibleIds: string[]): void {
   const visible = useRef(new Set<string>());
@@ -26,6 +30,9 @@ export function useSmartAccountSwitch(visibleIds: string[]): void {
         const r = await window.api.accountSwitchTick();
         $accounts.set(r.accounts);
         const now = Date.now();
+        // Moves the user asked for go first; the window's own session list stops syncing while it
+        // is hidden, so they are carried out from here too.
+        await restartPendingMoves(r.pending, now);
         const next = r.candidates.find((c) =>
           readyToMove(c, {
             focused: visible.current.has(c.id),
@@ -33,12 +40,14 @@ export function useSmartAccountSwitch(visibleIds: string[]): void {
             sinceTriedMs: now - (tried.get(c.id) ?? -Infinity),
           }),
         );
+        // A session with background work running stays put: ending it would stop that work.
         if (next) {
           tried.set(next.id, now);
-          window.dispatchEvent(
-            new CustomEvent(CONTINUE_ON_ACCOUNT_EVENT, { detail: next.id }),
-          );
-          void window.api.accountSwitchMoved();
+          if (
+            !(await backgroundBusy(next.id)) &&
+            (await window.api.setSessionAccount(next.id, next.to, "auto"))
+          )
+            restartOnAccount(next.id);
         }
       } catch {
         // the next tick tries again

@@ -7,8 +7,8 @@ import { DutyPanel } from "../../workspace/panels/DutyPanel";
 import { SessionPanel } from "../SessionPanel";
 import { SectionDivider } from "./SectionDivider";
 import { useStore } from "@nanostores/react";
-import { $accounts, badgeAccount } from "../../settings/accounts-store";
-import { AccountBadge } from "../../settings/AccountBadge";
+import { $accounts, sessionMarks } from "../../settings/accounts-store";
+import { SessionAccountMark } from "../../settings/AccountBadge";
 import type { SidebarPanelsProps } from "./index";
 
 /** Claude Code's telemetry stack: Pressure (with the account API as the rate-limit merge's fill
@@ -22,7 +22,7 @@ export function ClaudePanels({
 }: SidebarPanelsProps) {
   // Whose 5h / 7d the rows show, once there are two accounts to tell apart (fork, 2026-11-03).
   const accounts = useStore($accounts);
-  const account5h = badgeAccount(accounts, session.accountDevice);
+  const marks = sessionMarks(accounts, session);
   return (
     <>
       <PressurePanel
@@ -38,7 +38,12 @@ export function ClaudePanels({
             <ClaudeAccountSwitch
               session={session}
               mark={
-                account5h ? <AccountBadge account={account5h} /> : undefined
+                marks ? (
+                  <SessionAccountMark
+                    marks={marks}
+                    ended={session.state === "ended"}
+                  />
+                ) : undefined
               }
             />
           )

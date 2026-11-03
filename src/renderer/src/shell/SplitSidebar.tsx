@@ -7,10 +7,10 @@ import { AgentIcon } from "../ui/agent-icons";
 import { SidebarPanelLabel } from "./SidebarPanelLabel";
 import { ctxTone, CONTEXT_WARN_PCT } from "../ui/meta";
 import { PanelHeading, PanelSection } from "../workspace/panels/chrome";
-import { $accounts, badgeAccount } from "../settings/accounts-store";
+import { $accounts, sessionMarks } from "../settings/accounts-store";
 import {
-  AccountBadge,
   AccountQuotaRow,
+  SessionAccountMark,
   SmartSwitchControl,
 } from "../settings/AccountBadge";
 import { ClaudeAccountSwitch } from "../settings/ClaudeAccounts";
@@ -46,7 +46,7 @@ export function SplitSidebar({
   const accounts = useStore($accounts);
   const many = (accounts?.accounts.length ?? 0) >= 2;
   const Panels = SIDEBAR_PANELS[session.agent];
-  const selectedAccount = badgeAccount(accounts, session.accountDevice);
+  const selectedMarks = sessionMarks(accounts, session);
   return (
     <div className="flex flex-col px-1.5 pb-2">
       <PanelSection>
@@ -62,7 +62,7 @@ export function SplitSidebar({
           {panes.map((p) => {
             const title = sessionDisplayTitle(p, t);
             const active = p.id === session.id;
-            const badge = badgeAccount(accounts, p.accountDevice);
+            const marks = sessionMarks(accounts, p);
             return (
               <li key={p.id}>
                 <button
@@ -80,10 +80,10 @@ export function SplitSidebar({
                   <span className="grid size-3.5 shrink-0 place-items-center">
                     <Lamp state={p.state} management={p.management} />
                   </span>
-                  {badge ? (
-                    <AccountBadge
-                      account={badge}
-                      className={p.state === "ended" ? "opacity-50" : undefined}
+                  {marks ? (
+                    <SessionAccountMark
+                      marks={marks}
+                      ended={p.state === "ended"}
                     />
                   ) : (
                     many && <span className="size-3.5 shrink-0" />
@@ -131,7 +131,7 @@ export function SplitSidebar({
           <PanelSection>
             <PanelHeading
               icon="circle-user"
-              right={<ClaudeAccountSwitch session={session} mark={null} />}
+              right={<ClaudeAccountSwitch mark={null} />}
             >
               {s.accountsHeading}
             </PanelHeading>
@@ -156,7 +156,7 @@ export function SplitSidebar({
         <SidebarPanelLabel icon="app-window" className="shrink-0">
           {s.currentPane}
         </SidebarPanelLabel>
-        {selectedAccount && <AccountBadge account={selectedAccount} />}
+        {selectedMarks && <SessionAccountMark marks={selectedMarks} />}
         <span className="min-w-0 flex-1 truncate text-aux font-medium text-fg">
           {sessionDisplayTitle(session, t)}
         </span>

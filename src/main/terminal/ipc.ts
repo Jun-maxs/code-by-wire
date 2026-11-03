@@ -110,6 +110,7 @@ export function registerTerminalIpc({
   launchArgs,
   remoteSessions,
   remoteCommand,
+  accounts,
 }: {
   window: BrowserWindow;
   managed: ManagedRegistry;
@@ -134,6 +135,13 @@ export function registerTerminalIpc({
   remoteSessions?: RemoteSessionStore;
   /** The remote command (claude-r by default); see remote-sessions.ts. */
   remoteCommand?: () => string;
+  /** Fork (2026-11-03): the reclaude account each Claude launch starts on. `launch` answers the
+   *  env for `id` (RECLAUDE_ORG when the session has its own account) and records where it started;
+   *  `inherit` gives a fork its source's account. See session-accounts.ts. */
+  accounts?: {
+    launch(id: string, remote: boolean): Record<string, string>;
+    inherit(from: string, to: string): void;
+  };
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data, offset) => {
@@ -207,6 +215,8 @@ export function registerTerminalIpc({
       agent: req.agent,
       extraArgs: check.tokens,
       remote,
+      env:
+        req.agent === "claude" ? accounts?.launch(req.id, remote) : undefined,
       cols: req.cols,
       rows: req.rows,
     });
@@ -220,13 +230,15 @@ export function registerTerminalIpc({
     const d = gateResume(agentOf(req.id), resolveResumeTarget(req.id));
     if (!d.ok) return { ok: false, reason: d.reason };
     const stored = launchArgs?.get(req.id) ?? "";
+    const remote = d.agent === "claude" && remoteSessions?.has(req.id) === true;
     manager.resume({
       id: req.id,
       cwd: d.cwd,
       agent: d.agent,
       claimedRollout: d.claimedRollout,
       extraArgs: resolveStoredExtraArgs(d.agent, stored),
-      remote: d.agent === "claude" && remoteSessions?.has(req.id) === true,
+      remote,
+      env: d.agent === "claude" ? accounts?.launch(req.id, remote) : undefined,
       cols: req.cols,
       rows: req.rows,
     });
@@ -247,6 +259,15 @@ export function registerTerminalIpc({
     if (stored) persistLaunchArgs(req.newId, stored);
     const remote = remoteSessions?.has(req.sourceId) === true;
     if (remote) persistRemote(req.newId, true);
+    try {
+      accounts?.inherit(req.sourceId, req.newId);
+    } catch (err) {
+      logError(
+        "session-account-inherit-failed",
+        "fork could not take its source's account; it starts on the default",
+        err,
+      );
+    }
     manager.fork({
       id: req.newId,
       sourceId: req.sourceId,
@@ -254,6 +275,7 @@ export function registerTerminalIpc({
       cwd: d.cwd,
       extraArgs: resolveStoredExtraArgs("claude", stored),
       remote,
+      env: accounts?.launch(req.newId, remote),
       cols: req.cols,
       rows: req.rows,
     });

@@ -13,7 +13,7 @@ import { FillGauge } from "../ui/charts";
 import { clampPct } from "../ui/charts-geom";
 import { ctxColor, CONTEXT_DANGER_PCT, CONTEXT_WARN_PCT } from "../ui/meta";
 import { useI18n } from "../i18n";
-import { $accounts } from "./accounts-store";
+import { $accounts, type sessionMarks } from "./accounts-store";
 
 /**
  * Fork (2026-11-03): which account a session runs on — its number on the account's own fill, the
@@ -22,25 +22,74 @@ import { $accounts } from "./accounts-store";
  */
 export function AccountBadge({
   account,
+  pending = false,
   className,
 }: {
   account: AccountQuota;
+  /** An account a session is still waiting to move to: outlined, not filled, so "2 → 1" reads as
+   *  not done yet. */
+  pending?: boolean;
   className?: string;
 }) {
   const { t } = useI18n();
   const label = t.settings.accounts.badge(account.n, account.email);
+  const color = accountColor(account.n);
   return (
     <span
       title={label}
       role="img"
       aria-label={label}
       className={cx(
-        "grid size-3.5 shrink-0 place-items-center rounded-xs font-mono text-tiny font-semibold leading-none text-white tabular-nums",
+        "grid size-3.5 shrink-0 place-items-center rounded-xs font-mono text-tiny font-semibold leading-none tabular-nums",
+        !pending && "text-white",
         className,
       )}
-      style={{ backgroundColor: accountColor(account.n) }}
+      style={
+        pending
+          ? { boxShadow: `inset 0 0 0 1px ${color}`, color }
+          : { backgroundColor: color }
+      }
     >
       {account.n}
+    </span>
+  );
+}
+
+/**
+ * Fork (2026-11-03): a session's account badge; while it is to move to another account, an arrow
+ * and that account's badge after it, outlined ("2 → 1"), so a move still waiting — for the turn,
+ * its background work, or a resume — is visible where the session is.
+ */
+export function SessionAccountMark({
+  marks,
+  ended = false,
+}: {
+  marks: NonNullable<ReturnType<typeof sessionMarks>>;
+  ended?: boolean;
+}) {
+  const { t } = useI18n();
+  const { on, to } = marks;
+  return (
+    <span
+      className={cx(
+        "flex shrink-0 items-center gap-0.5",
+        ended && "opacity-50",
+      )}
+      title={
+        to
+          ? ended
+            ? t.settings.accounts.markOnResume(to.n)
+            : t.settings.accounts.markPending(to.n)
+          : undefined
+      }
+    >
+      {on && <AccountBadge account={on} />}
+      {to && (
+        <>
+          <Icon name="arrow-right" size={10} className="text-fg-faint" />
+          <AccountBadge account={to} pending />
+        </>
+      )}
     </span>
   );
 }
@@ -52,41 +101,45 @@ function savePrefs(view: AccountsOverview, prefs: SmartSwitchPrefs): void {
   });
 }
 
-/** The smart switch's one-line state: why it can't run, what it last did, or what it will do. */
+/** The smart switch's state line: why it can't run, or the rule it follows. */
 function smartStatus(
   view: AccountsOverview,
   t: ReturnType<typeof useI18n>["t"],
 ): string {
   const a = t.settings.accounts;
-  const { smart, accounts } = view;
+  const { smart } = view;
   if (!smart.available) return a.smartNeedsTwo;
   if (!smart.enabled) return a.smartOff;
-  if (smart.enabled && smart.stuck) return a.smartStuck;
+  if (smart.stuck) return a.smartStuck;
+  return a.smartShort(smart.threshold);
+}
+
+/** What smart switching last did, as a small second line: a switch from the last 12 hours whose
+ *  target is still the default. Older ones, or one the user has since switched away from, are
+ *  dropped. */
+function smartLastLine(
+  view: AccountsOverview,
+  t: ReturnType<typeof useI18n>["t"],
+): string | null {
+  const { smart, accounts } = view;
   const last = smart.last;
+  if (!smart.enabled || !smart.available || !last) return null;
+  const current = accounts.find((x) => x.current);
+  if (current?.deviceId !== last.to || Date.now() - last.at >= 12 * 3_600_000)
+    return null;
   const n = (device: string) =>
     accounts.find((x) => x.deviceId === device)?.n ?? 0;
-  // A switch from the last 12 hours is still news while its target is in use; older ones, or one
-  // the user has since switched away from, give way to the rule itself.
-  const current = accounts.find((x) => x.current);
-  if (
-    smart.enabled &&
-    last &&
-    current?.deviceId === last.to &&
-    Date.now() - last.at < 12 * 3_600_000
-  ) {
-    const time = new Date(last.at).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return a.smartLast(
-      time,
-      n(last.from),
-      n(last.to),
-      last.fromPct,
-      last.moved,
-    );
-  }
-  return a.smartShort(smart.threshold);
+  const time = new Date(last.at).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return t.settings.accounts.smartLast(
+    time,
+    n(last.from),
+    n(last.to),
+    last.fromPct,
+    last.moved,
+  );
 }
 
 /**
@@ -100,6 +153,7 @@ export function SmartSwitchControl({ full = false }: { full?: boolean }) {
   if (!view) return null;
   const { enabled, threshold, available, stuck } = view.smart;
   const on = enabled && available;
+  const lastLine = smartLastLine(view, t);
   return (
     <div className="flex flex-col">
       <div
@@ -122,6 +176,9 @@ export function SmartSwitchControl({ full = false }: { full?: boolean }) {
               ? a.smartDesc
               : smartStatus(view, t)}
           </div>
+          {lastLine && (
+            <div className="mt-0.5 text-meta text-fg-dim">{lastLine}</div>
+          )}
         </div>
         <button
           type="button"
