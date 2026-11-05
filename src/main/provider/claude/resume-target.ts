@@ -15,15 +15,22 @@ export interface ResumeTargetDeps {
  * The registry entry is the freshest one for the id — the same one `listCandidates` derives the UI's
  * `alive` from, so the gate and the displayed state agree. cwd comes from that entry, else from the
  * Transcript, which records `cwd` on every row — so a reaped registry file (the common Ended case) still
- * yields it. Null when neither source gives a cwd: there is nothing to resume.
+ * yields it. Null when neither source gives a cwd: there is nothing to resume. `transcript` says whether
+ * the session has written one at all — a session that never took a turn has none, and `--resume`
+ * would die on it (terminal/resume-gate.ts gateRelaunch starts such a session afresh instead).
  */
 export function resolveResumeTarget({
   claudeDir,
   isPidAlive,
   id,
-}: ResumeTargetDeps): { alive: boolean; cwd: string } | null {
+}: ResumeTargetDeps): {
+  alive: boolean;
+  cwd: string;
+  transcript: boolean;
+} | null {
   const reg = registryById(claudeDir).get(id);
   const alive = reg ? isPidAlive(reg.pid) : false;
+  const transcript = findTranscriptById(claudeDir, id) !== null;
 
   let cwd = reg?.cwd ?? "";
   if (!cwd) {
@@ -36,7 +43,7 @@ export function resolveResumeTarget({
       }
     }
   }
-  return cwd ? { alive, cwd } : null;
+  return cwd ? { alive, cwd, transcript } : null;
 }
 
 /**

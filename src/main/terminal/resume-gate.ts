@@ -1,10 +1,14 @@
 import type { AgentId } from "@shared/agents";
+import type { ModelSelection } from "@shared/models";
 
 /** The resume target as the provider resolves it (see Provider.resolveResumeTarget). */
 export interface ResumeTarget {
   alive: boolean;
   cwd: string;
   rolloutPath?: string;
+  /** Whether the session has written a transcript — what `--resume` loads. False for a session that
+   *  never took a turn (the claude provider reports it; others leave it undefined). */
+  transcript?: boolean;
 }
 
 export type ResumeDecision =
@@ -30,6 +34,41 @@ export function gateResume(
     agent,
     claimedRollout: agent === "codex" ? target.rolloutPath : undefined,
   };
+}
+
+/** What a claude session spawned this run was started with, kept so it can be started again under
+ *  its own id (gateRelaunch). `fork` names the source a fork was taken from. */
+export interface FreshLaunch {
+  cwd: string;
+  model: ModelSelection;
+  agent: AgentId;
+  fork?: string;
+}
+
+export type RelaunchDecision =
+  | { ok: true; launch: FreshLaunch }
+  | { ok: false; reason: "alive" }
+  | null;
+
+/**
+ * Fork (2026-11-05): a session that has not taken a turn yet has no transcript, so `claude --resume
+ * <id>` dies with "No conversation found with session ID". An account move restarts a session by
+ * ending and resuming it, which lost such a blank session: its row vanished and the view fell back to
+ * an older session. When this run spawned the id, it is started again the way it was spawned (same
+ * cwd, model and args, under the same id) — for a blank session that is the move. Null hands the
+ * decision to gateResume: the session has a transcript (or the provider can't say), this run didn't
+ * spawn it, or it isn't a claude session. `live` is the manager's word that the id's pty still runs.
+ */
+export function gateRelaunch(
+  agent: AgentId,
+  target: ResumeTarget | null,
+  launch: FreshLaunch | undefined,
+  live: boolean,
+): RelaunchDecision {
+  if (agent !== "claude" || !launch) return null;
+  if (target && target.transcript !== false) return null;
+  if (target?.alive || live) return { ok: false, reason: "alive" };
+  return { ok: true, launch };
 }
 
 export type ForkDecision =

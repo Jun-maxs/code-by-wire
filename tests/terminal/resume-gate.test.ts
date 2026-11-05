@@ -1,56 +1,106 @@
 import { describe, it, expect } from "vitest";
-import { gateResume, gateFork } from "../../src/main/terminal/resume-gate";
+import {
+  gateRelaunch,
+  gateResume,
+  type FreshLaunch,
+} from "../../src/main/terminal/resume-gate";
 
-describe("gateResume", () => {
-  it("refuses when nothing resolves the id", () => {
-    expect(gateResume("claude", null)).toEqual({
-      ok: false,
-      reason: "unresolvable",
+const launch: FreshLaunch = {
+  cwd: "/w/app",
+  model: "default",
+  agent: "claude",
+};
+
+describe("gateRelaunch (a session that never took a turn has no transcript)", () => {
+  it("relaunches a dead claude session spawned this run when it has no transcript", () => {
+    expect(
+      gateRelaunch(
+        "claude",
+        { alive: false, cwd: "/w/app", transcript: false },
+        launch,
+        false,
+      ),
+    ).toEqual({ ok: true, launch });
+  });
+
+  it("relaunches when nothing resolves the id any more (registry reaped, no transcript)", () => {
+    expect(gateRelaunch("claude", null, launch, false)).toEqual({
+      ok: true,
+      launch,
     });
   });
-  it("refuses a live target — the one-process-per-transcript guard", () => {
-    expect(gateResume("claude", { alive: true, cwd: "/w" })).toEqual({
+
+  it("stands aside once the session has a transcript — that is a normal resume", () => {
+    expect(
+      gateRelaunch(
+        "claude",
+        { alive: false, cwd: "/w/app", transcript: true },
+        launch,
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("stands aside when the provider does not say whether a transcript exists", () => {
+    expect(
+      gateRelaunch("claude", { alive: false, cwd: "/w/app" }, launch, false),
+    ).toBeNull();
+  });
+
+  it("stands aside for an id this run did not spawn (nothing to start it with)", () => {
+    expect(
+      gateRelaunch(
+        "claude",
+        { alive: false, cwd: "/w/app", transcript: false },
+        undefined,
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("stands aside for other agents", () => {
+    expect(
+      gateRelaunch(
+        "codex",
+        { alive: false, cwd: "/w/app", transcript: false },
+        { ...launch, agent: "codex" },
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("refuses while the registry still shows the process alive", () => {
+    expect(
+      gateRelaunch(
+        "claude",
+        { alive: true, cwd: "/w/app", transcript: false },
+        launch,
+        false,
+      ),
+    ).toEqual({ ok: false, reason: "alive" });
+  });
+
+  it("refuses while the manager still holds the session's pty", () => {
+    expect(gateRelaunch("claude", null, launch, true)).toEqual({
       ok: false,
       reason: "alive",
     });
   });
-  it("claude: proceeds with the resolved cwd and no claim binding", () => {
-    expect(gateResume("claude", { alive: false, cwd: "/w" })).toEqual({
+
+  it("carries a fork's source so the relaunch forks again under the same id", () => {
+    const fork: FreshLaunch = { ...launch, model: "opus", fork: "src-1" };
+    expect(gateRelaunch("claude", null, fork, false)).toEqual({
       ok: true,
-      cwd: "/w",
-      agent: "claude",
-      claimedRollout: undefined,
-    });
-  });
-  it("codex: proceeds and carries the rollout path out as the claim binding", () => {
-    expect(
-      gateResume("codex", { alive: false, cwd: "/w", rolloutPath: "/r.jsonl" }),
-    ).toEqual({
-      ok: true,
-      cwd: "/w",
-      agent: "codex",
-      claimedRollout: "/r.jsonl",
+      launch: fork,
     });
   });
 });
 
-describe("gateFork", () => {
-  it("refuses a codex source — fork is claude-only", () => {
-    expect(gateFork("codex", { alive: false, cwd: "/w" })).toEqual({
+describe("gateResume", () => {
+  it("still refuses an id nothing resolves", () => {
+    expect(gateResume("claude", null)).toEqual({
       ok: false,
       reason: "unresolvable",
-    });
-  });
-  it("refuses an unresolvable source", () => {
-    expect(gateFork("claude", null)).toEqual({
-      ok: false,
-      reason: "unresolvable",
-    });
-  });
-  it("claude: proceeds with the resolved cwd — no liveness gate (a fork writes its own transcript)", () => {
-    expect(gateFork("claude", { alive: true, cwd: "/w" })).toEqual({
-      ok: true,
-      cwd: "/w",
     });
   });
 });

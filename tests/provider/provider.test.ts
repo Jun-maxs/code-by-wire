@@ -305,6 +305,7 @@ describe("ClaudeProvider.resolveResumeTarget", () => {
     expect(provider.resolveResumeTarget("sx")).toEqual({
       alive: true,
       cwd: "/w/sx",
+      transcript: false,
     });
     expect(provider.resolveResumeTarget("nope")).toBeNull();
   });

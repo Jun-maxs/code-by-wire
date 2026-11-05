@@ -97,7 +97,9 @@ export interface ResumeRequest {
  * guards the one-process-per-Transcript invariant) or when no working directory can be resolved.
  */
 export type ResumeResult =
-  | { ok: true }
+  /** `session`: the optimistic draft (built the way spawn's is) when the id was started again as a
+   *  fresh session because it had no transcript to resume — see terminal/resume-gate.ts gateRelaunch. */
+  | { ok: true; session?: Session }
   | { ok: false; reason: "alive" | "unresolvable" };
 
 /**

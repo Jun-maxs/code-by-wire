@@ -33,7 +33,13 @@ import type { ManagedRegistry } from "../managed-registry";
 import { createTerminalManager } from "./manager";
 import { createPtyProcess } from "./pty-process";
 import { createRecorder } from "./recorder";
-import { gateResume, gateFork, type ResumeTarget } from "./resume-gate";
+import {
+  gateResume,
+  gateFork,
+  gateRelaunch,
+  type FreshLaunch,
+  type ResumeTarget,
+} from "./resume-gate";
 import type { LaunchArgsStore } from "../launch-args";
 import type { RemoteSessionStore } from "../remote-sessions";
 import { logError } from "../log-buffer";
@@ -168,6 +174,12 @@ export function registerTerminalIpc({
     remoteCommand,
   });
 
+  // Fork (2026-11-05): what each claude session spawned this run was started with, so one that has not
+  // taken a turn yet — no transcript for `--resume` to load — is started again under its own id when an
+  // account move (or a Resume) restarts it. See gateRelaunch. Kept past the pty's exit: that is when
+  // it is needed.
+  const launches = new Map<string, FreshLaunch>();
+
   // A remote mark that fails to save only costs Resume its remote-ness; the spawn still goes ahead.
   function persistRemote(id: string, remote: boolean): void {
     try {
@@ -208,6 +220,8 @@ export function registerTerminalIpc({
     persistLaunchArgs(req.id, raw);
     const remote = req.remote === true && req.agent === "claude";
     persistRemote(req.id, remote);
+    if (req.agent === "claude")
+      launches.set(req.id, { cwd: req.cwd, model: req.model, agent: "claude" });
     manager.spawn({
       id: req.id,
       cwd: req.cwd,
@@ -227,9 +241,56 @@ export function registerTerminalIpc({
   // sync is refused, so two processes never share one Transcript. cwd (and, for codex, the rollout
   // claim binding) is resolved in main, not trusted from the renderer.
   ipcMain.handle(TERMINAL.resume, (_e, req: ResumeRequest): ResumeResult => {
-    const d = gateResume(agentOf(req.id), resolveResumeTarget(req.id));
-    if (!d.ok) return { ok: false, reason: d.reason };
+    const agent = agentOf(req.id);
+    const target = resolveResumeTarget(req.id);
     const stored = launchArgs?.get(req.id) ?? "";
+    // A session that never took a turn has no transcript to resume: start it again as it was spawned
+    // (gateRelaunch), on the account it is to run on now. Its draft rides back so the row stays put.
+    const again = gateRelaunch(
+      agent,
+      target,
+      launches.get(req.id),
+      managed.has(req.id),
+    );
+    if (again) {
+      if (!again.ok) return { ok: false, reason: again.reason };
+      const { launch } = again;
+      const remote = remoteSessions?.has(req.id) === true;
+      const extraArgs = resolveStoredExtraArgs("claude", stored);
+      const env = accounts?.launch(req.id, remote);
+      const size = { cols: req.cols, rows: req.rows };
+      if (launch.fork)
+        manager.fork({
+          id: req.id,
+          sourceId: launch.fork,
+          model:
+            launch.model === "default"
+              ? normalizeModelId(undefined)
+              : launch.model,
+          cwd: launch.cwd,
+          extraArgs,
+          remote,
+          env,
+          ...size,
+        });
+      else
+        manager.spawn({
+          id: req.id,
+          cwd: launch.cwd,
+          model: launch.model,
+          agent: "claude",
+          extraArgs,
+          remote,
+          env,
+          ...size,
+        });
+      return {
+        ok: true,
+        session: draftSession(req.id, launch.cwd, launch.model, "claude"),
+      };
+    }
+    const d = gateResume(agent, target);
+    if (!d.ok) return { ok: false, reason: d.reason };
     const remote = d.agent === "claude" && remoteSessions?.has(req.id) === true;
     manager.resume({
       id: req.id,
@@ -259,6 +320,12 @@ export function registerTerminalIpc({
     if (stored) persistLaunchArgs(req.newId, stored);
     const remote = remoteSessions?.has(req.sourceId) === true;
     if (remote) persistRemote(req.newId, true);
+    launches.set(req.newId, {
+      cwd: d.cwd,
+      model: req.model,
+      agent: "claude",
+      fork: req.sourceId,
+    });
     try {
       accounts?.inherit(req.sourceId, req.newId);
     } catch (err) {
@@ -327,6 +394,11 @@ export function registerTerminalIpc({
   // reconcile), so by the next snapshot `to` reads Managed and `from` derives as an Ended ghost.
   const rename = (from: string, to: string): void => {
     manager.rename(from, to);
+    // The pty runs on under `to` with no transcript yet; a restart of it starts a fresh session there
+    // (not a fork again: a /clear meant a clean slate).
+    const l = launches.get(from);
+    if (l && !launches.has(to))
+      launches.set(to, { cwd: l.cwd, model: l.model, agent: l.agent });
     if (!window.isDestroyed())
       window.webContents.send(TERMINAL.rename, from, to);
   };

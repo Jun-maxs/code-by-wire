@@ -373,6 +373,12 @@ export function App() {
             : t.workspace.resume.couldNotResume,
         );
       }
+      // Fork (2026-11-05): a session with no transcript yet was started again as a fresh session; show
+      // its draft (as spawn does) so the row stays while the new process registers.
+      if (result.session) {
+        const draft = result.session;
+        setDrafts((ds) => [draft, ...ds.filter((d) => d.id !== draft.id)]);
+      }
       // A racing End click during this in-flight resume may have added id to `ending`. The End button reads
       // `live` off the resuming overlay, so it shows before the pty exists — that kill no-oped, and the
       // revived row now reads alive, which pruneEnding never clears (it only drops on Ended). Drop the stale

@@ -46,6 +46,7 @@ describe("resolveResumeTarget", () => {
     ).toEqual({
       alive: false,
       cwd: "/w/app",
+      transcript: true,
     });
   });
 
@@ -67,6 +68,7 @@ describe("resolveResumeTarget", () => {
     ).toEqual({
       alive: true,
       cwd: "/w/live",
+      transcript: false,
     });
   });
 
@@ -88,6 +90,35 @@ describe("resolveResumeTarget", () => {
     ).toEqual({
       alive: false,
       cwd: "/w/dead",
+      transcript: false,
+    });
+  });
+
+  it("reports a transcript next to the registry cwd once the session has taken a turn", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 7,
+      sessionId: "turned-1",
+      cwd: "/w/turned",
+      status: "idle",
+      updatedAt: 5,
+    });
+    writeTranscript(
+      home,
+      "-w-turned",
+      "turned-1",
+      '{"type":"user","cwd":"/w/turned","message":{"content":"hi"}}\n',
+    );
+    expect(
+      resolveResumeTarget({
+        claudeDir: home,
+        isPidAlive: () => false,
+        id: "turned-1",
+      }),
+    ).toEqual({
+      alive: false,
+      cwd: "/w/turned",
+      transcript: true,
     });
   });
 

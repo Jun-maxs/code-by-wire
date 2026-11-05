@@ -93,11 +93,15 @@ export interface Provider {
   ): Promise<MetricsRead> | MetricsRead;
   /** Resolve whether a session is still owned by a live process (the liveness re-check behind Resume's
    *  Ended-only state gate) and the working directory to resume it in. `rolloutPath` rides along for
-   *  agents whose resume pty must register claim-bound to its file (codex); claude omits it. Null when
-   *  nothing resolves a cwd. */
-  resolveResumeTarget(
-    id: string,
-  ): { alive: boolean; cwd: string; rolloutPath?: string } | null;
+   *  agents whose resume pty must register claim-bound to its file (codex); claude omits it. `transcript`
+   *  says whether the session has written one (claude reports it; a session that never took a turn has
+   *  none, so `--resume` can't load it). Null when nothing resolves a cwd. */
+  resolveResumeTarget(id: string): {
+    alive: boolean;
+    cwd: string;
+    rolloutPath?: string;
+    transcript?: boolean;
+  } | null;
   /** Resolve just a session's working directory, for actions that only need the folder (Open in).
    *  Cheaper than resolveResumeTarget: no liveness probe, and a targeted transcript lookup rather than a
    *  full index. Null when no cwd resolves. */
