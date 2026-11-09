@@ -5,7 +5,7 @@ import { AGENT_IDS, AGENTS, type AgentId } from "@shared/agents";
 import { isUpdatePending } from "@shared/update";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { AppearanceCard } from "./AppearanceCard";
-import { HudCard } from "./HudCard";
+import { LaunchAtLoginCard } from "./LaunchAtLoginCard";
 import { JunAccountCard } from "./JunAccountCard";
 import { ClaudeAccountsCard } from "./ClaudeAccounts";
 import { CliCard } from "./CliCard";
@@ -129,7 +129,7 @@ export function SettingsView({
               />
               <JunAccountCard />
               <AppearanceCard />
-              <HudCard />
+              <LaunchAtLoginCard />
               <ClaudeAccountsCard />
             </>
           )}

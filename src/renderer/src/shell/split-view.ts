@@ -8,7 +8,7 @@ import { isPlaceholderTitle, isUnsentSession } from "./session-list-model";
 /**
  * Fork (2026-11-02): the middle column's split view — up to six sessions side by side, each with
  * its own task progress strip. The selected session is the focused pane; picking another session
- * (sidebar, Ctrl+Tab, HUD) while split puts it into the grid. Design: docs/plans/2026-11-02-split-view.md.
+ * (sidebar, Ctrl+Tab, DeskTidy's island) while split puts it into the grid. Design: docs/plans/2026-11-02-split-view.md.
  */
 export const MAX_SPLIT = 6;
 /** Below this pane width the grid drops a column (a Claude Code TUI gets unreadable much narrower). */

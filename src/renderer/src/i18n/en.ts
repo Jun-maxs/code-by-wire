@@ -90,15 +90,10 @@ export const en = {
       dark: "Dark",
       light: "Light",
     },
-    hud: {
-      title: "HUD",
-      enabled: "Show the HUD",
-      enabledDesc:
-        "The strip and glow along the top of the screen; hidden while a full-screen app is in front",
-      display: "Display",
-      displayDesc: "Which screen the HUD sits on",
-      primary: "Primary",
-      screen: (n: number) => `Screen ${n}`,
+    launchAtLogin: {
+      title: "Startup",
+      enabled: "Launch at login",
+      enabledDesc: "Open Jun-Code when you sign in to Windows",
     },
     accounts: {
       title: "Claude account",

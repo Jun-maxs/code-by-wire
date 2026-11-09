@@ -21,9 +21,16 @@ import {
   readTaskTitles,
   saveTopic,
 } from "./products";
-import { app, clipboard, dialog, ipcMain, nativeTheme, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+} from "electron";
 import { cpus, freemem, homedir, release, totalmem } from "node:os";
-import { appWindows } from "./hud/overlay";
 import { existsSync, statSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import {
@@ -309,8 +316,6 @@ export function registerIpc({
     setAppTheme: () => {},
     setTerminalTheme: () => {},
     setAppLocale: () => {},
-    setHud: () => {},
-    setHudPanel: () => {},
     setSessionCleanup: () => {},
     setLastCleanup: () => {},
     setSmartAccountSwitch: () => {},
@@ -1169,7 +1174,7 @@ export function registerIpc({
         { fileName: value.fileName, markdown: value.markdown },
         {
           showSaveDialog: async (options) => {
-            const window = appWindows()[0];
+            const window = BrowserWindow.getAllWindows()[0];
             return window
               ? dialog.showSaveDialog(window, options)
               : dialog.showSaveDialog(options);

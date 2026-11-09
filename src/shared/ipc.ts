@@ -140,7 +140,7 @@ export const IPC = {
   statuslineRepair: "statusline:repair",
   caffeinateGet: "caffeinate:get",
   caffeinateSet: "caffeinate:set",
-  hudSettingsGet: "hud:settingsGet",
+  loginItemGet: "loginItem:get",
   claudeAccountsList: "claudeAccounts:list",
   claudeAccountsUse: "claudeAccounts:use",
   claudeAccountsBind: "claudeAccounts:bind",
@@ -149,7 +149,7 @@ export const IPC = {
   accountSwitchTick: "accountSwitch:tick",
   accountSwitchSetPrefs: "accountSwitch:setPrefs",
   accountSwitchSetSession: "accountSwitch:setSession",
-  hudSettingsSet: "hud:settingsSet",
+  loginItemSet: "loginItem:set",
   launchPresetsGet: "launchPresets:get",
   launchPresetsSet: "launchPresets:set",
   /** PUSH: main -> renderer on every update-state transition. */
@@ -157,10 +157,11 @@ export const IPC = {
   selectSession: "window:selectSession",
 } as const;
 
-/** The HUD overlay's preferences: whether it shows, and on which display (`null` = the primary). */
-export interface HudSettings {
+/** Fork: the OS login item, for Settings' "Launch at login". `supported` is false where Electron
+ *  can't set one (Linux). */
+export interface LoginItem {
+  supported: boolean;
   enabled: boolean;
-  display: string | null;
 }
 
 /** One of the user's reclaude organizations (one Claude account each). */
@@ -182,20 +183,6 @@ export interface ClaudeOrg {
 export interface ClaudeAccountsView {
   orgs: ClaudeOrg[] | null;
   error?: string;
-}
-
-/** A display the HUD can sit on, for the Settings picker. */
-export interface HudDisplayOption {
-  id: string;
-  primary: boolean;
-  width: number;
-  height: number;
-}
-
-/** What Settings shows for the HUD: the stored preferences and the displays attached now. */
-export interface HudSettingsView {
-  settings: HudSettings;
-  displays: HudDisplayOption[];
 }
 
 /** What the clipboard holds besides text: an image (a screenshot), or files copied in the file
@@ -563,8 +550,8 @@ export interface IpcApi {
   /** Turn keep-awake on or off. Resolves to the resulting state — main is the source of truth,
    *  so the footer renders the response rather than assuming the toggle took. */
   setCaffeinate(on: boolean): Promise<boolean>;
-  /** The HUD overlay's preferences and the displays it can use. */
-  getHudSettings(): Promise<HudSettingsView>;
+  /** Whether the app opens when the user signs in to the OS. */
+  getLoginItem(): Promise<LoginItem>;
   /** reclaude's organizations (Claude accounts) and which one new sessions use. */
   listClaudeAccounts(): Promise<ClaudeAccountsView>;
   /** Make a bound organization the default (`reclaude org use`); answers with the new list. */
@@ -590,8 +577,8 @@ export interface IpcApi {
     device: string,
     by: "manual" | "auto",
   ): Promise<boolean>;
-  /** Store the HUD preferences and apply them at once (show, hide or move the overlay). */
-  setHudSettings(settings: HudSettings): Promise<HudSettingsView>;
+  /** Turn launch at login on or off; answers with the login item as the OS now has it. */
+  setLoginItem(enabled: boolean): Promise<LoginItem>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
@@ -617,6 +604,6 @@ export type AppApi = IpcApi & {
   /** Subscribe to update-state pushes. Main sends on every transition (including download progress);
    *  the returned fn unsubscribes. Mirrors onFullscreenChange. */
   onUpdateState(cb: (state: UpdateState) => void): () => void;
-  /** Subscribe to main asking the window to show a session (the HUD panel's session rows). */
+  /** Subscribe to main asking the window to show a session (a session clicked on DeskTidy's island). */
   onSelectSession(cb: (id: string) => void): () => void;
 };

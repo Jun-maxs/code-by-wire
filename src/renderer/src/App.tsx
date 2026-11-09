@@ -156,7 +156,7 @@ export function App() {
   // guards on `!isOverview`, so it never yanks this to a session on first load; the user clicks into a
   // session to leave it.
   const [selectedId, setSelectedId] = useState<string | null>(OVERVIEW_ID);
-  // The HUD overlay's session rows open their session here (main/hud/overlay.ts → showMain).
+  // A session clicked on DeskTidy's top island opens here (main/island-feed.ts → showMain).
   useEffect(() => window.api.onSelectSession(setSelectedId), []);
   const update = useUpdate();
   const updatePending = isUpdatePending(update.state.phase);

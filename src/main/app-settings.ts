@@ -2,7 +2,6 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
 import type { Locale } from "../shared/locale";
-import type { HudSettings } from "../shared/ipc";
 import type { SmartSwitchPrefs } from "../shared/account-switch";
 import type {
   CleanupRun,
@@ -29,34 +28,12 @@ export interface AppSettings {
    *  normalizeLocale over it, so a persisted alias ("zh-CN") or garbage still reads as a
    *  supported locale. */
   appLocale?: Locale;
-  /** The HUD overlay. Missing means on, on the primary display; callers read `hudSettings(read())`. */
-  hud?: Partial<HudSettings>;
-  /** The HUD's own preferences, set in its Settings window (Agent HUD's General page). */
-  hudPanel?: HudPanelSettings;
   /** Automatic session cleanup; read through cleanupSettings() (missing = off, 30 days). */
   sessionCleanup?: Partial<SessionCleanupSettings>;
   /** The last cleanup run, for the Settings card. */
   lastCleanup?: CleanupRun;
   /** Fork (2026-11-03): smart account switching; read through normalizePrefs (missing = on, 85%). */
   smartAccountSwitch?: Partial<SmartSwitchPrefs>;
-}
-
-/** Agent HUD's General page: the HUD windows' appearance and language, and whether quota reads as
- *  used or remaining. Missing fields follow the app (its theme and language) and "consumed". */
-export interface HudPanelSettings {
-  appearance?: "system" | "light" | "dark";
-  language?: "system" | "zh-CN" | "en";
-  quotaDisplay?: "consumed" | "remaining";
-  /** Agents turned off on the HUD's Agents page. */
-  disabledAgents?: string[];
-}
-
-/** The HUD preferences with their defaults filled in. */
-export function hudSettings(s: AppSettings): HudSettings {
-  return {
-    enabled: s.hud?.enabled ?? true,
-    display: typeof s.hud?.display === "string" ? s.hud.display : null,
-  };
 }
 
 export interface AppSettingsStore {
@@ -67,8 +44,6 @@ export interface AppSettingsStore {
   setAppTheme(theme: "dark" | "light"): void;
   setTerminalTheme(theme: "dark" | "light"): void;
   setAppLocale(locale: Locale): void;
-  setHud(hud: HudSettings): void;
-  setHudPanel(patch: HudPanelSettings): void;
   setSessionCleanup(next: SessionCleanupSettings): void;
   setLastCleanup(run: CleanupRun): void;
   setSmartAccountSwitch(prefs: SmartSwitchPrefs): void;
@@ -119,13 +94,6 @@ export function createAppSettingsStore(
     },
     setAppLocale(locale) {
       write({ ...read(), appLocale: locale });
-    },
-    setHud(hud) {
-      write({ ...read(), hud });
-    },
-    setHudPanel(patch) {
-      const s = read();
-      write({ ...s, hudPanel: { ...s.hudPanel, ...patch } });
     },
     setSessionCleanup(next) {
       write({ ...read(), sessionCleanup: next });

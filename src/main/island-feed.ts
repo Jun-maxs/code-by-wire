@@ -150,10 +150,7 @@ export async function startIslandFeed(
   return {
     port,
     stop: async () => {
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve());
-        server.closeAllConnections();
-      });
+      // The file goes first, synchronously: on quit the app may exit before the server has closed.
       // Only our own file: a later launch may already have written its own.
       try {
         const on = JSON.parse(readFileSync(file, "utf8")) as {
@@ -163,6 +160,10 @@ export async function startIslandFeed(
       } catch {
         // gone already, or not ours to judge
       }
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        server.closeAllConnections();
+      });
     },
   };
 }

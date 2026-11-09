@@ -216,7 +216,7 @@ function SplitPane({
   const accounts = useStore($accounts);
   const marks = sessionMarks(accounts, s);
 
-  // Focused from elsewhere (Ctrl+Tab, the sidebar, the HUD): put the keyboard in this pane's terminal.
+  // Focused from elsewhere (Ctrl+Tab, the sidebar, DeskTidy's island): put the keyboard in this pane's terminal.
   const showsTerminal = !transcriptOn && hasLiveTerminal;
   useEffect(() => {
     if (!active || !showsTerminal) return;
