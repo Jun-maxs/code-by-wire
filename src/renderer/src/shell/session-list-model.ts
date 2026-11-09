@@ -1,4 +1,5 @@
 import { shortTopicName, type ProductInfo } from "@shared/products";
+import { compareRanked, STATE_RANK } from "@shared/session-order";
 import type { Session } from "@shared/types";
 import { tNow } from "../i18n";
 import type { SessionsListPreferences } from "./session-list-preferences";
@@ -20,25 +21,7 @@ export function isUnsentSession(session: Session): boolean {
 
 /** Fork (2026-11-01): the order a session sorts by. Waiting on you first, then running, then live but
  *  idle, then ended. */
-export const STATE_RANK: Record<Session["state"], number> = {
-  waiting: 0,
-  working: 1,
-  idle: 2,
-  ended: 3,
-};
-
-/** Within one rank: waiting and running sessions keep their creation order (newest first), so a
- *  running row doesn't hop on every tick of its activity clock; idle and ended ones go by when they
- *  were last touched. */
-function compareRanked(
-  a: { rank: number; createdMs: number; lastActivityMs: number },
-  b: { rank: number; createdMs: number; lastActivityMs: number },
-): number {
-  if (a.rank !== b.rank) return a.rank - b.rank;
-  return a.rank <= STATE_RANK.working
-    ? b.createdMs - a.createdMs
-    : b.lastActivityMs - a.lastActivityMs;
-}
+export { STATE_RANK } from "@shared/session-order";
 
 export function sortSessions(sessions: Session[]): Session[] {
   return [...sessions].sort((a, b) =>

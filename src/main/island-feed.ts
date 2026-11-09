@@ -140,12 +140,30 @@ export async function startIslandFeed(
   // Written whole and renamed into place, so the island never reads half a file; a file left by a
   // crashed launch is replaced.
   const file = join(deps.dir, ISLAND_FEED_FILE);
-  mkdirSync(deps.dir, { recursive: true });
-  writeFileSync(
-    `${file}.tmp`,
-    JSON.stringify({ version: 1, port, token, pid: process.pid }),
-  );
-  renameSync(`${file}.tmp`, file);
+  try {
+    mkdirSync(deps.dir, { recursive: true });
+    const body = JSON.stringify({ version: 1, port, token, pid: process.pid });
+    writeFileSync(`${file}.tmp`, body);
+    // The island may be reading the old file just now (Windows then refuses the replace): try again
+    // shortly, and in the end write it in place.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        renameSync(`${file}.tmp`, file);
+        break;
+      } catch (err) {
+        if (attempt >= 4) {
+          writeFileSync(file, body);
+          rmSync(`${file}.tmp`, { force: true });
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+        void err;
+      }
+    }
+  } catch (err) {
+    server.close();
+    throw err;
+  }
 
   return {
     port,

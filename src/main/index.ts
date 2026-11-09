@@ -90,7 +90,7 @@ import {
 import { restoreWindowsPath } from "./terminal/windows-path";
 import { startIslandFeed, type IslandFeed } from "./island-feed";
 import { remoteStatus } from "./remote-status";
-import { buildIslandSnapshot } from "@shared/island-feed";
+import { buildIslandSnapshot, type IslandSnapshot } from "@shared/island-feed";
 import type { ProductsData } from "@shared/products";
 import { adoptReclaude, detectReclaude } from "./reclaude";
 import {
@@ -889,25 +889,44 @@ app
     // sync is 10s old it also starts one in the background, so the island stays current while the
     // main window is minimized and not polling.
     let lastIslandSync = Date.now();
+    let islandSyncing = false;
     let islandProducts: { at: number; data: ProductsData | null } | null = null;
-    const islandSnapshot = () => {
+    let islandLast: { at: number; snap: IslandSnapshot } | null = null;
+    const islandSnapshot = (): IslandSnapshot => {
       const now = Date.now();
-      if (now - lastIslandSync > 10_000) {
-        lastIslandSync = now;
-        void sync().catch((err) =>
-          logError("island-sync-failed", "island sync failed", err),
-        );
+      // Building it is synchronous main-process work (SQLite, statusLine captures, a few JSON
+      // files): a second poller, or a poll right after one, gets the last one.
+      if (islandLast && now - islandLast.at < 1000) return islandLast.snap;
+      // One background sync at a time: a slow one must not queue another every 10s behind it.
+      if (!islandSyncing && now - lastIslandSync > 10_000) {
+        islandSyncing = true;
+        void sync()
+          .catch((err) =>
+            logError("island-sync-failed", "island sync failed", err),
+          )
+          .finally(() => {
+            islandSyncing = false;
+            lastIslandSync = Date.now();
+          });
       }
-      // The topic cards change rarely; read them at most every 2s, not on every poll.
+      // The topic cards change rarely; read them at most every 2s, not on every poll. A bad card
+      // file costs the topic colours, not the whole snapshot.
       if (!islandProducts || now - islandProducts.at > 2000) {
         const dirs = productsDirs();
-        islandProducts = {
-          at: now,
-          data: readProducts(dirs.cardsDir, dirs.stateDir),
-        };
+        let data: ProductsData | null = null;
+        try {
+          data = readProducts(dirs.cardsDir, dirs.stateDir);
+        } catch (err) {
+          logError(
+            "island-products-failed",
+            "readProducts failed; island gets no topics",
+            err,
+          );
+        }
+        islandProducts = { at: now, data };
       }
       const o = overview();
-      return buildIslandSnapshot({
+      const snap = buildIslandSnapshot({
         sessions: o.sessions,
         accounts: accountView(),
         account: o.account,
@@ -915,6 +934,11 @@ app
         remoteOnline: remoteStatus().online,
         now,
       });
+      const took = Date.now() - now;
+      if (took > 50)
+        logWarn("island-snapshot-slow", `island snapshot took ${took} ms`);
+      islandLast = { at: now, snap };
+      return snap;
     };
     const showMain = (sessionId?: string) => {
       if (BrowserWindow.getAllWindows().length === 0) openWindow();

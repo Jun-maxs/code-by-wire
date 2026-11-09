@@ -210,4 +210,38 @@ describe("buildIslandSnapshot", () => {
     expect(snap.version).toBe(1);
     expect(snap.now).toBe(NOW);
   });
+
+  // The island (C#) reads these as integers; a Codex/Pi mtime carries a fraction on Windows.
+  it("sends whole numbers", () => {
+    const snap = buildIslandSnapshot(
+      input({
+        now: NOW + 0.25,
+        sessions: [
+          session("c", { agent: "codex", lastActivityMs: NOW - 1000.0405 }),
+        ],
+        account: {
+          billingMode: "subscription",
+          fiveHour: { usedPct: 41.6, resetsAt: NOW + HOUR + 0.7 },
+        } as Parameters<typeof buildIslandSnapshot>[0]["account"],
+      }),
+    );
+    expect(snap.now).toBe(NOW);
+    expect(snap.sessions[0].lastActivity).toBe(NOW - 1000);
+    expect(snap.accounts.items[0].fiveHour).toEqual({
+      usedPct: 42,
+      resetsAt: NOW + HOUR + 1,
+    });
+  });
+
+  it("leaves agent threads out (they sit under their parent in the sidebar)", () => {
+    const snap = buildIslandSnapshot(
+      input({
+        sessions: [
+          session("parent", { agent: "codex" }),
+          session("child", { agent: "codex", parentSessionId: "parent" }),
+        ],
+      }),
+    );
+    expect(snap.sessions.map((s) => s.id)).toEqual(["parent"]);
+  });
 });

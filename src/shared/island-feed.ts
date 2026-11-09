@@ -1,4 +1,5 @@
 import type { AgentId } from "./agents";
+import { compareRanked, STATE_RANK } from "./session-order";
 import {
   accountColor,
   windowPct,
@@ -76,23 +77,12 @@ export const ISLAND_MAX_SESSIONS = 30;
 /** Ended sessions older than this are left out. */
 const RECENT_MS = 24 * 60 * 60 * 1000;
 
-/** The sidebar's order (renderer/shell/session-list-model's sortSessions): waiting on you, then
- *  running, then idle, then ended; waiting and running rows by creation (newest first) so they don't
- *  hop as they work, idle and ended ones by last activity. */
-const RANK: Record<IslandState, number> = {
-  waiting: 0,
-  working: 1,
-  idle: 2,
-  ended: 3,
-};
-function bySidebar(a: Session, b: Session): number {
-  const ra = RANK[a.state];
-  const rb = RANK[b.state];
-  if (ra !== rb) return ra - rb;
-  return ra <= RANK.working
-    ? b.createdMs - a.createdMs
-    : b.lastActivityMs - a.lastActivityMs;
-}
+/** The sidebar's order (shared/session-order, as renderer/shell/session-list-model sorts). */
+const bySidebar = (a: Session, b: Session): number =>
+  compareRanked(
+    { ...a, rank: STATE_RANK[a.state] },
+    { ...b, rank: STATE_RANK[b.state] },
+  );
 
 /** A window as the island shows it: null when nothing is known, 0% once it has reset. */
 function islandWindow(
@@ -100,7 +90,10 @@ function islandWindow(
   now: number,
 ): IslandWindow | null {
   const pct = windowPct(w, now);
-  return w && pct !== null ? { usedPct: pct, resetsAt: w.resetsAt } : null;
+  // Whole numbers: the island reads them as integers (usage percentages and reset times can carry fractions).
+  return w && pct !== null
+    ? { usedPct: Math.round(pct), resetsAt: Math.round(w.resetsAt) }
+    : null;
 }
 
 function islandAccounts(
@@ -148,6 +141,8 @@ export function buildIslandSnapshot(
     (input.accounts?.accounts ?? []).map((a) => [a.deviceId, `#${a.n}`]),
   );
   const sessions = input.sessions
+    // Agent threads sit under their parent in the sidebar; listed on their own they'd count twice.
+    .filter((s) => !s.parentSessionId)
     .filter((s) => s.state !== "ended" || now - s.lastActivityMs <= RECENT_MS)
     .sort(bySidebar)
     .slice(0, ISLAND_MAX_SESSIONS)
@@ -161,7 +156,8 @@ export function buildIslandSnapshot(
         title: topic ? `${shortTopicName(topic.name)} · ${s.title}` : s.title,
         project: s.repoLabel ?? s.project,
         topicColor: topic?.color ?? null,
-        lastActivity: s.lastActivityMs,
+        // Codex/Pi take it from a file's mtime, which has a fraction on Windows; the island wants an integer.
+        lastActivity: Math.round(s.lastActivityMs),
         account:
           s.accountDevice !== undefined
             ? (badge.get(s.accountDevice) ?? null)
@@ -171,7 +167,7 @@ export function buildIslandSnapshot(
     });
   return {
     version: 1,
-    now,
+    now: Math.round(now),
     sessions,
     accounts: islandAccounts(input),
     remote: { online: input.remoteOnline },
