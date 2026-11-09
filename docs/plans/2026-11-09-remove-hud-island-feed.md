@@ -166,6 +166,25 @@ git commit -m "feat(island): serve the snapshot and open-session on loopback for
 - [ ] **Step 2: 删除与搬移**（上面 Files 列表），`git mv` 搬 remote-status。然后跑类型检查，按报错把 HUD 的残余引用清干净：
 
 Run: `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json; node node_modules/typescript/bin/tsc --noEmit -p tsconfig.web.json`
+Expected: 只剩 index.ts 里尚未接线处的错误（下一步解决）。
+
+- [ ] **Step 3: 在 `index.ts` 接线**。在原 HUD 块的位置：
+  - `islandSnapshot()`：沿用旧 `hudSnapshot` 的「距上次 sync 超过 10 秒就 `void sync()`」，然后 `buildIslandSnapshot({ sessions: overview().sessions, accounts: accountView?.() ?? null, account: overview().account, products: <readProducts(...)，2 秒内复用上次结果>, remoteOnline: remoteStatus().online, now })`。
+  - `showMain` 保留原样；`startIslandFeed({ dir: app.getPath("userData"), snapshot: islandSnapshot, open: showMain, log })`；`OFFSCREEN` 时也启动（接口不弹窗口，屏幕外开发版正好用来冒烟）。
+  - `app.on("before-quit")` 里 `void feed.stop()`。删除窗口关闭时的 `hud.stop()`、`hudWindows.closeAll()`（`window-all-closed` 照旧退出）。
+  - IPC：`loginItemGet` 回 `{ supported: process.platform !== "linux", enabled: … openAtLogin }`（原 `loginItem()`）；`loginItemSet(enabled)` 调 `app.setLoginItemSettings({ openAtLogin })` 后回新值。
+
+- [ ] **Step 4: `LaunchAtLoginCard`**：照 `HudCard` 的卡片和开关样式（同一套 `Card`、`role="switch"` 按钮类名），一行「开机启动 / 登录 Windows 后自动打开 Jun-Code」+ 开关；`supported === false` 时不渲染。
+
+- [ ] **Step 5: 检查**
+
+Run: `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json; node node_modules/typescript/bin/tsc --noEmit -p tsconfig.web.json`
+Expected: 无输出
+Run: `node node_modules/vitest/vitest.mjs run tests/app-settings.test.ts tests/shared/island-feed.test.ts tests/main/island-feed.test.ts tests/ipc.test.ts`
+Expected: PASS
+Run: `node node_modules/eslint/bin/eslint.js src/main/index.ts src/main/island-feed.ts src/shared/island-feed.ts src/renderer/src/settings/LaunchAtLoginCard.tsx src/renderer/src/settings/SettingsView.tsx`
+Expected: 无错误
+Run: `rg -n "hud" -i src --glob '!**/*.md'`
 Expected: 只剩与 HUD 无关的词（如有，逐条确认）
 
 - [ ] **Step 6: 开发版冒烟**（不弹窗口）：`node node_modules/electron-vite/bin/electron-vite.js build`，用 `run_in_background` 起 `CBW_OFFSCREEN=1 CBW_USER_DATA_DIR=E:\build\cbw-dev-userdata node_modules/electron/dist/electron.exe .`（主窗口开在屏幕外、不进任务栏）。读 `E:\build\cbw-dev-userdata\island-feed.json`，`curl --noproxy '*' -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/v1/snapshot` 拿到 JSON 且 `sessions` 有内容；不带令牌 401。结束只按 PID 停（`Stop-Process -Id`），不要按名字杀（会关掉用户的 Jun-Code）。
