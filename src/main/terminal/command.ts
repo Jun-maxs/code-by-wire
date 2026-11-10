@@ -10,6 +10,17 @@ export function claudeLauncher(env: NodeJS.ProcessEnv = process.env): string {
   return env.CBW_CLAUDE_LAUNCHER || "claude";
 }
 
+// Jun-Code defaults apply to every model, including sessions restored with resume.
+// CLI flags and user -c overrides still take precedence over these config defaults.
+const CODEX_DEFAULT_ARGS = [
+  "-c",
+  "approval_policy=never",
+  "-c",
+  "sandbox_mode=danger-full-access",
+  "-c",
+  "model_context_window=900000",
+];
+
 export interface ClaudeCommand {
   file: string;
   args: string[];
@@ -45,7 +56,7 @@ export function buildClaudeCommand(opts: {
 /**
  * Argv to spawn a fresh Managed session for ANY agent — the one place the per-agent spawn shape
  * lives. Claude pins the session id and takes the model alias (buildClaudeCommand); codex is the
- * bare binary with no args — it has no id-pin flag (correlation happens via rollout claiming, see
+ * binary with Jun-Code defaults — it has no id-pin flag (correlation happens via rollout claiming, see
  * provider/codex/claim.ts) and models are chosen inside its own TUI. The binary name comes from
  * the AGENTS descriptor, so a future agent adds a branch here without inventing a second registry.
  */
@@ -61,7 +72,13 @@ export function buildSpawnCommand(opts: {
       model: opts.model,
       extraArgs: opts.extraArgs,
     });
-  return { file: AGENTS[opts.agent].binary, args: [...(opts.extraArgs ?? [])] };
+  return {
+    file: AGENTS[opts.agent].binary,
+    args: [
+      ...(opts.agent === "codex" ? CODEX_DEFAULT_ARGS : []),
+      ...(opts.extraArgs ?? []),
+    ],
+  };
 }
 
 /**
@@ -164,7 +181,7 @@ export function toSpawnForm(
 /**
  * Argv to Resume an Ended session under its OWN id, per agent: claude (`claude --resume <id>`)
  * keeps writing the same Transcript at `projects/<cwd-slug>/<id>.jsonl`; codex
- * (`codex resume <id>` — subcommand form, no flags) appends in place to the same rollout file.
+ * (`codex resume <id>` plus the same defaults as a new session) appends in place to the same rollout file.
  * No `--model` on either: both CLIs restore the session's model themselves, which is the
  * "inherit" in one-click Resume. The binary name comes from the AGENTS descriptor, matching
  * buildSpawnCommand's per-agent dispatch.
@@ -181,7 +198,12 @@ export function buildResumeCommand(opts: {
     };
   return {
     file: AGENTS[opts.agent].binary,
-    args: ["resume", opts.id, ...(opts.extraArgs ?? [])],
+    args: [
+      "resume",
+      opts.id,
+      ...(opts.agent === "codex" ? CODEX_DEFAULT_ARGS : []),
+      ...(opts.extraArgs ?? []),
+    ],
   };
 }
 

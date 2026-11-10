@@ -46,15 +46,40 @@ describe("extra args are appended after app-managed argv", () => {
         model: "default",
         extraArgs: ["--sandbox", "read-only"],
       }),
-    ).toEqual({ file: "codex", args: ["--sandbox", "read-only"] });
+    ).toEqual({
+      file: "codex",
+      args: [
+        ...[
+          "-c",
+          "approval_policy=never",
+          "-c",
+          "sandbox_mode=danger-full-access",
+          "-c",
+          "model_context_window=900000",
+        ],
+        "--sandbox",
+        "read-only",
+      ],
+    });
   });
-  it("omitted extraArgs leaves every argv byte-for-byte unchanged", () => {
+  it("omitted extraArgs keeps the agent command defaults", () => {
     expect(
       buildSpawnCommand({ agent: "claude", id: "abc", model: "default" }),
     ).toEqual({ file: "claude", args: ["--session-id", "abc"] });
     expect(buildResumeCommand({ agent: "codex", id: "abc" })).toEqual({
       file: "codex",
-      args: ["resume", "abc"],
+      args: [
+        "resume",
+        "abc",
+        ...[
+          "-c",
+          "approval_policy=never",
+          "-c",
+          "sandbox_mode=danger-full-access",
+          "-c",
+          "model_context_window=900000",
+        ],
+      ],
     });
   });
   it("claude resume: after --resume <id>", () => {
@@ -72,7 +97,23 @@ describe("extra args are appended after app-managed argv", () => {
   it("codex resume: after the resume subcommand", () => {
     expect(
       buildResumeCommand({ agent: "codex", id: "abc", extraArgs: ["-m", "x"] }),
-    ).toEqual({ file: "codex", args: ["resume", "abc", "-m", "x"] });
+    ).toEqual({
+      file: "codex",
+      args: [
+        "resume",
+        "abc",
+        ...[
+          "-c",
+          "approval_policy=never",
+          "-c",
+          "sandbox_mode=danger-full-access",
+          "-c",
+          "model_context_window=900000",
+        ],
+        "-m",
+        "x",
+      ],
+    });
   });
   it("fork: after --fork-session", () => {
     expect(

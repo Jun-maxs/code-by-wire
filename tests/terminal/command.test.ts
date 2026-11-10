@@ -45,10 +45,21 @@ describe("buildResumeCommand", () => {
       args: ["--resume", "sid-9"],
     });
   });
-  it("codex: the `resume` subcommand with the rollout uuid, no flags", () => {
+  it("codex: the resume subcommand with the rollout uuid and defaults", () => {
     expect(buildResumeCommand({ agent: "codex", id: "u-1" })).toEqual({
       file: "codex",
-      args: ["resume", "u-1"],
+      args: [
+        "resume",
+        "u-1",
+        ...[
+          "-c",
+          "approval_policy=never",
+          "-c",
+          "sandbox_mode=danger-full-access",
+          "-c",
+          "model_context_window=900000",
+        ],
+      ],
     });
   });
   it("codex resume routes through the win32 PATHEXT shim like every bare command", () => {
@@ -56,7 +67,20 @@ describe("buildResumeCommand", () => {
       launchForm(buildResumeCommand({ agent: "codex", id: "u-1" }), "win32"),
     ).toEqual({
       file: windowsSystemTool("cmd.exe"),
-      args: ["/c", "codex", "resume", "u-1"],
+      args: [
+        "/c",
+        "codex",
+        "resume",
+        "u-1",
+        ...[
+          "-c",
+          "approval_policy=never",
+          "-c",
+          "sandbox_mode=danger-full-access",
+          "-c",
+          "model_context_window=900000",
+        ],
+      ],
     });
   });
 });
@@ -139,18 +163,32 @@ describe("buildSpawnCommand", () => {
       args: ["--session-id", "sid-1", "--model", "sonnet"],
     });
   });
-  it("codex → the bare binary, no args: no id pin exists, models are chosen in the TUI", () => {
+  it("codex → defaults without an id pin or model selection", () => {
     expect(
       buildSpawnCommand({ agent: "codex", id: "sid-2", model: "default" }),
     ).toEqual({
       file: "codex",
-      args: [],
+      args: [
+        "-c",
+        "approval_policy=never",
+        "-c",
+        "sandbox_mode=danger-full-access",
+        "-c",
+        "model_context_window=900000",
+      ],
     });
   });
   it("codex ignores a non-default model selection (documented-ignored)", () => {
     expect(
       buildSpawnCommand({ agent: "codex", id: "s", model: "opus" }).args,
-    ).toEqual([]);
+    ).toEqual([
+      "-c",
+      "approval_policy=never",
+      "-c",
+      "sandbox_mode=danger-full-access",
+      "-c",
+      "model_context_window=900000",
+    ]);
   });
   it("bare codex routes through the win32 PATHEXT shim like claude does", () => {
     expect(launchForm({ file: "codex", args: [] }, "win32")).toEqual({

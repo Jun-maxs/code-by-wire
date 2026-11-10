@@ -415,7 +415,7 @@ describe("createTerminalManager", () => {
     expect(spawnedIds).toEqual(["11111111-2222-3333-4444-555555555555"]);
     expect(h.ptys[0].state.spawnedWith!.args).toEqual([
       "-ic",
-      "'codex' 'resume' '11111111-2222-3333-4444-555555555555'",
+      "'codex' 'resume' '11111111-2222-3333-4444-555555555555' '-c' 'approval_policy=never' '-c' 'sandbox_mode=danger-full-access' '-c' 'model_context_window=900000'",
     ]);
     expect(spawnedInfos[0]).toMatchObject({
       agent: "codex",
