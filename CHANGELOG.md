@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.1.62 - 2026-11-10
+
+### Changed
+
+- Jun-Code starts and resumes every Codex model with full access and a 900,000-token
+  context setting. Explicit session arguments can override these defaults; actual
+  context capacity still depends on the model service.
+
+### Fixed
+
+- On Windows, paste clipboard screenshots into Codex as saved PNG attachments,
+  avoiding native clipboard format-conversion errors. Attachments persist across
+  restarts so resumed sessions can continue to read them. Bitmaps Electron reads
+  as empty (a 32-bit CF_DIBV5 with an alpha mask and no PNG) are exported through
+  Windows' own clipboard reader instead.
+
 ## [0.1.49] - 2026-08-19
 
 ### Fixed
@@ -1215,7 +1231,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.49...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.62...HEAD
+[0.1.62]: https://github.com/luojiahai/code-by-wire/compare/v0.1.49...v0.1.62
 [0.1.49]: https://github.com/luojiahai/code-by-wire/compare/v0.1.48...v0.1.49
 [0.1.48]: https://github.com/luojiahai/code-by-wire/compare/v0.1.47...v0.1.48
 [0.1.47]: https://github.com/luojiahai/code-by-wire/compare/v0.1.46...v0.1.47
