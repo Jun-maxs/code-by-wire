@@ -12,7 +12,7 @@ function fakeDeps(opts?: {
   bracketed?: boolean;
   readRejects?: boolean;
   writeRejects?: boolean;
-  probe?: { hasImage: boolean; files: string[] };
+  probe?: { hasImage: boolean; files: string[]; imagePath?: string };
   os?: "mac" | "windows" | "linux";
   mouseTracking?: string;
 }) {
@@ -218,6 +218,29 @@ describe("attachClipboardContextMenu — Windows right-click copyPaste", () => {
 });
 
 describe("text-less clipboard: screenshots and copied files", () => {
+  it("pastes a saved Codex image path without native clipboard conversion", async () => {
+    const f = fakeDeps({
+      os: "windows",
+      probe: {
+        hasImage: true,
+        files: [],
+        imagePath: "C:\\Jun Data\\clipboard-images\\shot.png",
+      },
+    });
+    await runClipboardAction("paste", f.deps);
+    expect(f.pastes).toEqual(["'C:\\Jun Data\\clipboard-images\\shot.png' "]);
+    expect(f.ptyWrites).toEqual([]);
+  });
+  it("right-click paste also attaches a saved Codex image", async () => {
+    const f = fakeDeps({
+      os: "windows",
+      probe: { hasImage: true, files: [], imagePath: "C:\\images\\shot.png" },
+    });
+    await runClipboardAction("paste-no-fallback", f.deps);
+    expect(f.pastes).toEqual(["'C:\\images\\shot.png' "]);
+    expect(f.ptyWrites).toEqual([]);
+  });
+
   it("an image on Windows sends Claude Code's Alt+V, not ^V", async () => {
     const f = fakeDeps({ os: "windows", probe: { hasImage: true, files: [] } });
     await runClipboardAction("paste", f.deps);

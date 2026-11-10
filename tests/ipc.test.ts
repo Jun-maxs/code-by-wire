@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { homedir, tmpdir } from "node:os";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join, sep } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
 import type { PersistedSession } from "@shared/types";
 import { IPC, type OverviewData } from "@shared/ipc";
 import type { Provider } from "../src/main/provider/types";
@@ -10,26 +10,50 @@ import { createCaffeinate } from "../src/main/caffeinate";
 import { createAppSettingsStore } from "../src/main/app-settings";
 
 // Capture the handlers registerIpc registers, without a real Electron ipcMain.
-const { handlers, getAppMetrics, showSaveDialog } = vi.hoisted(() => ({
+const {
+  handlers,
+  getAppMetrics,
+  showSaveDialog,
+  clipboardImage,
+  getPath,
+  exportClipboardPng,
+} = vi.hoisted(() => ({
   handlers: new Map<string, (...a: unknown[]) => unknown>(),
+  exportClipboardPng: vi.fn(
+    (): Promise<Buffer | null> => Promise.resolve(null),
+  ),
   getAppMetrics: vi.fn(() => []),
+  getPath: vi.fn(() => "user-data"),
+  clipboardImage: {
+    availableFormats: () => ["image/png"],
+    readImage: vi.fn(),
+    readBuffer: () => Buffer.alloc(0),
+  },
   showSaveDialog: vi.fn(() => Promise.resolve({ canceled: true })),
 }));
 vi.mock("electron", () => ({
   app: {
     getVersion: () => "test-version",
     getAppMetrics,
+    getPath,
   },
   BrowserWindow: { getAllWindows: () => [] },
   dialog: { showSaveDialog },
+  clipboard: clipboardImage,
   ipcMain: {
     handle: (channel: string, fn: (...a: unknown[]) => unknown) =>
       handlers.set(channel, fn),
   },
   nativeTheme: { themeSource: "system" },
 }));
+// The Windows PNG fallback shells out to PowerShell; tests drive it as a fake.
+vi.mock("../src/main/clipboard-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/main/clipboard-image")>()),
+  exportClipboardPngWindows: exportClipboardPng,
+}));
 
 import { registerIpc } from "../src/main/ipc";
+import { createManagedRegistry } from "../src/main/managed-registry";
 import { migrate, upsertSessions } from "../src/main/db/store";
 import { migrateAnalytics, upsertWorktree } from "../src/main/db/analytics";
 import { openTestDb } from "./helpers/sqlite";
@@ -1189,5 +1213,113 @@ describe("registerIpc diagnostic report", () => {
         },
       ),
     ).resolves.toEqual({ ok: true, status: "canceled" });
+  });
+});
+
+describe("Codex clipboard attachments", () => {
+  let directory: string;
+  const png = Buffer.from("clipboard PNG bytes");
+  const toPNG = vi.fn(() => png);
+  beforeEach(() => {
+    vi.stubGlobal("process", { ...process, platform: "win32" });
+    directory = mkdtempSync(join(tmpdir(), "jun-clipboard-ipc-"));
+    getPath.mockReturnValue(directory);
+    toPNG.mockClear();
+    exportClipboardPng.mockReset();
+    exportClipboardPng.mockResolvedValue(null);
+    clipboardImage.readImage.mockReturnValue({ isEmpty: () => false, toPNG });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    getPath.mockReset();
+    clipboardImage.readImage.mockReset();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("exports a newly spawned Codex image before its session has been indexed", async () => {
+    const db = openTestDb();
+    migrate(db);
+    const managed = createManagedRegistry();
+    managed.add("new-codex", 1, {
+      agent: "codex",
+      cwd: P("p"),
+      spawnedAtMs: 0,
+    });
+    registerIpc({ db, provider: provider(() => []), managed });
+    const result = (await handlers.get(IPC.clipboardProbe)!(
+      {},
+      "new-codex",
+    )) as { imagePath: string };
+    expect(dirname(result.imagePath)).toBe(join(directory, "clipboard-images"));
+    expect(readFileSync(result.imagePath)).toEqual(png);
+  });
+
+  it("recognizes an indexed Codex session when no managed entry remains", async () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [{ ...seed, agent: "codex" }]);
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      managed: createManagedRegistry(),
+    });
+    const result = (await handlers.get(IPC.clipboardProbe)!({}, "seed")) as {
+      imagePath: string;
+    };
+    expect(readFileSync(result.imagePath)).toEqual(png);
+  });
+
+  it("keeps native image handling for Claude, shell terminals, and non-Windows Codex", async () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [seed, { ...seed, id: "codex", agent: "codex" }]);
+    registerIpc({ db, provider: provider(() => []) });
+    const probe = handlers.get(IPC.clipboardProbe)!;
+    await expect(probe({}, "seed")).resolves.toEqual({
+      hasImage: true,
+      files: [],
+    });
+    await expect(probe({})).resolves.toEqual({ hasImage: true, files: [] });
+    vi.stubGlobal("process", { ...process, platform: "darwin" });
+    await expect(probe({}, "codex")).resolves.toEqual({
+      hasImage: true,
+      files: [],
+    });
+    expect(toPNG).not.toHaveBeenCalled();
+    expect(exportClipboardPng).not.toHaveBeenCalled();
+  });
+
+  it("exports through the Windows fallback when Electron reads the image as empty", async () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [{ ...seed, agent: "codex" }]);
+    registerIpc({ db, provider: provider(() => []) });
+    clipboardImage.readImage.mockReturnValueOnce({
+      isEmpty: () => true,
+      toPNG,
+    });
+    const fallbackPng = Buffer.from("GDI PNG bytes");
+    exportClipboardPng.mockResolvedValueOnce(fallbackPng);
+    const result = (await handlers.get(IPC.clipboardProbe)!({}, "seed")) as {
+      imagePath: string;
+    };
+    expect(readFileSync(result.imagePath)).toEqual(fallbackPng);
+    expect(toPNG).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to native paste if the image disappears during export", async () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [{ ...seed, agent: "codex" }]);
+    registerIpc({ db, provider: provider(() => []) });
+    clipboardImage.readImage.mockReturnValueOnce({
+      isEmpty: () => true,
+      toPNG,
+    });
+    await expect(handlers.get(IPC.clipboardProbe)!({}, "seed")).rejects.toThrow(
+      "Clipboard image is no longer available",
+    );
+    expect(exportClipboardPng).toHaveBeenCalledOnce();
+    expect(toPNG).not.toHaveBeenCalled();
   });
 });

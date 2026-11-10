@@ -29,7 +29,7 @@ export interface ClipboardIpc {
   readText(type?: "selection"): Promise<string>;
   writeText(text: string): Promise<void>;
   /** What the clipboard holds when it has no text; absent where the host can't tell. */
-  probe?(): Promise<ClipboardProbe>;
+  probe?(sessionId?: string): Promise<ClipboardProbe>;
 }
 
 export interface ClipboardActionDeps {
@@ -54,6 +54,10 @@ export function imagePasteKey(os: OsKind | undefined): string {
 async function pasteNonText(deps: ClipboardActionDeps): Promise<boolean> {
   if (!deps.clipboard.probe) return false;
   const probe = await deps.clipboard.probe();
+  if (probe.imagePath) {
+    deps.term.paste(quotePathForShell(probe.imagePath) + " ");
+    return true;
+  }
   if (probe.hasImage) {
     deps.writePty(imagePasteKey(deps.os));
     return true;

@@ -32,7 +32,8 @@ const api: AppApi = {
   clipboardWriteText: (text) =>
     ipcRenderer.invoke(IPC.clipboardWriteText, text),
   clipboardReadText: (type) => ipcRenderer.invoke(IPC.clipboardReadText, type),
-  clipboardProbe: () => ipcRenderer.invoke(IPC.clipboardProbe),
+  clipboardProbe: (sessionId) =>
+    ipcRenderer.invoke(IPC.clipboardProbe, sessionId),
   renameSession: (id, title) =>
     ipcRenderer.invoke(IPC.renameSession, id, title),
   setSessionPinned: (id, pinned) =>

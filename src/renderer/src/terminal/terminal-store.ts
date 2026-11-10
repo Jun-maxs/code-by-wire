@@ -202,7 +202,13 @@ export function createTerminalStore({
         term: created.term,
         // Reads handle.id so the ^V image-paste fallback follows a /clear rename too.
         writePty: (data) => api.write(handle.id, data),
-        clipboard,
+        clipboard: {
+          ...clipboard,
+          // Read the current id at paste time so /clear and rollout claiming cannot leave a stale id.
+          probe: clipboard.probe
+            ? () => clipboard.probe!(handle.id)
+            : undefined,
+        },
         os,
       };
       // Windows right-click copyPaste on the persistent wrapper (it survives attach/detach

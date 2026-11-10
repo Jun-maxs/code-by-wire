@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { FLOW, type ReattachSnapshot } from "../../src/shared/terminal";
 import type { OsKind } from "../../src/shared/platform";
+import type { ClipboardIpc } from "../../src/renderer/src/xterm/clipboard-actions";
 import {
   createTerminalStore,
   type XtermLike,
@@ -56,7 +57,7 @@ function fakeXterm() {
   };
 }
 
-function harness(os: OsKind = "mac") {
+function harness(os: OsKind = "mac", clipboardProbe?: ClipboardIpc["probe"]) {
   let dataRouter: (id: string, d: string, offset: number) => void = () => {};
   let exitRouter: (id: string, c: number) => void = () => {};
   const api = {
@@ -81,6 +82,7 @@ function harness(os: OsKind = "mac") {
   };
   let clipboardText = "";
   const clipboard = {
+    probe: clipboardProbe,
     readText: vi.fn(() => Promise.resolve(clipboardText)),
     writeText: vi.fn((t: string) => {
       clipboardText = t;
@@ -638,6 +640,23 @@ describe("clipboard keybindings (windows — the platforms where xterm swallowed
     await vi.waitFor(() =>
       expect(h.api.write).toHaveBeenCalledWith("b", "\x16"),
     );
+  });
+
+  it("image attachment probing follows the current session id after rollout claiming", async () => {
+    const probe = vi.fn(() =>
+      Promise.resolve({
+        hasImage: true,
+        files: [],
+        imagePath: "C:\\images\\shot.png",
+      }),
+    );
+    const h = harness("windows", probe);
+    h.store.create("pending");
+    h.store.rename("pending", "claimed");
+    h.made[0].pressKey(keydown({ key: "v", ctrlKey: true }));
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledWith("claimed"));
+    expect(h.made[0].pastes).toHaveLength(1);
+    expect(h.api.write).not.toHaveBeenCalled();
   });
 
   it("Ctrl+C with a selection copies-and-clears instead of sending SIGINT", async () => {

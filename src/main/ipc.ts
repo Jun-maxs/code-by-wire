@@ -44,6 +44,10 @@ import {
   type ClipboardProbe,
 } from "@shared/ipc";
 import { probeClipboard } from "./clipboard-probe";
+import {
+  exportClipboardPngWindows,
+  saveClipboardImage,
+} from "./clipboard-image";
 import { normalizeLocale, type Locale } from "@shared/locale";
 import type { Session } from "@shared/types";
 import type { Provider } from "./provider/types";
@@ -94,6 +98,7 @@ import {
   readIndexDbCounts,
   readSessionOrigins,
   readSessionTitles,
+  getSessionAgent,
 } from "./db/store";
 import {
   readTotals,
@@ -1198,7 +1203,23 @@ export function registerIpc({
   );
   ipcMain.handle(
     IPC.clipboardProbe,
-    (): ClipboardProbe => probeClipboard(clipboard, process.platform),
+    async (_e, sessionId?: string): Promise<ClipboardProbe> => {
+      const probe = probeClipboard(clipboard, process.platform);
+      const agent =
+        typeof sessionId === "string"
+          ? (managed?.agentOf(sessionId) ?? getSessionAgent(db, sessionId))
+          : undefined;
+      if (!probe.hasImage || process.platform !== "win32" || agent !== "codex")
+        return probe;
+      const imagePath = await saveClipboardImage(
+        clipboard,
+        join(app.getPath("userData"), "clipboard-images"),
+        exportClipboardPngWindows,
+      );
+      // Do not send a native image-paste key if the clipboard changed while exporting.
+      if (!imagePath) throw new Error("Clipboard image is no longer available");
+      return { ...probe, imagePath };
+    },
   );
   ipcMain.handle(IPC.updateGetState, (): UpdateState => upd.getState());
   ipcMain.handle(IPC.updateCheck, (): Promise<UpdateState> => upd.check());

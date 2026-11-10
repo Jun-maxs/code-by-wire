@@ -188,6 +188,8 @@ export interface ClaudeAccountsView {
 /** What the clipboard holds besides text: an image (a screenshot), or files copied in the file
  *  manager (Windows Explorer puts no text on the clipboard for those). */
 export interface ClipboardProbe {
+  /** A PNG persisted by main for Codex path attachment, avoiding native clipboard conversion. */
+  imagePath?: string;
   hasImage: boolean;
   files: string[];
 }
@@ -407,7 +409,7 @@ export interface IpcApi {
   clipboardReadText(type?: "selection"): Promise<string>;
   /** What the clipboard holds when it has no text (a screenshot, Explorer-copied files), so a
    *  terminal paste can hand the CLI its image key or the file paths. */
-  clipboardProbe(): Promise<ClipboardProbe>;
+  clipboardProbe(sessionId?: string): Promise<ClipboardProbe>;
   /** Persist a display-name override for a session id (null or a value that trims to empty clears it,
    *  reverting to the derived/live name), then return the fresh overview with the override applied.
    *  Both overview() and refresh() also carry the override, since it is applied in overviewNow(). */
