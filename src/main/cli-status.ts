@@ -52,6 +52,12 @@ export const AGENT_PROBES: Record<AgentId, AgentProbeSpec> = {
     productPattern: null,
     checkAuth: false,
   },
+  agy: {
+    binary: AGENTS.agy.binary,
+    floor: null,
+    productPattern: null,
+    checkAuth: false,
+  },
 };
 
 export function evaluateCliStatus(p: CliProbeInput): CliStatus {

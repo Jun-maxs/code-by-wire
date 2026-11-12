@@ -44,6 +44,17 @@ const CLAUDE_RESERVED = new Set([
   "--fork-session",
 ]);
 
+/** agy's conversation flags: the app picks the conversation (new, or `--conversation <id>` on resume),
+ *  and a print-mode flag would end the interactive session the pane is for. */
+const AGY_RESERVED = new Set([
+  "--conversation",
+  "--continue",
+  "-c",
+  "-p",
+  "--print",
+  "--prompt",
+]);
+
 /** Shell-like tokenizer for the args suffix: splits on whitespace (spaces, tabs, and — since main is
  *  the trust boundary and can't assume a renderer already stripped a pasted line break — newlines
  *  too); `"…"` and `'…'` spans group (and may sit mid-token, so `--flag="a b"` is one token) and can
@@ -90,13 +101,15 @@ export function validateExtraArgs(
 ): ExtraArgsResult {
   const t = tokenize(input);
   if (!t.ok) return t;
-  if (agent === "claude") {
+  if (agent === "claude" || agent === "agy") {
+    const reserved = agent === "claude" ? CLAUDE_RESERVED : AGY_RESERVED;
     for (const token of t.tokens) {
       const flag = token.split("=", 1)[0];
-      if (CLAUDE_RESERVED.has(flag))
+      if (reserved.has(flag))
         return { ok: false, kind: "reserved", token: flag };
     }
-  } else {
+  }
+  if (agent !== "claude") {
     const first = t.tokens[0];
     if (first !== undefined && !first.startsWith("-"))
       return { ok: false, kind: "reserved", token: first };

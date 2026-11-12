@@ -21,6 +21,18 @@ const CODEX_DEFAULT_ARGS = [
   "model_context_window=900000",
 ];
 
+// agy runs with every tool permission granted, like the Claude and Codex sessions. Its context window and
+// compaction stay agy's own (the official defaults) — no override is passed.
+const AGY_DEFAULT_ARGS = ["--dangerously-skip-permissions"];
+
+/** The app-managed flags each non-Claude agent starts and resumes with. */
+const agentDefaults = (agent: AgentId): string[] =>
+  agent === "codex"
+    ? CODEX_DEFAULT_ARGS
+    : agent === "agy"
+      ? AGY_DEFAULT_ARGS
+      : [];
+
 export interface ClaudeCommand {
   file: string;
   args: string[];
@@ -74,10 +86,7 @@ export function buildSpawnCommand(opts: {
     });
   return {
     file: AGENTS[opts.agent].binary,
-    args: [
-      ...(opts.agent === "codex" ? CODEX_DEFAULT_ARGS : []),
-      ...(opts.extraArgs ?? []),
-    ],
+    args: [...agentDefaults(opts.agent), ...(opts.extraArgs ?? [])],
   };
 }
 
@@ -196,14 +205,12 @@ export function buildResumeCommand(opts: {
       file: claudeLauncher(),
       args: ["--resume", opts.id, ...(opts.extraArgs ?? [])],
     };
+  // agy reopens a conversation by flag (`agy --conversation <id>`), codex by subcommand.
+  const target =
+    opts.agent === "agy" ? ["--conversation", opts.id] : ["resume", opts.id];
   return {
     file: AGENTS[opts.agent].binary,
-    args: [
-      "resume",
-      opts.id,
-      ...(opts.agent === "codex" ? CODEX_DEFAULT_ARGS : []),
-      ...(opts.extraArgs ?? []),
-    ],
+    args: [...target, ...agentDefaults(opts.agent), ...(opts.extraArgs ?? [])],
   };
 }
 

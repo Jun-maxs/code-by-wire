@@ -40,7 +40,8 @@ import {
   sessionDisplayTitle,
   splitCandidates,
 } from "./shell/split-view";
-import { ViewModeSwitch } from "./shell/SplitControls";
+import { ViewModeSwitch, type SplitNewSession } from "./shell/SplitControls";
+import { defaultSpawnAgent, saveLastAgent } from "./shell/agent-preference";
 import { useMetrics } from "./workspace/use-metrics";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { spawnGateFor } from "./ui/cli-gating";
@@ -99,6 +100,13 @@ const NEW_SESSION_ID = "new-session";
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
  *  often than the conversation, and a sync re-walks ~/.claude. */
 const SYNC_MS = 3000;
+
+/** The split view's quick picks for a new session, by the model family each agent runs. */
+const SPLIT_NEW_AGENTS: { agent: AgentId; label: string }[] = [
+  { agent: "codex", label: "GPT" },
+  { agent: "claude", label: "Claude" },
+  { agent: "agy", label: "Gemini" },
+];
 
 export function App() {
   const { t } = useI18n();
@@ -622,10 +630,25 @@ export function App() {
   const newSessionLabel = t.shell.split.newSession(
     selected?.repoLabel ?? newSessionDir ?? "",
   );
-  function newSessionInSplit(): void {
-    if (selected && newSessionDir)
-      void quickAddSession(newSessionDir, selected.agent);
-  }
+  // The row starts the app's default agent (the one last started, as the sidebar folder "+" does);
+  // a chip per agent starts that one and becomes the default.
+  const canSpawnAgent = (agent: AgentId): boolean =>
+    spawnGateFor(cliStatus, agent).canSpawn;
+  const splitNewSession: SplitNewSession | undefined =
+    selected && newSessionDir
+      ? {
+          label: newSessionLabel,
+          defaultAgent: defaultSpawnAgent(canSpawnAgent),
+          choices: SPLIT_NEW_AGENTS.map((c) => ({
+            ...c,
+            enabled: canSpawnAgent(c.agent),
+          })),
+          start: (agent) => {
+            saveLastAgent(window.localStorage, agent);
+            void quickAddSession(newSessionDir, agent);
+          },
+        }
+      : undefined;
   function removeFromSplit(id: string): void {
     const cur = $split.get();
     if (cur.ids.length <= 1) return;
@@ -693,8 +716,7 @@ export function App() {
       onSingle={() => showSingle()}
       onSplit={showSplit}
       onAdd={setSelectedId}
-      onNewSession={newSessionInSplit}
-      newSessionLabel={newSessionLabel}
+      newSession={splitNewSession}
       activeTitle={selected ? sessionDisplayTitle(selected, t) : ""}
     />
   );
@@ -755,8 +777,7 @@ export function App() {
       panes={splitPanes}
       active={selected}
       candidates={candidates}
-      onNewSession={newSessionInSplit}
-      newSessionLabel={newSessionLabel}
+      newSession={splitNewSession}
       leading={viewSwitch}
       canSpawnFor={(s) => spawnGateFor(cliStatus, s.agent).canSpawn}
       onActivate={setSelectedId}

@@ -16,7 +16,7 @@ import { terminalStore } from "../terminal/terminal-store-instance";
 import { useSessionTasks } from "../board/session-tasks";
 import { MiddleHeader } from "../shell/MiddleHeader";
 import { SessionMenu } from "../shell/SessionMenu";
-import { SplitCandidates } from "../shell/SplitControls";
+import { SplitCandidates, type SplitNewSession } from "../shell/SplitControls";
 import {
   paneLine,
   paneProgress,
@@ -49,8 +49,7 @@ export function SplitWorkspace({
   panes,
   active,
   candidates,
-  onNewSession,
-  newSessionLabel,
+  newSession,
   leading,
   canSpawnFor,
   onActivate,
@@ -72,8 +71,7 @@ export function SplitWorkspace({
   /** Sessions an empty grid cell offers to add. */
   candidates: Session[];
   /** Start a new session in the focused pane's directory; it joins the grid. */
-  onNewSession: () => void;
-  newSessionLabel: string;
+  newSession?: SplitNewSession;
   leading: ReactNode;
   canSpawnFor: (s: Session) => boolean;
   onActivate: (id: string) => void;
@@ -157,8 +155,7 @@ export function SplitWorkspace({
             span={empty}
             candidates={candidates}
             onAdd={onAdd}
-            onNewSession={onNewSession}
-            newSessionLabel={newSessionLabel}
+            newSession={newSession}
           />
         )}
       </div>
@@ -416,14 +413,12 @@ function EmptyCell({
   span,
   candidates,
   onAdd,
-  onNewSession,
-  newSessionLabel,
+  newSession,
 }: {
   span: number;
   candidates: Session[];
   onAdd: (id: string) => void;
-  onNewSession: () => void;
-  newSessionLabel: string;
+  newSession?: SplitNewSession;
 }) {
   const { t } = useI18n();
   return (
@@ -438,8 +433,7 @@ function EmptyCell({
         <SplitCandidates
           sessions={candidates}
           onPick={onAdd}
-          onNew={onNewSession}
-          newLabel={newSessionLabel}
+          newSession={newSession}
         />
       </div>
     </div>

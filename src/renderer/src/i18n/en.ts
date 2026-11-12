@@ -212,6 +212,11 @@ export const en = {
       notInstalledHeadline: "NOT DETECTED",
       docs: "Codex docs",
     },
+    agyCli: {
+      title: "Antigravity CLI",
+      notInstalledHeadline: "NOT DETECTED",
+      docs: "Antigravity",
+    },
     statusline: {
       title: "Statusline",
       stateCapturing: "CAPTURING",
@@ -538,6 +543,8 @@ export const en = {
       maximize: "Show this one alone",
       remove: "Remove from split (keeps the session)",
       newSession: (dir: string) => `New session in ${dir}`,
+      newSessionAs: (agent: string, isDefault: boolean) =>
+        `New ${agent} session${isDefault ? " (default)" : ""}`,
       showTranscript: "Show transcript",
       showTerminal: "Show terminal",
       todoProgress: (done: number, total: number) =>
@@ -807,6 +814,8 @@ export const en = {
       info: "What this session has consumed: total tokens by kind — fresh input, generated output, cached reads, and the 5-minute and 1-hour cache writes. The $ is Claude Code's own session accounting; on a subscription it is the API-equivalent value, not a bill.",
       infoCodex:
         "What this session has consumed: total tokens by kind — fresh input, generated output, and cached reads. Codex reports no cost accounting, so there is no $ figure.",
+      infoAgy:
+        "What this session has consumed: total tokens by kind — fresh input, generated output, and cached reads. Antigravity reports no cost accounting, so there is no $ figure.",
       // Mirrors ui/token-kinds.ts's TOKEN_KINDS, keyed the same way, so SpendPanel can render
       // translated label/description text while still iterating TOKEN_KINDS for order and key.
       kinds: {

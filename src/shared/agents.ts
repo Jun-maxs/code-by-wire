@@ -3,7 +3,7 @@
  *  branch in terminal/command.ts, one probe spec in main/cli-status.ts, one settings card, one
  *  icon in ui/agent-icons.tsx. Every picker/dropdown/menu iterates AGENT_IDS — never a hardcoded
  *  pair — so the surfaces pick a new agent up from here alone. */
-export const AGENT_IDS = ["claude", "codex", "pi"] as const;
+export const AGENT_IDS = ["claude", "codex", "pi", "agy"] as const;
 
 export type AgentId = (typeof AGENT_IDS)[number];
 
@@ -107,6 +107,21 @@ export const AGENTS: Record<AgentId, AgentDescriptor> = {
       ...NONE,
       hasTranscript: true,
       hasTelemetry: true,
+    },
+  },
+  // agy (Antigravity CLI, provider/agy): sessions and transcripts from its conversation dbs, the plan's
+  // windows via Antigravity Tools, resume by `--conversation <id>`. New sessions are matched to their
+  // conversation by the codex-style claim (agy takes no id up front).
+  agy: {
+    id: "agy",
+    label: "Antigravity",
+    binary: "agy",
+    capabilities: {
+      ...NONE,
+      hasTranscript: true,
+      hasTelemetry: true,
+      hasRateLimits: true,
+      canResume: true,
     },
   },
 };

@@ -1,39 +1,83 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { AgentId } from "@shared/agents";
 import type { Session } from "@shared/types";
 import { formatAgeShort } from "@shared/format";
 import { Lamp } from "../ui/atoms";
 import { Icon } from "../ui/icons";
+import { AgentIcon } from "../ui/agent-icons";
 import { useI18n } from "../i18n";
 import { MAX_SPLIT, sessionDisplayTitle, type ViewMode } from "./split-view";
 import { ViewSegment } from "./MiddleHeader";
+
+/** The split view's "new session" row: the row itself starts the default agent, and a chip per agent
+ *  starts that one instead. The default's chip is the highlighted one. */
+export interface SplitNewSession {
+  /** "新建会话 · <folder>". */
+  label: string;
+  /** What the row starts: the app's default agent (the one last started). */
+  defaultAgent: AgentId;
+  /** The chips beside the row, in order; a disabled one's CLI can't start right now. */
+  choices: { agent: AgentId; label: string; enabled: boolean }[];
+  start: (agent: AgentId) => void;
+}
 
 /** The pick-a-session list, shared by the header's add popover and an empty grid cell. */
 export function SplitCandidates({
   sessions,
   onPick,
-  onNew,
-  newLabel,
+  newSession,
 }: {
   sessions: Session[];
   onPick: (id: string) => void;
   /** Start a new session into the grid (listed first). */
-  onNew?: () => void;
-  newLabel?: string;
+  newSession?: SplitNewSession;
 }) {
   const { t } = useI18n();
   const now = Date.now();
-  const newRow = onNew && (
-    <button
-      type="button"
-      onClick={onNew}
-      className="flex h-7 w-full items-center gap-2 rounded-xs px-2 text-left text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
-    >
-      <span className="grid size-3.5 shrink-0 place-items-center">
-        <Icon name="plus" size={13} />
-      </span>
-      <span className="min-w-0 flex-1 truncate">{newLabel}</span>
-    </button>
+  const defaultChoice = newSession?.choices.find(
+    (c) => c.agent === newSession.defaultAgent,
+  );
+  const newRow = newSession && (
+    <div className="flex h-7 w-full items-center gap-1 rounded-xs pr-1 text-body text-fg-muted">
+      <button
+        type="button"
+        onClick={() => newSession.start(newSession.defaultAgent)}
+        title={
+          defaultChoice
+            ? t.shell.split.newSessionAs(defaultChoice.label, true)
+            : undefined
+        }
+        className="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-xs px-2 text-left transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+      >
+        <span className="grid size-3.5 shrink-0 place-items-center">
+          <Icon name="plus" size={13} />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{newSession.label}</span>
+      </button>
+      {newSession.choices.map((c) => {
+        const isDefault = c.agent === newSession.defaultAgent;
+        const hint = t.shell.split.newSessionAs(c.label, isDefault);
+        return (
+          <button
+            key={c.agent}
+            type="button"
+            disabled={!c.enabled}
+            onClick={() => newSession.start(c.agent)}
+            aria-label={hint}
+            title={hint}
+            className={`flex h-5 shrink-0 items-center gap-1 rounded-xs px-1.5 text-meta transition-colors duration-100 disabled:pointer-events-none disabled:opacity-40 ${
+              isDefault
+                ? "bg-ink-700 text-fg ring-1 ring-inset ring-ink-600"
+                : "text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+            }`}
+          >
+            <AgentIcon agent={c.agent} size={11} />
+            {c.label}
+          </button>
+        );
+      })}
+    </div>
   );
   if (sessions.length === 0)
     return (
@@ -86,8 +130,7 @@ export function ViewModeSwitch({
   onSingle,
   onSplit,
   onAdd,
-  onNewSession,
-  newSessionLabel,
+  newSession,
   activeTitle,
 }: {
   mode: ViewMode;
@@ -98,8 +141,7 @@ export function ViewModeSwitch({
   onSingle: () => void;
   onSplit: () => void;
   onAdd: (id: string) => void;
-  onNewSession: () => void;
-  newSessionLabel: string;
+  newSession?: SplitNewSession;
   /** The focused pane's title — the one a pick replaces once the grid is full. */
   activeTitle: string;
 }) {
@@ -138,8 +180,7 @@ export function ViewModeSwitch({
           full={count >= MAX_SPLIT}
           candidates={candidates}
           onAdd={onAdd}
-          onNewSession={onNewSession}
-          newSessionLabel={newSessionLabel}
+          newSession={newSession}
           activeTitle={activeTitle}
         />
       )}
@@ -152,15 +193,13 @@ function AddPaneButton({
   full,
   candidates,
   onAdd,
-  onNewSession,
-  newSessionLabel,
+  newSession,
   activeTitle,
 }: {
   full: boolean;
   candidates: Session[];
   onAdd: (id: string) => void;
-  onNewSession: () => void;
-  newSessionLabel: string;
+  newSession?: SplitNewSession;
   activeTitle: string;
 }) {
   const { t } = useI18n();
@@ -210,7 +249,7 @@ function AddPaneButton({
           <div
             ref={pop}
             style={{ top: at.top, left: at.left }}
-            className="fixed z-50 max-h-[min(26rem,calc(100vh-6rem))] w-80 max-w-[calc(100vw-16px)] overflow-y-auto rounded-md border border-ink-800 bg-ink-900 p-1 shadow-(--shadow-md)"
+            className="fixed z-50 max-h-[min(26rem,calc(100vh-6rem))] w-96 max-w-[calc(100vw-16px)] overflow-y-auto rounded-md border border-ink-800 bg-ink-900 p-1 shadow-(--shadow-md)"
           >
             <p className="px-2 pb-1 pt-1 text-aux text-fg-faint">
               {full
@@ -225,11 +264,15 @@ function AddPaneButton({
                 setAt(null);
                 onAdd(id);
               }}
-              onNew={() => {
-                setAt(null);
-                onNewSession();
-              }}
-              newLabel={newSessionLabel}
+              newSession={
+                newSession && {
+                  ...newSession,
+                  start: (agent) => {
+                    setAt(null);
+                    newSession.start(agent);
+                  },
+                }
+              }
             />
           </div>,
           document.body,

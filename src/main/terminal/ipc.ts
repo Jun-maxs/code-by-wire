@@ -117,6 +117,7 @@ export function registerTerminalIpc({
   remoteSessions,
   remoteCommand,
   accounts,
+  agentEnv,
 }: {
   window: BrowserWindow;
   managed: ManagedRegistry;
@@ -148,6 +149,9 @@ export function registerTerminalIpc({
     launch(id: string, remote: boolean): Record<string, string>;
     inherit(from: string, to: string): void;
   };
+  /** Extra env a non-Claude agent's spawn and resume start with (agy: the system proxy, see
+   *  agy-proxy.ts). Claude's env comes from `accounts`. */
+  agentEnv?: (agent: AgentId) => Record<string, string> | undefined;
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data, offset) => {
@@ -230,7 +234,9 @@ export function registerTerminalIpc({
       extraArgs: check.tokens,
       remote,
       env:
-        req.agent === "claude" ? accounts?.launch(req.id, remote) : undefined,
+        req.agent === "claude"
+          ? accounts?.launch(req.id, remote)
+          : agentEnv?.(req.agent),
       cols: req.cols,
       rows: req.rows,
     });
@@ -299,7 +305,10 @@ export function registerTerminalIpc({
       claimedRollout: d.claimedRollout,
       extraArgs: resolveStoredExtraArgs(d.agent, stored),
       remote,
-      env: d.agent === "claude" ? accounts?.launch(req.id, remote) : undefined,
+      env:
+        d.agent === "claude"
+          ? accounts?.launch(req.id, remote)
+          : agentEnv?.(d.agent),
       cols: req.cols,
       rows: req.rows,
     });

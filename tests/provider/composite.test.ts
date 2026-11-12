@@ -58,11 +58,13 @@ describe("createCompositeProvider", () => {
         claude: fake("claude", calls),
         codex: fake("codex", calls),
         pi: fake("pi", calls),
+        agy: fake("agy", calls),
       },
       () => "claude",
     );
     const cands = await p.listCandidates();
     expect(cands.map((c) => c.id).sort()).toEqual([
+      "agy-1",
       "claude-1",
       "codex-1",
       "pi-1",
@@ -77,6 +79,7 @@ describe("createCompositeProvider", () => {
         claude: fake("claude", calls),
         codex: fake("codex", calls),
         pi: fake("pi", calls),
+        agy: fake("agy", calls),
       },
       (id) => (id.startsWith("codex") ? "codex" : "claude"),
     );

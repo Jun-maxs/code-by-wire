@@ -32,7 +32,8 @@ export function gateResume(
     ok: true,
     cwd: target.cwd,
     agent,
-    claimedRollout: agent === "codex" ? target.rolloutPath : undefined,
+    claimedRollout:
+      agent === "codex" || agent === "agy" ? target.rolloutPath : undefined,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   net,
   powerSaveBlocker,
   safeStorage,
+  session,
   shell,
 } from "electron";
 import { applyLegacyDockIconIfNeeded } from "./dock-icon";
@@ -19,6 +20,10 @@ import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
 import { createCodexProvider } from "./provider/codex";
 import { createPiProvider, resolvePiDir } from "./provider/pi";
+import { createAgyProvider, scanClaimableAgy } from "./provider/agy";
+import { createAgyQuotaReader } from "./provider/agy/quota";
+import { resolveAgyDir } from "./provider/agy/store";
+import { createAgyProxy } from "./agy-proxy";
 import { createCodexLimitsService } from "./provider/codex/limits";
 import {
   createRelayUsageService,
@@ -138,6 +143,14 @@ else app.setPath("userData", join(app.getPath("appData"), "Code-by-wire"));
 // config dir and launched through rec.exe (see reclaude.ts). Before anything resolves claudeDir.
 adoptReclaude();
 
+/** agy sessions start with the system proxy (agy-proxy.ts). Made on first use: the session that
+ *  answers proxy lookups exists only once the app is ready. */
+let agyProxyHolder: ReturnType<typeof createAgyProxy> | null = null;
+const agyProxy = (): ReturnType<typeof createAgyProxy> =>
+  (agyProxyHolder ??= createAgyProxy({
+    resolve: (url) => session.defaultSession.resolveProxy(url),
+  }));
+
 /** The BrowserWindow's native background, painted before the page loads — must match the
  *  persisted app theme or the window flashes the wrong color on launch. Native window chrome, so
  *  it lives here rather than in index.css. */
@@ -228,6 +241,7 @@ function createWindow(
     remoteSessions,
     remoteCommand: () => remoteCommand(),
     accounts,
+    agentEnv: (agent) => (agent === "agy" ? agyProxy().env() : undefined),
     posixShell: { isExecutable: isExecutableFile, findOnPath },
   });
   registerRename(rename);
@@ -348,6 +362,8 @@ app
       join(app.getPath("userData"), "content-search.db"),
     );
     app.on("will-quit", () => contentSearch.close());
+    // Ask for the system proxy now, so the first agy session already starts with it.
+    agyProxy();
     const openWindow = (): void =>
       createWindow(
         managed,
@@ -500,13 +516,30 @@ app
         fetchFn: net.fetch.bind(net),
       }),
     });
+    // agy (Antigravity CLI): its conversation dbs, and the plan windows Antigravity Tools keeps.
+    const agyDir = resolveAgyDir();
+    const agyProvider = createAgyProvider({
+      agyDir,
+      recentWindowMs,
+      managed: {
+        has: (id) => managed.agentOf(id) === "agy",
+        cwdOf: (id) => managed.cwdOf(id),
+        agyEntries: () => managed.agyEntries(),
+      },
+      quota: createAgyQuotaReader(),
+    });
     // id → agent: live drafts answer from the registry; indexed rows from the sessions table;
     // anything unknown is claude (the legacy default — never a projects/ sweep for a codex id).
     const agentOf = (id: string): AgentId =>
       managed.agentOf(id) ?? getSessionAgent(db, id) ?? "claude";
     services.agentOf = agentOf;
     const provider = createCompositeProvider(
-      { claude: claudeProvider, codex: codexProvider, pi: piProvider },
+      {
+        claude: claudeProvider,
+        codex: codexProvider,
+        pi: piProvider,
+        agy: agyProvider,
+      },
       agentOf,
     );
     services.provider = provider;
@@ -532,7 +565,12 @@ app
       dir: app.getPath("userData"),
     });
     const cliStatus = createCliStatusController({
-      configDirs: { claude: claudeDir, codex: codexDir, pi: piDir },
+      configDirs: {
+        claude: claudeDir,
+        codex: codexDir,
+        pi: piDir,
+        agy: agyDir,
+      },
     });
     services.cliStatus = cliStatus;
     // Warm every agent's verdict in the background; each check is async and the window is already up.
@@ -691,6 +729,25 @@ app
     // registry and re-key the live pty + renderer, so the rotated session stays Managed instead of being
     // re-derived as a read-only Observed one.
     const checkedUnderPtys = new Set<string>();
+    // A claimed pty (codex rollout, agy conversation) takes its session's own id everywhere the
+    // app keyed it by the draft id.
+    const applyClaim = ({
+      from,
+      to,
+      rolloutPath,
+    }: {
+      from: string;
+      to: string;
+      rolloutPath: string;
+    }): void => {
+      managed.rename(from, to);
+      managed.claim(to, rolloutPath);
+      sessionTitles.rename(from, to);
+      sessionPins.rename(from, to);
+      launchArgs.rename(from, to);
+      remoteSessions.rename(from, to);
+      renameInWindow(from, to);
+    };
     const reconcile = async (): Promise<void> => {
       await applyRotations(
         {
@@ -753,15 +810,16 @@ app
                 claimedRollouts,
               }),
             ),
-        apply: ({ from, to, rolloutPath }) => {
-          managed.rename(from, to);
-          managed.claim(to, rolloutPath);
-          sessionTitles.rename(from, to);
-          sessionPins.rename(from, to);
-          launchArgs.rename(from, to);
-          remoteSessions.rename(from, to);
-          renameInWindow(from, to);
-        },
+        apply: applyClaim,
+      });
+      // agy takes no session id either: its new conversation db is claimed the same way. The scan
+      // stays in-process — it opens only dbs touched since the oldest pending agy spawn.
+      await applyClaims({
+        ptys: managed.agyEntries(),
+        claimedRollouts: managed.claimedRollouts(),
+        scan: (earliestMs, claimedRollouts) =>
+          scanClaimableAgy(agyDir, earliestMs, claimedRollouts),
+        apply: applyClaim,
       });
     };
     const caffeinate = createCaffeinate({ blocker: powerSaveBlocker });
@@ -811,6 +869,7 @@ app
       sessionOverlays: [
         (sessions) => codexProvider.overlaySessions(sessions),
         (sessions) => piProvider.overlaySessions(sessions),
+        (sessions) => agyProvider.overlaySessions(sessions),
       ],
     });
 

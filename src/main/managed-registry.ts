@@ -64,6 +64,8 @@ export interface ManagedRegistry {
   entriesFor(agent: AgentId): ManagedPty[];
   /** The codex claim's inputs: live codex ptys with their spawn cwd/time and claim state. */
   codexEntries(): ManagedCodexPty[];
+  /** The same claim inputs for agy, which also takes no session id up front. */
+  agyEntries(): ManagedCodexPty[];
   /** Bind a discovered rollout file to a live codex pty (post-rename, under the rollout's id). */
   claim(id: string, rolloutPath: string): void;
   /** Rollout paths already bound to a live pty — the discovery-side duplicate suppressor. */
@@ -82,6 +84,15 @@ export function createManagedRegistry(): ManagedRegistry {
     string,
     { pid: number; info: ManagedEntryInfo; claimedRollout?: string }
   >();
+  const claimEntries = (agent: AgentId): ManagedCodexPty[] =>
+    [...byId]
+      .filter(([, e]) => e.info.agent === agent)
+      .map(([id, e]) => ({
+        id,
+        cwd: e.info.cwd,
+        spawnedAtMs: e.info.spawnedAtMs,
+        claimedRollout: e.claimedRollout,
+      }));
   return {
     add: (id, pid, info) =>
       byId.set(id, { pid, info, claimedRollout: info.claimedRollout }),
@@ -106,15 +117,8 @@ export function createManagedRegistry(): ManagedRegistry {
       [...byId]
         .filter(([, e]) => e.info.agent === agent)
         .map(([id, { pid }]) => ({ id, pid })),
-    codexEntries: () =>
-      [...byId]
-        .filter(([, e]) => e.info.agent === "codex")
-        .map(([id, e]) => ({
-          id,
-          cwd: e.info.cwd,
-          spawnedAtMs: e.info.spawnedAtMs,
-          claimedRollout: e.claimedRollout,
-        })),
+    codexEntries: () => claimEntries("codex"),
+    agyEntries: () => claimEntries("agy"),
     claim: (id, rolloutPath) => {
       const e = byId.get(id);
       if (e) e.claimedRollout = rolloutPath;

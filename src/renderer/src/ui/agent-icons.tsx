@@ -86,6 +86,39 @@ function PiMark({ size, className }: { size: number; className?: string }) {
   );
 }
 
+/** Antigravity CLI: the agent runs Google's Gemini models, so its mark is lobe-icons' Gemini "Color"
+ *  asset — the four-point spark (static-svg/icons/gemini.svg path) in its official gradient. */
+function AgyMark({ size, className }: { size: number; className?: string }) {
+  const gradientId = useId();
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={`url(#${gradientId})`}
+      fillRule="nonzero"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M12 24A14.304 14.304 0 000 12 14.304 14.304 0 0012 0a14.305 14.305 0 0012 12 14.305 14.305 0 00-12 12" />
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="0"
+          y1="24"
+          x2="24"
+          y2="0"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#1C7DFF" />
+          <stop offset=".52" stopColor="#1C69FF" />
+          <stop offset="1" stopColor="#F0DCD6" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 const AGENT_GLYPHS: Record<
   AgentId,
   (p: { size: number; className?: string }) => React.JSX.Element
@@ -93,6 +126,7 @@ const AGENT_GLYPHS: Record<
   claude: ClaudeMark,
   codex: CodexMark,
   pi: PiMark,
+  agy: AgyMark,
 };
 
 /** The agent's official brand mark at glyph scale, sized like lucide's Icon — fixed brand color

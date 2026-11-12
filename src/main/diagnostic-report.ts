@@ -36,6 +36,8 @@ const KNOWN_ENTRY_TYPES: Record<AgentId, ReadonlySet<string>> = {
     "session",
     "thinking_level_change",
   ]),
+  // agy keeps SQLite, not JSONL (resolveTranscriptPath answers null), so there's nothing to scan.
+  agy: new Set(),
 };
 
 export interface TranscriptScanData {

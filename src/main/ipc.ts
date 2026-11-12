@@ -1433,6 +1433,7 @@ export function registerIpc({
     claude: null,
     codex: null,
     pi: null,
+    agy: null,
   };
   // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
   // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is

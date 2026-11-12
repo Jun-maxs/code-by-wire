@@ -23,15 +23,24 @@ const TONE: Record<ReturnType<typeof footerView>["dot"], LampTone> = {
  *  band), with codex-sized remedies — an install command and a login pointer, no tab set and no
  *  version floor. Probes run through the same login-shell/PATHEXT spawn form (main/cli-check.ts). */
 export function CodexCliCard({
+  agent = "codex",
   status,
   checking,
   onRecheck,
 }: {
+  /** The same card serves the Antigravity CLI: only its names, docs link and data dir differ. */
+  agent?: "codex" | "agy";
   status: CliStatus | null;
   checking: boolean;
   onRecheck: () => void;
 }) {
   const { t } = useI18n();
+  const copy = agent === "agy" ? t.settings.agyCli : t.settings.codexCli;
+  const docsHref =
+    agent === "agy"
+      ? "https://antigravity.google/"
+      : "https://developers.openai.com/codex/cli";
+  const defaultDir = agent === "agy" ? "~/.gemini/antigravity-cli" : "~/.codex";
   const word =
     status === null
       ? t.settings.cli.stateChecking
@@ -39,7 +48,7 @@ export function CodexCliCard({
         ? t.settings.cli.stateReady
         : t.settings.cli.stateFault;
   return (
-    <Card title={t.settings.codexCli.title}>
+    <Card title={copy.title}>
       <SubsystemHeader
         tone={TONE[footerView(status).dot]}
         word={word}
@@ -58,11 +67,8 @@ export function CodexCliCard({
         }
       />
       {status && status.kind !== "ready" && (
-        <FaultBand headline={t.settings.codexCli.notInstalledHeadline}>
-          <DocsLink
-            href="https://developers.openai.com/codex/cli"
-            label={t.settings.codexCli.docs}
-          />
+        <FaultBand headline={copy.notInstalledHeadline}>
+          <DocsLink href={docsHref} label={copy.docs} />
         </FaultBand>
       )}
       <ReadoutRow
@@ -73,7 +79,7 @@ export function CodexCliCard({
       />
       <ReadoutRow
         label={t.settings.cli.config}
-        value={status?.configDir.active ?? "~/.codex"}
+        value={status?.configDir.active ?? defaultDir}
       />
     </Card>
   );
