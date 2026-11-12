@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.1.63 - 2026-11-12
+
+### Added
+
+- Antigravity CLI (`agy`) as a fourth agent: start, resume and watch its sessions,
+  with transcripts read from agy's own conversation store. Sessions start with every
+  tool permission granted and with the system proxy (agy ignores it otherwise).
+- The Pressure panel shows an agy session's context against its model's official
+  window (1M for Gemini, 250K for Claude, 131K for GPT-OSS) and the plan's 5-hour and
+  weekly windows for the pool the model draws from, read through Antigravity Tools.
+- The split view's new-session row offers GPT / Claude / Gemini; the default — the
+  agent last started — is highlighted.
+
 ## 0.1.62 - 2026-11-10
 
 ### Changed
@@ -1231,7 +1244,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.62...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.63...HEAD
+[0.1.63]: https://github.com/luojiahai/code-by-wire/compare/v0.1.62...v0.1.63
 [0.1.62]: https://github.com/luojiahai/code-by-wire/compare/v0.1.49...v0.1.62
 [0.1.49]: https://github.com/luojiahai/code-by-wire/compare/v0.1.48...v0.1.49
 [0.1.48]: https://github.com/luojiahai/code-by-wire/compare/v0.1.47...v0.1.48
