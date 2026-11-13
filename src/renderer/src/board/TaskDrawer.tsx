@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   PRIORITIES,
   newId,
@@ -27,9 +34,12 @@ export function TaskDrawer({
     s,
     update,
     topics,
+    approveTaskById,
     completeTask,
     reopenTaskById,
     dismissTaskById,
+    newSessionFor,
+    openSession,
   } = ctx;
   const task = rawDoc.tasks.find((t) => t.id === taskId);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -61,21 +71,23 @@ export function TaskDrawer({
   };
 
   return (
-    <Sheet onClose={onClose} label={task.title || s.untitled}>
-      <div className="flex items-center gap-2 border-b border-ink-850 px-4 py-3">
-        <input
+    <Sheet onClose={onClose} label={task.title || s.untitled} width={480}>
+      <div className="flex items-start gap-2 border-b border-ink-850 px-4 py-3">
+        <AutoTextarea
           value={task.title}
           placeholder={s.untitled}
           autoFocus={!task.title}
-          onChange={(e) => set({ title: e.target.value })}
-          aria-label={s.fTitle}
-          className="min-w-0 flex-1 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2.5 py-1 text-subhead font-semibold text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)"
+          ariaLabel={s.fTitle}
+          onChange={(next) => set({ title: next.replace(/\r?\n/g, " ") })}
+          className="min-w-0 flex-1 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2.5 py-1.5 text-subhead font-semibold leading-snug text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)"
         />
-        <span className="shrink-0 text-meta text-fg-faint">{s.fAutoSaved}</span>
+        <span className="mt-1.5 shrink-0 text-meta text-fg-faint">
+          {s.fAutoSaved}
+        </span>
         <button
           type="button"
           onClick={onClose}
-          className={btn.ghost}
+          className={cx(btn.ghost, "mt-0.5")}
           aria-label="close"
         >
           <Icon name="x" size={15} />
@@ -106,10 +118,20 @@ export function TaskDrawer({
         </Field>
 
         <Field label={s.fSummary}>
-          <input
+          <AutoTextarea
             value={task.summary}
             placeholder={s.fSummaryPlaceholder}
-            onChange={(e) => set({ summary: e.target.value })}
+            ariaLabel={s.fSummary}
+            onChange={(next) => set({ summary: next.replace(/\r?\n/g, " ") })}
+            className={cx(input, "h-auto min-h-7 py-1.5 leading-snug")}
+          />
+        </Field>
+
+        <Field label={s.fOutcome}>
+          <input
+            value={task.outcome}
+            placeholder={s.fOutcomePlaceholder}
+            onChange={(e) => set({ outcome: e.target.value })}
             className={input}
           />
         </Field>
@@ -189,7 +211,7 @@ export function TaskDrawer({
         </Field>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-ink-850 px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-850 px-4 py-2.5">
         <button
           type="button"
           onClick={() => {
@@ -199,17 +221,17 @@ export function TaskDrawer({
           }}
           onBlur={() => setConfirmDelete(false)}
           className={cx(
-            "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-aux transition-colors",
+            "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-aux transition-colors",
             confirmDelete
               ? "bg-ink-800 text-danger"
               : "text-fg-faint hover:text-danger",
           )}
         >
           <Icon name="trash" size={13} />
-          {confirmDelete ? s.fDeleteConfirm : s.fDelete}
+          {confirmDelete ? s.fDeleteConfirm : s.dismissItem}
         </button>
 
-        <div className="flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
           {task.status === "decide" && (
             <>
               <button
@@ -226,7 +248,21 @@ export function TaskDrawer({
               <button
                 type="button"
                 onClick={() => {
-                  set({ status: "todo" });
+                  approveTaskById(task.id);
+                  void newSessionFor({ ...task, status: "todo" }).then((id) => {
+                    if (id) openSession(id);
+                  });
+                  onClose();
+                }}
+                className={btn.outline}
+              >
+                <Icon name="rocket" size={13} />
+                {s.approveAndSpawn}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  approveTaskById(task.id);
                   onClose();
                 }}
                 className={btn.primary}
@@ -286,12 +322,55 @@ export function Sheet({
   );
 }
 
+function AutoTextarea({
+  value,
+  placeholder,
+  autoFocus,
+  ariaLabel,
+  onChange,
+  className,
+}: {
+  value: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+  ariaLabel?: string;
+  onChange: (next: string) => void;
+  className: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      className={cx(className, "resize-none overflow-hidden")}
+    />
+  );
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <span className="text-meta font-medium text-fg-faint">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 

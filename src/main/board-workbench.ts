@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 import {
   addDays,
   blankTask,
+  cleanDeployTarget,
   dayKey,
   normalizeBrief,
   normalizeBriefTextKey,
@@ -78,8 +79,11 @@ export function cleanCommitSubject(raw: string): string | null {
     body = body.slice(m[0].length).trim();
   }
   if (SKIP_COMMIT_SUBJECT_RE.test(body)) return null;
-  // Drop trailing pure doc-path parentheticals like `（docs/2026-11-11-...）`
-  body = body.replace(/[（(]docs\/[0-9a-zA-Z/_.,\s\-—]+[）)]\s*$/u, "").trim();
+  // Drop trailing pure doc-path parentheticals like `（docs/2026-11-11-...）` or redundant date stamps `（2026-11-12）`
+  body = body
+    .replace(/[（(]docs\/[0-9a-zA-Z/_.,\s\-—]+[）)]\s*$/u, "")
+    .replace(/[（(]20\d{2}-\d{2}-\d{2}[）)]\s*$/u, "")
+    .trim();
   if (!body || body.length < 3) return null;
   return body.length > 160 ? `${body.slice(0, 159)}…` : body;
 }
@@ -272,7 +276,9 @@ export function parseStatusNextSteps(md: string, topic: string): PendingSeed[] {
     );
     const isDecision = /待用户|待拍板|待确认/.test(line);
     if (!dueMatch && !isDecision) continue;
-    const cleaned = line.replace(/^20\d{2}-\d{2}-\d{2}\s*/, "").trim();
+    const cleaned = line
+      .replace(/^(?:约\s*)?20\d{2}-\d{2}-\d{2}[：:\s]*/, "")
+      .trim();
     const split = splitCardLine(cleaned || line);
     if (!split) continue;
     out.push({
@@ -389,7 +395,7 @@ export function parseReleasesJsonl(
     const sha = typeof row.ref === "string" ? row.ref.slice(0, 8) : null;
     const target =
       typeof row.target === "string" && row.target.trim()
-        ? row.target.trim()
+        ? cleanDeployTarget(row.target.trim())
         : null;
     const ref = kind === "deploy" ? (target ?? sha) : sha;
     const createdAt = Number.isFinite(Date.parse(ts))

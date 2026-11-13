@@ -33,6 +33,11 @@ describe("board-workbench helpers", () => {
         "feat(knowledge): 导图主题支持加粗、文字颜色和标记（docs/2026-11-11-maps）",
       ),
     ).toBe("导图主题支持加粗、文字颜色和标记");
+    expect(
+      cleanCommitSubject(
+        "feat(board): 收拢左侧看板入口与日报导出（2026-11-12）",
+      ),
+    ).toBe("收拢左侧看板入口与日报导出");
   });
 
   it("maps worktree paths to canonical product topics", () => {
@@ -71,15 +76,22 @@ describe("board-workbench helpers", () => {
       "# STATUS",
       "## 下一步（更新：2026-11-13）",
       "1. 2026-11-19 跑 workbench/bin/weekly.py 完成四周正式复盘",
-      "2. 日常观察无日期",
+      "2. 约 2026-11-23 跑 drift_audit 核验证书续期",
+      "3. 日常观察无日期",
     ].join("\n");
     const seeds = parseStatusNextSteps(md, "platform");
-    expect(seeds).toHaveLength(1);
+    expect(seeds).toHaveLength(2);
     expect(seeds[0]).toMatchObject({
       topic: "platform",
       status: "todo",
       due: "2026-11-19",
       title: "跑 workbench/bin/weekly.py 完成四周正式复盘",
+    });
+    expect(seeds[1]).toMatchObject({
+      topic: "platform",
+      status: "todo",
+      due: "2026-11-23",
+      title: "跑 drift_audit 核验证书续期",
     });
   });
 
@@ -96,20 +108,20 @@ describe("board-workbench helpers", () => {
       JSON.stringify({
         ts: "2026-11-10T22:38:43+08:00",
         kind: "deploy",
-        product: "shiyu",
-        repo: "E:/0项目/06.max-maps",
+        product: "ciyu",
+        repo: "E:/0项目/04.英语学习/ciyu",
         ref: "4187bce",
-        target: "max.yuanhk.top",
-        subject: "feat(knowledge): 自由摆放的分支不盖住别的主题",
+        target: "myjp:wcj.yuanai.best",
+        subject: "feat(wcj): 自由摆放的分支不盖住别的主题",
       }),
     ].join("\n");
     const items = parseReleasesJsonl(jsonl, "2026-11-01", new Map());
     expect(items).toHaveLength(2);
     expect(items[1]).toMatchObject({
       date: "2026-11-10",
-      topic: "shiyu",
+      topic: "ciyu",
       source: "deploy",
-      ref: "max.yuanhk.top",
+      ref: "wcj.yuanai.best",
     });
   });
 });

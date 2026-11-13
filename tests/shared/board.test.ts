@@ -3,17 +3,20 @@ import {
   blankBrief,
   blankTask,
   buildInsightPrompt,
+  cleanDeployTarget,
   completeTaskWithBrief,
   dismissBrief,
   dismissTask,
   emptyBoard,
   finishEstimate,
   formatDayMarkdown,
+  hiddenDailyBriefs,
   loadDays,
   mergedDailyBriefs,
   normalizeBoard,
   parseInsightReply,
   reopenTask,
+  restoreBrief,
   splitPendingQueue,
   taskRisks,
   upsertBriefText,
@@ -107,14 +110,36 @@ describe("pending confirmations & execution queue", () => {
       "Urgent P0",
       "Todo P2",
     ]);
+
+    // Newly approved undated tasks (`order < 0`) stay ahead of future-dated tasks of the same priority.
+    const datedFuture = blankTask(doc, "Future dated P1", {
+      status: "todo",
+      priority: "P1",
+      due: "2026-11-23",
+      order: 5,
+    });
+    const newlyApproved = blankTask(doc, "Just approved P1", {
+      status: "todo",
+      priority: "P1",
+      order: -1,
+    });
+    const g2 = splitPendingQueue(
+      [datedFuture, newlyApproved],
+      "2026-11-13",
+      new Map(),
+    );
+    expect(g2.execute.map((t) => t.title)).toEqual([
+      "Just approved P1",
+      "Future dated P1",
+    ]);
   });
 
-  it("completes a task into dailyLog and cleans up when reopened or dismissed", () => {
+  it("completes a task into dailyLog using outcome or title (never overwriting title with summary options)", () => {
     let doc = emptyBoard();
-    const t = blankTask(doc, "重构左侧看板", {
-      summary: "重构左侧看板为待确认队列与每日实现简述清单",
-      topic: "cockpit",
-      sourceKey: "wb:card:cockpit:decide:abc",
+    const t = blankTask(doc, "高频词冲刺范围定为前 500 词（每日约 25 新词）", {
+      summary: "全部 1124（每天约 53 新词）/ 300 / 500",
+      topic: "ciyu",
+      sourceKey: "wb:card:ciyu:decide:abc",
       sessionIds: ["sess-1"],
     });
     doc = { ...doc, tasks: [t] };
@@ -124,20 +149,32 @@ describe("pending confirmations & execution queue", () => {
     expect(doc.dailyLog).toHaveLength(1);
     expect(doc.dailyLog[0]).toMatchObject({
       date: "2026-11-13",
-      topic: "cockpit",
-      text: "重构左侧看板为待确认队列与每日实现简述清单",
+      topic: "ciyu",
+      text: "高频词冲刺范围定为前 500 词（每日约 25 新词）",
       source: "task",
       sessionId: "sess-1",
       taskId: t.id,
     });
 
+    // When `outcome` is explicitly provided, it takes precedence over `title`.
     doc = reopenTask(doc, t.id, "todo");
     expect(doc.tasks[0].status).toBe("todo");
     expect(doc.dailyLog).toHaveLength(0);
 
+    doc = {
+      ...doc,
+      tasks: doc.tasks.map((x) =>
+        x.id === t.id
+          ? { ...x, outcome: "完成前 500 高频词冲刺范围配置并上线" }
+          : x,
+      ),
+    };
+    doc = completeTaskWithBrief(doc, t.id, "2026-11-13", 1700000001000);
+    expect(doc.dailyLog[0].text).toBe("完成前 500 高频词冲刺范围配置并上线");
+
     doc = dismissTask(doc, t.id);
     expect(doc.tasks).toHaveLength(0);
-    expect(doc.dismissedSyncKeys).toContain("wb:card:cockpit:decide:abc");
+    expect(doc.dismissedSyncKeys).toContain("wb:card:ciyu:decide:abc");
   });
 });
 
@@ -192,9 +229,43 @@ describe("daily implementation digest", () => {
       "### 2026-11-13 任务实现简述清单\n- [词屿] 新增词屿标准发布脚本（上线 cet.yuanai.best）",
     );
 
-    // Dismissing an auto item suppresses its syncKey.
+    const multiMd = formatDayMarkdown(
+      "2026-11-13",
+      [
+        merged[0],
+        blankBrief("2026-11-13", "完成看板全面重构", {
+          topic: "cockpit",
+          source: "task",
+        }),
+        blankBrief("2026-11-13", "收尾词根跳转上线", {
+          topic: "ciyu",
+          source: "deploy",
+          ref: "myjp:wcj.yuanai.best",
+        }),
+      ],
+      { ciyu: "词屿", cockpit: "Jun-Code" },
+    );
+    expect(multiMd).toBe(
+      [
+        "### 2026-11-13 任务实现简述清单",
+        "- **词屿**",
+        "  - 新增词屿标准发布脚本（上线 cet.yuanai.best）",
+        "  - 收尾词根跳转上线（上线 wcj.yuanai.best）",
+        "- **Jun-Code**",
+        "  - 完成看板全面重构",
+      ].join("\n"),
+    );
+    expect(cleanDeployTarget("myjp:wcj.yuanai.best")).toBe("wcj.yuanai.best");
+
+    // Dismissing an auto item suppresses its syncKey, and restoreBrief brings it back.
     doc = dismissBrief(doc, merged[0]);
     expect(mergedDailyBriefs(doc).map((b) => b.date)).toEqual(["2026-11-12"]);
+    expect(hiddenDailyBriefs(doc)).toHaveLength(2);
+    doc = restoreBrief(doc, merged[0]);
+    expect(mergedDailyBriefs(doc).map((b) => b.date)).toEqual([
+      "2026-11-13",
+      "2026-11-12",
+    ]);
   });
 });
 

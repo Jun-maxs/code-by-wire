@@ -28,22 +28,28 @@ export interface BoardCtx extends BoardApi {
   /** Spawn a session for the task and attach it; resolves to its id, or null on failure. */
   newSessionFor: (task: BoardTask) => Promise<string | null>;
   openTask: (id: string) => void;
-  /** Complete task and log into today's implementation digest. */
+  /** Approve a `decide` task into `todo` (placing it near the top of queued tasks) with 1-click undo. */
+  approveTaskById: (taskId: string) => void;
+  /** Complete task and log into today's implementation digest (with 1-click undo). */
   completeTask: (taskId: string) => void;
   /** Reopen a completed task to `status` (default `"todo"`). */
   reopenTaskById: (
     taskId: string,
     status?: Exclude<TaskStatus, "done">,
   ) => void;
-  /** Dismiss a task and suppress its `sourceKey` so auto-sync won't resurrect it. */
+  /** Dismiss a task and suppress its `sourceKey` so auto-sync won't resurrect it (with 1-click undo). */
   dismissTaskById: (taskId: string) => void;
   /** Add a manual daily brief for `date` (defaults to `today`). */
   addManualBrief: (text: string, topic?: string | null, date?: string) => void;
   /** Update the wording of any daily brief (creating an override when editing an auto item). */
   editBriefText: (brief: DailyBrief, nextText: string) => void;
-  /** Hide/remove a daily brief (suppressing `syncKey` when auto-synced). */
+  /** Hide/remove a daily brief (suppressing `syncKey` when auto-synced, with 1-click undo). */
   removeBrief: (
     brief: Pick<DailyBrief, "id" | "syncKey" | "date" | "topic" | "text">,
+  ) => void;
+  /** Restore a previously hidden auto-synced brief. */
+  restoreHiddenBrief: (
+    brief: Pick<DailyBrief, "syncKey" | "date" | "topic" | "text">,
   ) => void;
   /** The topic the board is filtered to (new tasks and briefs land in it), or null. */
   defaultTopic: string | null;
@@ -100,6 +106,7 @@ export function taskMatches(
   return (
     t.title.toLowerCase().includes(s) ||
     t.summary.toLowerCase().includes(s) ||
+    t.outcome.toLowerCase().includes(s) ||
     topicLabel.includes(s) ||
     t.tags.some((x) => x.toLowerCase().includes(s)) ||
     t.notes.toLowerCase().includes(s)

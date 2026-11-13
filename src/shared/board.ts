@@ -30,8 +30,10 @@ export interface BoardTask {
   /** Product/topic key from the workbench cards, or null. */
   topic: string | null;
   tags: string[];
-  /** One-line decision context (when `decide`) or implementation summary (when completed). */
+  /** One-line decision options / background context (especially while `status === "decide"`). */
   summary: string;
+  /** Optional custom completion brief written to `dailyLog` when done (falls back to `title`). */
+  outcome: string;
   /** Stable key for deduplicating items synced from workbench cards / STATUS.md, or null. */
   sourceKey: string | null;
   /** Legacy estimated hours (preserved for backward compatibility). */
@@ -158,16 +160,16 @@ export function normalizeAi(v: unknown): BoardAi {
   };
 }
 
-/** Short label for the model in use: "Claude CLI · haiku" or "qwen2.5:7b · 127.0.0.1:11434". */
+/** Short label for the model in use: "Claude CLI / haiku" or "qwen2.5:7b / 127.0.0.1:11434". */
 export function aiLabel(ai: BoardAi): string {
-  if (ai.provider === "claude") return `Claude CLI · ${ai.claudeModel}`;
+  if (ai.provider === "claude") return `Claude CLI / ${ai.claudeModel}`;
   let host = ai.baseUrl;
   try {
     host = new URL(ai.baseUrl).host;
   } catch {
     // keep the raw text
   }
-  return `${ai.model || "?"} · ${host || "?"}`;
+  return `${ai.model || "?"} / ${host || "?"}`;
 }
 
 export interface BoardDoc {
@@ -230,6 +232,7 @@ export function blankTask(
     topic: null,
     tags: [],
     summary: "",
+    outcome: "",
     sourceKey: null,
     estimateH: 0,
     due: null,
@@ -327,6 +330,7 @@ export function normalizeBoard(raw: unknown): BoardDoc {
     topic: str(t.topic) || null,
     tags: strs(t.tags),
     summary: str(t.summary),
+    outcome: str(t.outcome),
     sourceKey: str(t.sourceKey) || null,
     estimateH: Math.max(0, num(t.estimateH)),
     due: day(t.due),
@@ -501,6 +505,8 @@ export function splitPendingQueue(
     if (ao !== bo) return ao - bo;
     if (a.priority !== b.priority)
       return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    if ((a.order < 0 || b.order < 0) && a.order !== b.order)
+      return a.order - b.order;
     const ad = a.due ?? "9999-99-99";
     const bd = b.due ?? "9999-99-99";
     if (ad !== bd) return ad < bd ? -1 : 1;
@@ -519,6 +525,8 @@ export function splitPendingQueue(
     if (ao !== bo) return ao - bo;
     if (a.priority !== b.priority)
       return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    if ((a.order < 0 || b.order < 0) && a.order !== b.order)
+      return a.order - b.order;
     const ad = a.due ?? "9999-99-99";
     const bd = b.due ?? "9999-99-99";
     if (ad !== bd) return ad < bd ? -1 : 1;
@@ -544,7 +552,11 @@ export function completeTaskWithBrief(
       ? { ...t, status: "done" as const, doneAt: t.doneAt ?? now }
       : t,
   );
-  const text = (target.summary.trim() || target.title.trim()).slice(0, 240);
+  const text = (
+    target.outcome.trim() ||
+    target.title.trim() ||
+    target.summary.trim()
+  ).slice(0, 240);
   if (!text) return { ...doc, tasks };
   const existingIdx = doc.dailyLog.findIndex((b) => b.taskId === taskId);
   const nextBrief: DailyBrief =
@@ -664,6 +676,67 @@ export function dismissBrief(
   };
 }
 
+/** Restore a previously hidden auto-synced brief by clearing its suppression keys. */
+export function restoreBrief(
+  doc: BoardDoc,
+  brief: Pick<DailyBrief, "syncKey" | "date" | "topic" | "text">,
+): BoardDoc {
+  const removeSet = new Set<string>([
+    ...(brief.syncKey ? [brief.syncKey] : []),
+    briefSuppressKey(brief),
+  ]);
+  return {
+    ...doc,
+    dismissedSyncKeys: doc.dismissedSyncKeys.filter((k) => !removeSet.has(k)),
+  };
+}
+
+/** Return auto-synced briefs currently suppressed by `dismissedSyncKeys` (for user inspection/restore). */
+export function hiddenDailyBriefs(
+  doc: Pick<BoardDoc, "dailyLog" | "autoBriefs" | "dismissedSyncKeys">,
+  opts: { topic?: string; query?: string } = {},
+): DailyBrief[] {
+  if (doc.dismissedSyncKeys.length === 0) return [];
+  const dismissed = new Set(doc.dismissedSyncKeys);
+  const topicFilter = opts.topic ?? "all";
+  const q = (opts.query ?? "").trim().toLowerCase();
+  const seen = new Set<string>();
+  const out: DailyBrief[] = [];
+  for (const b of doc.autoBriefs ?? []) {
+    const isHidden =
+      (!!b.syncKey && dismissed.has(b.syncKey)) ||
+      dismissed.has(briefSuppressKey(b));
+    if (!isHidden) continue;
+    if (
+      topicFilter !== "all" &&
+      (topicFilter === "none" ? !!b.topic : b.topic !== topicFilter)
+    ) {
+      continue;
+    }
+    if (q) {
+      const hay = `${b.text} ${b.ref ?? ""} ${b.topic ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) continue;
+    }
+    const key = b.syncKey ?? briefSuppressKey(b);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(b);
+  }
+  return out.sort(
+    (a, b) =>
+      (a.date === b.date ? 0 : a.date > b.date ? -1 : 1) ||
+      b.createdAt - a.createdAt,
+  );
+}
+
+/** Strip internal SSH host alias prefixes (`myjp:wcj.yuanai.best` → `wcj.yuanai.best`). */
+export function cleanDeployTarget(ref: string | null): string | null {
+  if (!ref) return null;
+  const trimmed = ref.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/^[a-z0-9_-]+:(?=[a-z0-9.-]+\.[a-z]{2,})/i, "");
+}
+
 /**
  * Merge persisted `dailyLog` + runtime `autoBriefs`, honoring `dismissedSyncKeys`, user wording
  * overrides, deploy-over-commit priority, and `(date, topic, normalizedText)` deduplication.
@@ -755,13 +828,47 @@ export function formatDayMarkdown(
   items: DailyBrief[],
   topicNames: Record<string, string>,
   headingLabel = "任务实现简述清单",
+  untaggedLabel = "其他",
 ): string {
   const lines = [`### ${date} ${headingLabel}`];
+  const distinctTopics = new Set(items.map((x) => x.topic ?? ""));
+  const shouldGroupByProduct =
+    distinctTopics.size >= 2 && items.some((x) => !!x.topic);
+
+  const fmtSuffix = (item: DailyBrief) => {
+    if (item.source !== "deploy") return "";
+    const target = cleanDeployTarget(item.ref);
+    return target ? `（上线 ${target}）` : "";
+  };
+
+  if (!shouldGroupByProduct) {
+    for (const item of items) {
+      const tag = item.topic
+        ? `[${topicNames[item.topic] ?? item.topic}] `
+        : "";
+      lines.push(`- ${tag}${item.text}${fmtSuffix(item)}`);
+    }
+    return lines.join("\n");
+  }
+
+  const byTopic = new Map<string, DailyBrief[]>();
   for (const item of items) {
-    const tag = item.topic ? `[${topicNames[item.topic] ?? item.topic}] ` : "";
-    const suffix =
-      item.source === "deploy" && item.ref ? `（上线 ${item.ref}）` : "";
-    lines.push(`- ${tag}${item.text}${suffix}`);
+    const key = item.topic ?? "";
+    const bucket = byTopic.get(key);
+    if (bucket) bucket.push(item);
+    else byTopic.set(key, [item]);
+  }
+  // Keep named products first in recency order, untagged last.
+  const orderedKeys = [
+    ...[...byTopic.keys()].filter((k) => k !== ""),
+    ...(byTopic.has("") ? [""] : []),
+  ];
+  for (const key of orderedKeys) {
+    const groupTitle = key ? (topicNames[key] ?? key) : untaggedLabel;
+    lines.push(`- **${groupTitle}**`);
+    for (const item of byTopic.get(key) ?? []) {
+      lines.push(`  - ${item.text}${fmtSuffix(item)}`);
+    }
   }
   return lines.join("\n");
 }

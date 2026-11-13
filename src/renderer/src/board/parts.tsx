@@ -91,9 +91,41 @@ export function Chip({
   );
 }
 
-export function TopicChip({ topic }: { topic: ProductInfo | undefined }) {
+export function TopicChip({
+  topic,
+  className,
+}: {
+  topic: ProductInfo | undefined;
+  className?: string;
+}) {
   if (!topic) return null;
-  return <Chip color={topic.color}>{shortTopicName(topic.name)}</Chip>;
+  return (
+    <Chip color={topic.color} className={className}>
+      {shortTopicName(topic.name)}
+    </Chip>
+  );
+}
+
+/** Render inline Markdown backticks (`code`) as quiet borderless monospace pills instead of raw `` ` `` chars. */
+export function InlineCodeText({ text }: { text: string }) {
+  if (!text.includes("`")) return <>{text}</>;
+  const parts = text.split(/(`[^`\n]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.length >= 3 && part.startsWith("`") && part.endsWith("`") ? (
+          <code
+            key={i}
+            className="rounded-sm bg-ink-900 px-1 py-px font-mono text-aux text-fg-muted"
+          >
+            {part.slice(1, -1)}
+          </code>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
 }
 
 /** A thin progress rule. */
@@ -141,7 +173,7 @@ export function Panel({
   return (
     <section
       className={cx(
-        "flex min-w-0 flex-col rounded-xl border border-ink-800 bg-ink-925",
+        "@container flex min-w-0 flex-col rounded-xl border border-ink-800 bg-ink-925",
         className,
       )}
     >
@@ -222,6 +254,6 @@ export const btn = {
 };
 
 export const inputInline =
-  "h-7 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)";
+  "h-7 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-ellipsis text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)";
 
 export const input = `${inputInline} w-full`;

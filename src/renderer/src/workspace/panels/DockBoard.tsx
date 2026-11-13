@@ -85,8 +85,10 @@ export function DockTaskDetail({ session }: { session: Session }) {
             </DockButton>
           </span>
         </div>
-        {task.summary.trim() && (
-          <p className="text-aux text-fg-muted">{task.summary.trim()}</p>
+        {(task.outcome.trim() || task.summary.trim()) && (
+          <p className="text-aux text-fg-muted">
+            {task.outcome.trim() || task.summary.trim()}
+          </p>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-dim">
           <span>
@@ -227,7 +229,7 @@ function TopicHeader({ product }: { product: ProductInfo }) {
       {product.name}
       {product.domains.length > 0 && (
         <span className="truncate text-meta font-normal text-fg-dim">
-          {product.domains.join(" · ")}
+          {product.domains.join(" / ")}
         </span>
       )}
     </h3>

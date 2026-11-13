@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   PRIORITIES,
   blankTask,
@@ -16,6 +16,7 @@ import { buildLiveByTask, taskMatches, useBoardCtx } from "./context";
 import {
   Chip,
   Dot,
+  InlineCodeText,
   PRIORITY_TEXT,
   Panel,
   TopicChip,
@@ -26,7 +27,8 @@ import { fmtDay } from "./strings";
 
 type QueueFilter = "all" | "confirm" | "execute" | "done";
 
-const SPLIT_CONFIRM_PREVIEW = 4;
+const SPLIT_CONFIRM_PREVIEW_TALL = 4;
+const SPLIT_CONFIRM_PREVIEW_COMPACT = 2;
 
 /**
  * Core Module 1: Pending Confirmations (`decide` + live `waiting` sessions) & Queued Execution
@@ -57,6 +59,7 @@ export function PendingQueuePanel({
     newSessionFor,
     openTask,
     update,
+    approveTaskById,
     completeTask,
     reopenTaskById,
     dismissTaskById,
@@ -72,6 +75,15 @@ export function PendingQueuePanel({
   const [executeCollapsed, setExecuteCollapsed] = useState(false);
   const [doneExpanded, setDoneExpanded] = useState(false);
   const [spawningId, setSpawningId] = useState<string | null>(null);
+  const [compactViewport, setCompactViewport] = useState(
+    () => typeof window !== "undefined" && window.innerHeight < 740,
+  );
+
+  useEffect(() => {
+    const onResize = () => setCompactViewport(window.innerHeight < 740);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const topicNames = useMemo(() => {
     const out: Record<string, string> = {};
@@ -165,16 +177,19 @@ export function PendingQueuePanel({
   const showExecute = filter === "all" || filter === "execute";
   const showDoneOnly = filter === "done";
 
-  // In split `all` overview, cap pending confirmations to the top 4 by default so `Queued for execution`
-  // stays immediately visible in the first screen without scrolling past 15 items.
+  // In split `all` overview, cap pending confirmations (4 on tall viewports, 2 on compact <740px)
+  // so `Queued for execution` and its top items stay visible on screen 1 without scrolling.
+  const confirmPreviewLimit = compactViewport
+    ? SPLIT_CONFIRM_PREVIEW_COMPACT
+    : SPLIT_CONFIRM_PREVIEW_TALL;
   const capConfirm =
     scrollBody === "split" &&
     filter === "all" &&
     !query.trim() &&
     !confirmShowAll &&
-    groups.confirm.length > SPLIT_CONFIRM_PREVIEW;
+    groups.confirm.length > confirmPreviewLimit;
   const visibleConfirmTasks = capConfirm
-    ? groups.confirm.slice(0, SPLIT_CONFIRM_PREVIEW)
+    ? groups.confirm.slice(0, confirmPreviewLimit)
     : groups.confirm;
   const hiddenConfirmCount = groups.confirm.length - visibleConfirmTasks.length;
 
@@ -242,10 +257,10 @@ export function PendingQueuePanel({
         </div>
       }
     >
-      {/* 1-line inline quick-add bar */}
+      {/* Responsive inline quick-add bar: 1 row on >=512px panels, full-width input + compact controls row on narrow panels */}
       {!showDoneOnly && (
-        <div className="flex items-center gap-1.5 border-b border-ink-850 px-4 py-2">
-          <div className="inline-flex shrink-0 items-center rounded-md border border-(--ui-stroke-tertiary) bg-well p-0.5">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-ink-850 px-4 py-2">
+          <div className="order-2 inline-flex shrink-0 items-center rounded-md border border-(--ui-stroke-tertiary) bg-well p-0.5 @lg:order-1">
             <button
               type="button"
               aria-pressed={effectiveKind === "decide"}
@@ -288,7 +303,10 @@ export function PendingQueuePanel({
                 ? s.quickTaskPlaceholderConfirm
                 : s.quickTaskPlaceholderExecute
             }
-            className={cx(inputInline, "min-w-0 flex-1")}
+            className={cx(
+              inputInline,
+              "order-1 min-w-0 basis-full @lg:order-2 @lg:min-w-44 @lg:basis-auto @lg:flex-1",
+            )}
           />
 
           {defaultTopic === null && Object.keys(topics).length > 0 && (
@@ -296,7 +314,10 @@ export function PendingQueuePanel({
               value={quickTopic}
               onChange={(e) => setQuickTopic(e.target.value)}
               aria-label={s.fTopic}
-              className={cx(inputInline, "w-20 shrink-0 px-1.5 text-aux")}
+              className={cx(
+                inputInline,
+                "order-3 w-24 shrink-0 px-1.5 text-aux",
+              )}
             >
               <option value="">{s.fNoTopic}</option>
               {Object.values(topics).map((p) => (
@@ -312,7 +333,7 @@ export function PendingQueuePanel({
             onClick={cyclePriority}
             title={s.fPriority}
             className={cx(
-              "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 font-mono text-aux hover:text-fg",
+              "order-4 inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 font-mono text-aux hover:text-fg",
               PRIORITY_TEXT[quickPriority],
             )}
           >
@@ -323,7 +344,7 @@ export function PendingQueuePanel({
             <button
               type="button"
               onClick={submitQuickAdd}
-              className={btn.outline}
+              className={cx(btn.outline, "order-5 ml-auto @lg:ml-0")}
             >
               <Icon name="plus" size={13} />
               {s.quickAddBtn}
@@ -428,14 +449,7 @@ export function PendingQueuePanel({
                           today={today}
                           spawning={spawningId === t.id}
                           onOpen={() => openTask(t.id)}
-                          onApprove={() =>
-                            update((d) => ({
-                              ...d,
-                              tasks: d.tasks.map((x) =>
-                                x.id === t.id ? { ...x, status: "todo" } : x,
-                              ),
-                            }))
-                          }
+                          onApprove={() => approveTaskById(t.id)}
                           onMarkDecide={() => undefined}
                           onSessionAction={(latest) =>
                             handleSessionAction(t, latest)
@@ -449,11 +463,11 @@ export function PendingQueuePanel({
                         (confirmShowAll &&
                           scrollBody === "split" &&
                           filter === "all" &&
-                          groups.confirm.length > SPLIT_CONFIRM_PREVIEW)) && (
+                          groups.confirm.length > confirmPreviewLimit)) && (
                         <button
                           type="button"
                           onClick={() => setConfirmShowAll((v) => !v)}
-                          className="flex w-full items-center justify-center gap-1.5 py-2 text-aux text-fg-faint transition-colors hover:bg-(--ui-row-hover-background) hover:text-fg"
+                          className="flex w-full items-center justify-center gap-1.5 py-1.5 text-aux text-fg-faint transition-colors hover:bg-(--ui-row-hover-background) hover:text-fg"
                         >
                           <Icon
                             name={
@@ -623,9 +637,13 @@ function TaskQueueRow({
   const isLiveRunning = workingCount > 0 || task.status === "doing";
   const doneSteps = task.subtasks.filter((st) => st.done).length;
   const deltaDays = task.due ? daysBetween(today, task.due) : null;
+  const subtitleText = inConfirm
+    ? task.summary
+    : task.outcome ||
+      (!task.sourceKey?.includes(":decide:") ? task.summary : "");
 
   return (
-    <div className="group flex items-start gap-2.5 px-4 py-2.5 transition-colors hover:bg-(--ui-row-hover-background)">
+    <div className="group flex items-start gap-2.5 px-4 py-2 transition-colors hover:bg-(--ui-row-hover-background)">
       {/* Queued execution items expose a 1-click completion circle; pending confirmation items avoid accidental tick-done before deciding. */}
       {!inConfirm && (
         <button
@@ -640,36 +658,40 @@ function TaskQueueRow({
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-1.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="group/title block w-full text-left text-body font-medium leading-relaxed text-fg"
+        >
           {waitingCount > 0 && (
-            <Dot className="mt-1.5 bg-accent animate-pulse" />
+            <span
+              aria-hidden
+              className="mr-1.5 inline-block size-2 rounded-full bg-accent align-middle animate-pulse"
+            />
           )}
           {!inConfirm && waitingCount === 0 && isLiveRunning && (
-            <Dot className="mt-1.5 bg-working" />
+            <span
+              aria-hidden
+              className="mr-1.5 inline-block size-2 rounded-full bg-working align-middle"
+            />
           )}
-          {topic && (
-            <span className="mt-0.5 shrink-0">
-              <TopicChip topic={topic} />
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={onOpen}
-            className="min-w-0 flex-1 text-left text-body font-medium leading-relaxed text-fg hover:underline"
-          >
-            {task.title || s.untitled}
-          </button>
-        </div>
+          <TopicChip topic={topic} className="mr-1.5 align-middle" />
+          <span className="align-middle group-hover/title:underline">
+            <InlineCodeText text={task.title || s.untitled} />
+          </span>
+        </button>
 
-        {(task.summary ||
+        {(subtitleText ||
+          isLiveRunning ||
+          waitingCount > 0 ||
           task.due ||
           task.subtasks.length > 0 ||
           linkedSessions.length > 0 ||
           task.priority !== "P1") && (
           <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta text-fg-faint">
-            {task.summary && (
+            {subtitleText && (
               <span className="line-clamp-1 text-aux text-fg-muted">
-                {task.summary}
+                <InlineCodeText text={subtitleText} />
               </span>
             )}
             {waitingCount > 0 && <Chip tone="mid">{s.waitingSessionTag}</Chip>}
@@ -832,7 +854,7 @@ function DoneTaskRow({
         onClick={onOpen}
         className="min-w-0 flex-1 truncate text-left text-body text-fg-faint line-through hover:text-fg"
       >
-        {task.title || s.untitled}
+        <InlineCodeText text={task.title || s.untitled} />
       </button>
       {doneDay && (
         <span className="shrink-0 font-mono text-meta tabular-nums text-fg-faint">

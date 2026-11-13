@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import {
   addDays,
+  cleanDeployTarget,
   formatDayMarkdown,
   groupBriefsByDay,
+  hiddenDailyBriefs,
   mergedDailyBriefs,
   parseDay,
   type DailyBrief,
@@ -11,7 +13,15 @@ import { shortTopicName } from "@shared/products";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { useBoardCtx } from "./context";
-import { Chip, Panel, TopicChip, btn, input, inputInline } from "./parts";
+import {
+  Chip,
+  InlineCodeText,
+  Panel,
+  TopicChip,
+  btn,
+  input,
+  inputInline,
+} from "./parts";
 import { fmtDay } from "./strings";
 
 type DigestFilter = "all" | "manual_task" | "git_deploy";
@@ -43,6 +53,7 @@ export function DailyDigestPanel({
     addManualBrief,
     editBriefText,
     removeBrief,
+    restoreHiddenBrief,
   } = ctx;
 
   const [sourceFilter, setSourceFilter] = useState<DigestFilter>("all");
@@ -51,6 +62,19 @@ export function DailyDigestPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [showHidden, setShowHidden] = useState(false);
+
+  const toggleDay = (date: string) => {
+    setCollapsedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
 
   const topicNames = useMemo(() => {
     const out: Record<string, string> = {};
@@ -61,6 +85,11 @@ export function DailyDigestPanel({
 
   const allMerged = useMemo(
     () => mergedDailyBriefs(rawDoc, { topic: topicFilter, query }),
+    [rawDoc, topicFilter, query],
+  );
+
+  const hiddenItems = useMemo(
+    () => hiddenDailyBriefs(rawDoc, { topic: topicFilter, query }),
     [rawDoc, topicFilter, query],
   );
 
@@ -92,7 +121,13 @@ export function DailyDigestPanel({
     items: DailyBrief[],
     key: string,
   ) => {
-    const md = formatDayMarkdown(date, items, topicNames, s.markdownHeading);
+    const md = formatDayMarkdown(
+      date,
+      items,
+      topicNames,
+      s.markdownHeading,
+      s.markdownUntagged,
+    );
     void navigator.clipboard?.writeText(md);
     setCopiedKey(key);
     setTimeout(() => {
@@ -170,9 +205,9 @@ export function DailyDigestPanel({
         </div>
       }
     >
-      {/* 1-line quick-jot bar */}
-      <div className="flex items-center gap-1.5 border-b border-ink-850 px-4 py-2">
-        <div className="relative flex min-w-0 flex-1 items-center">
+      {/* Responsive quick-jot bar */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-ink-850 px-4 py-2">
+        <div className="relative flex min-w-[13rem] flex-1 items-center">
           <Icon
             name="plus"
             size={13}
@@ -197,7 +232,7 @@ export function DailyDigestPanel({
             value={jotTopic}
             onChange={(e) => setJotTopic(e.target.value)}
             aria-label={s.fTopic}
-            className={cx(inputInline, "w-20 shrink-0 px-1.5 text-aux")}
+            className={cx(inputInline, "w-24 shrink-0 px-1.5 text-aux")}
           >
             <option value="">{s.fNoTopic}</option>
             {Object.values(topics).map((p) => (
@@ -233,10 +268,21 @@ export function DailyDigestPanel({
                 : group.date === yesterday
                   ? s.dayYesterday
                   : null;
+            const isCollapsed = collapsedDays.has(group.date);
             return (
               <div key={group.date} className="flex flex-col">
-                <div className="flex items-center justify-between gap-2 bg-ink-950/60 px-4 py-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2 bg-ink-950/60 px-4 py-1.5 transition-colors hover:bg-(--ui-row-hover-background)">
+                  <button
+                    type="button"
+                    aria-expanded={!isCollapsed}
+                    onClick={() => toggleDay(group.date)}
+                    className="flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left"
+                  >
+                    <Icon
+                      name={isCollapsed ? "chevron-right" : "chevron-down"}
+                      size={12}
+                      className="shrink-0 text-fg-faint"
+                    />
                     {relativeLabel && (
                       <span
                         className={cx(
@@ -254,7 +300,7 @@ export function DailyDigestPanel({
                     <span className="font-mono text-meta tabular-nums text-fg-faint">
                       {s.dayCount(group.items.length)}
                     </span>
-                  </div>
+                  </button>
 
                   {group.date !== primaryCopyGroup?.date && (
                     <button
@@ -262,7 +308,7 @@ export function DailyDigestPanel({
                       onClick={() =>
                         copyDayToClipboard(group.date, group.items, group.date)
                       }
-                      className="inline-flex h-6 items-center gap-1 rounded-sm px-2 text-meta text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
+                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-sm px-2 text-meta text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
                     >
                       <Icon
                         name={copiedKey === group.date ? "check" : "copy"}
@@ -274,157 +320,233 @@ export function DailyDigestPanel({
                   )}
                 </div>
 
-                <div className="divide-y divide-ink-850">
-                  {group.items.map((item) => {
-                    const topic = item.topic ? topics[item.topic] : undefined;
-                    const linkedSession = item.sessionId
-                      ? sessionsById.get(item.sessionId)
-                      : undefined;
-                    const isEditing = editingId === item.id;
+                {!isCollapsed && (
+                  <div className="divide-y divide-ink-850">
+                    {group.items.map((item) => {
+                      const topic = item.topic ? topics[item.topic] : undefined;
+                      const linkedSession = item.sessionId
+                        ? sessionsById.get(item.sessionId)
+                        : undefined;
+                      const isEditing = editingId === item.id;
+                      const cleanTarget =
+                        item.source === "deploy"
+                          ? cleanDeployTarget(item.ref)
+                          : null;
 
-                    return (
-                      <div
-                        key={item.id}
-                        className="group flex items-start gap-2.5 px-4 py-2.5 transition-colors hover:bg-(--ui-row-hover-background)"
-                      >
-                        <span
-                          aria-hidden
-                          className={cx(
-                            "mt-1.5 size-1.5 shrink-0 rounded-full",
-                            item.source === "deploy" || item.source === "task"
-                              ? "bg-ok"
-                              : "bg-fg/45",
-                          )}
-                        />
+                      return (
+                        <div
+                          key={item.id}
+                          className="group flex items-start gap-2.5 px-4 py-2 transition-colors hover:bg-(--ui-row-hover-background)"
+                        >
+                          <span
+                            aria-hidden
+                            className={cx(
+                              "mt-2 size-1.5 shrink-0 rounded-full",
+                              item.source === "deploy" || item.source === "task"
+                                ? "bg-ok"
+                                : "bg-fg/45",
+                            )}
+                          />
 
-                        {topic && (
-                          <div className="mt-0.5">
-                            <TopicChip topic={topic} />
-                          </div>
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                autoFocus
-                                value={editingText}
-                                onChange={(e) => setEditingText(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (
-                                    e.key === "Enter" &&
-                                    !e.nativeEvent.isComposing
-                                  ) {
-                                    e.preventDefault();
-                                    editBriefText(item, editingText);
-                                    setEditingId(null);
-                                  } else if (e.key === "Escape") {
-                                    setEditingId(null);
+                          <div className="min-w-0 flex-1">
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1.5">
+                                <textarea
+                                  autoFocus
+                                  rows={2}
+                                  value={editingText}
+                                  onChange={(e) =>
+                                    setEditingText(e.target.value)
                                   }
-                                }}
-                                className={input}
-                              />
+                                  onKeyDown={(e) => {
+                                    if (
+                                      e.key === "Enter" &&
+                                      !e.shiftKey &&
+                                      !e.nativeEvent.isComposing
+                                    ) {
+                                      e.preventDefault();
+                                      editBriefText(item, editingText);
+                                      setEditingId(null);
+                                    } else if (e.key === "Escape") {
+                                      setEditingId(null);
+                                    }
+                                  }}
+                                  className={cx(
+                                    input,
+                                    "h-auto resize-y py-1.5 leading-relaxed",
+                                  )}
+                                />
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingId(null)}
+                                    className={btn.ghost}
+                                  >
+                                    {s.cancelEdit}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      editBriefText(item, editingText);
+                                      setEditingId(null);
+                                    }}
+                                    className={btn.compact}
+                                  >
+                                    {s.saveBrief}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-body leading-relaxed text-fg">
+                                <TopicChip
+                                  topic={topic}
+                                  className="mr-1.5 align-middle"
+                                />
+                                {item.taskId ? (
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() =>
+                                      item.taskId && openTask(item.taskId)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (
+                                        (e.key === "Enter" || e.key === " ") &&
+                                        item.taskId
+                                      ) {
+                                        e.preventDefault();
+                                        openTask(item.taskId);
+                                      }
+                                    }}
+                                    className="cursor-pointer align-middle hover:underline"
+                                  >
+                                    <InlineCodeText text={item.text} />
+                                  </span>
+                                ) : (
+                                  <span className="align-middle">
+                                    <InlineCodeText text={item.text} />
+                                  </span>
+                                )}
+                                {item.source === "deploy" && (
+                                  <Chip
+                                    tone="ok"
+                                    className="ml-1.5 align-middle"
+                                  >
+                                    {cleanTarget
+                                      ? s.deployedTo(cleanTarget)
+                                      : s.briefSource.deploy}
+                                  </Chip>
+                                )}
+                                {item.source === "task" && (
+                                  <Chip className="ml-1.5 align-middle">
+                                    {s.briefSource.task}
+                                  </Chip>
+                                )}
+                                {item.source === "manual" && (
+                                  <Chip className="ml-1.5 align-middle">
+                                    {s.briefSource.manual}
+                                  </Chip>
+                                )}
+                                {item.source === "commit" && item.ref && (
+                                  <span className="ml-1.5 inline-block align-middle font-mono text-meta tabular-nums text-fg-faint">
+                                    {item.ref}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {!isEditing && (
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {linkedSession && (
+                                <button
+                                  type="button"
+                                  onClick={() => openSession(linkedSession.id)}
+                                  title={s.openSessionBtn}
+                                  aria-label={s.openSessionBtn}
+                                  className="grid size-6 place-items-center rounded-sm text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg"
+                                >
+                                  <Icon name="arrow-up-right" size={12} />
+                                </button>
+                              )}
+
                               <button
                                 type="button"
                                 onClick={() => {
-                                  editBriefText(item, editingText);
-                                  setEditingId(null);
+                                  setEditingId(item.id);
+                                  setEditingText(item.text);
                                 }}
-                                className={btn.compact}
+                                title={s.editBrief}
+                                aria-label={s.editBrief}
+                                className="grid size-6 place-items-center rounded-sm text-fg-faint opacity-55 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:bg-(--ui-control-hover-background) hover:text-fg"
                               >
-                                {s.saveBrief}
+                                <Icon name="pencil" size={12} />
                               </button>
+
                               <button
                                 type="button"
-                                onClick={() => setEditingId(null)}
-                                className={btn.ghost}
+                                onClick={() => removeBrief(item)}
+                                title={s.hideBrief}
+                                aria-label={s.hideBrief}
+                                className="grid size-6 place-items-center rounded-sm text-fg-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:bg-(--ui-control-hover-background) hover:text-fg"
                               >
-                                {s.cancelEdit}
+                                <Icon name="x" size={13} />
                               </button>
                             </div>
-                          ) : (
-                            <p className="text-body leading-relaxed text-fg">
-                              {item.taskId ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    item.taskId && openTask(item.taskId)
-                                  }
-                                  className="text-left hover:underline"
-                                >
-                                  {item.text}
-                                </button>
-                              ) : (
-                                item.text
-                              )}
-                            </p>
                           )}
                         </div>
-
-                        {!isEditing && (
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            {item.source === "deploy" && (
-                              <Chip tone="ok">
-                                {item.ref
-                                  ? s.deployedTo(item.ref)
-                                  : s.briefSource.deploy}
-                              </Chip>
-                            )}
-                            {item.source === "task" && (
-                              <Chip>{s.briefSource.task}</Chip>
-                            )}
-                            {item.source === "manual" && (
-                              <Chip>{s.briefSource.manual}</Chip>
-                            )}
-                            {item.source === "commit" && item.ref && (
-                              <span className="font-mono text-meta tabular-nums text-fg-faint">
-                                {item.ref}
-                              </span>
-                            )}
-
-                            {linkedSession && (
-                              <button
-                                type="button"
-                                onClick={() => openSession(linkedSession.id)}
-                                title={s.openSessionBtn}
-                                aria-label={s.openSessionBtn}
-                                className="grid size-6 place-items-center rounded-sm text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg"
-                              >
-                                <Icon name="arrow-up-right" size={12} />
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(item.id);
-                                setEditingText(item.text);
-                              }}
-                              title={s.editBrief}
-                              aria-label={s.editBrief}
-                              className="grid size-6 place-items-center rounded-sm text-fg-faint opacity-50 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:bg-(--ui-control-hover-background) hover:text-fg"
-                            >
-                              <Icon name="pencil" size={12} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => removeBrief(item)}
-                              title={s.hideBrief}
-                              aria-label={s.hideBrief}
-                              className="grid size-6 place-items-center rounded-sm text-fg-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:bg-(--ui-control-hover-background) hover:text-fg"
-                            >
-                              <Icon name="x" size={13} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })
+        )}
+
+        {hiddenItems.length > 0 && (
+          <div className="flex flex-col">
+            <button
+              type="button"
+              aria-expanded={showHidden}
+              onClick={() => setShowHidden((v) => !v)}
+              className="flex items-center gap-1.5 px-4 py-2 text-left text-aux text-fg-faint transition-colors hover:bg-(--ui-row-hover-background) hover:text-fg"
+            >
+              <Icon
+                name={showHidden ? "chevron-down" : "chevron-right"}
+                size={12}
+              />
+              <span>{s.hiddenBriefsToggle(hiddenItems.length)}</span>
+            </button>
+            {showHidden && (
+              <div className="divide-y divide-ink-850 border-t border-ink-850">
+                {hiddenItems.map((b) => {
+                  const tp = b.topic ? topics[b.topic] : undefined;
+                  return (
+                    <div
+                      key={b.id}
+                      className="flex items-center gap-2 px-4 py-2 text-aux text-fg-faint"
+                    >
+                      <TopicChip topic={tp} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">
+                        <InlineCodeText text={b.text} />
+                      </span>
+                      <span className="shrink-0 font-mono text-meta tabular-nums">
+                        {fmtDay(b.date)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => restoreHiddenBrief(b)}
+                        className={btn.compact}
+                      >
+                        {s.restoreBriefBtn}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </Panel>

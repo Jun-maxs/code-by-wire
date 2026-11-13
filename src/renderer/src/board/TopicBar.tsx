@@ -22,9 +22,10 @@ export function TopicBar({
   onTopic: (key: string) => void;
   onManage: () => void;
 }) {
-  const { rawDoc, topics, sessionsById, today, s } = useBoardCtx();
+  const { rawDoc, loaded, topics, sessionsById, today, s } = useBoardCtx();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
+  const lockedOrderRef = useRef<string[] | null>(null);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -65,7 +66,7 @@ export function TopicBar({
     }
 
     const totalOpen = confirm.length + execute.length;
-    const list = Object.values(topics).sort((a, b) => {
+    const naturalSorted = Object.values(topics).sort((a, b) => {
       const ac = confirmByTopic.has(a.key) ? 0 : 1;
       const bc = confirmByTopic.has(b.key) ? 0 : 1;
       if (ac !== bc) return ac - bc;
@@ -78,6 +79,21 @@ export function TopicBar({
       return a.name.localeCompare(b.name, "zh-Hans-CN");
     });
 
+    // Lock pill order once initial board data settles so completing a single task never causes
+    // product pills to jump slots under the cursor.
+    if (loaded && naturalSorted.length > 0 && lockedOrderRef.current === null) {
+      lockedOrderRef.current = naturalSorted.map((x) => x.key);
+    }
+    const orderIndex = lockedOrderRef.current
+      ? new Map(lockedOrderRef.current.map((k, idx) => [k, idx]))
+      : null;
+    const list = orderIndex
+      ? [...naturalSorted].sort(
+          (a, b) =>
+            (orderIndex.get(a.key) ?? 999) - (orderIndex.get(b.key) ?? 999),
+        )
+      : naturalSorted;
+
     const untaggedCount =
       (openByTopic.get("none") ?? 0) + (recentBriefByTopic.get("none") ?? 0);
 
@@ -89,7 +105,7 @@ export function TopicBar({
       untaggedOpen: openByTopic.get("none") ?? 0,
       hasUntagged: untaggedCount > 0,
     };
-  }, [rawDoc, topics, sessionsById, today]);
+  }, [rawDoc, loaded, topics, sessionsById, today]);
 
   if (stats.list.length === 0) return null;
 
@@ -118,7 +134,7 @@ export function TopicBar({
     (showUntaggedInMenu && stats.confirmByTopic.has("none"));
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-ink-850 px-5 pb-2">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-ink-850 px-5 pb-1.5">
       <div className="flex min-w-0 flex-1 items-center gap-1">
         <FilterPill
           active={topic === "all"}

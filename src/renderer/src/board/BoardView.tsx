@@ -1,4 +1,11 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   MAX_DAILY_LOG,
   blankBrief,
@@ -8,8 +15,10 @@ import {
   dismissTask,
   mergedDailyBriefs,
   reopenTask,
+  restoreBrief,
   splitPendingQueue,
   upsertBriefText,
+  type BoardDoc,
   type BoardTask,
   type DailyBrief,
   type TaskStatus,
@@ -144,11 +153,65 @@ export function BoardView({
   );
   const defaultTopic = topic === "all" || topic === "none" ? null : topic;
 
+  const [undoNotice, setUndoNotice] = useState<{
+    message: string;
+    snapshot: BoardDoc;
+  } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushUndo = useCallback((message: string, snapshot: BoardDoc) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoNotice({ message, snapshot });
+    undoTimerRef.current = setTimeout(() => {
+      setUndoNotice(null);
+      undoTimerRef.current = null;
+    }, 6500);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
+
+  const handleUndo = useCallback(() => {
+    if (!undoNotice) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = null;
+    const snap = undoNotice.snapshot;
+    setUndoNotice(null);
+    api.update(() => snap);
+  }, [undoNotice, api]);
+
+  const approveTaskById = useCallback(
+    (id: string) => {
+      const target = api.doc.tasks.find((t) => t.id === id);
+      if (target) {
+        pushUndo(s.undoApproved(target.title || s.untitled), api.doc);
+      }
+      api.update((d) => {
+        const frontOrder = Math.min(0, ...d.tasks.map((x) => x.order)) - 1;
+        return {
+          ...d,
+          tasks: d.tasks.map((t) =>
+            t.id === id ? { ...t, status: "todo", order: frontOrder } : t,
+          ),
+        };
+      });
+    },
+    [api, pushUndo, s],
+  );
+
   const completeTask = useCallback(
     (id: string) => {
+      const target = api.doc.tasks.find((t) => t.id === id);
+      if (target) {
+        pushUndo(s.undoCompleted(target.title || s.untitled), api.doc);
+      }
       api.update((d) => completeTaskWithBrief(d, id, api.today));
     },
-    [api],
+    [api, pushUndo, s],
   );
 
   const reopenTaskById = useCallback(
@@ -160,9 +223,13 @@ export function BoardView({
 
   const dismissTaskById = useCallback(
     (id: string) => {
+      const target = api.doc.tasks.find((t) => t.id === id);
+      if (target) {
+        pushUndo(s.undoDismissedTask(target.title || s.untitled), api.doc);
+      }
       api.update((d) => dismissTask(d, id));
     },
-    [api],
+    [api, pushUndo, s],
   );
 
   const addManualBrief = useCallback(
@@ -192,7 +259,15 @@ export function BoardView({
 
   const removeBrief = useCallback(
     (brief: Pick<DailyBrief, "id" | "syncKey" | "date" | "topic" | "text">) => {
+      pushUndo(s.undoHiddenBrief(brief.text), api.doc);
       api.update((d) => dismissBrief(d, brief));
+    },
+    [api, pushUndo, s],
+  );
+
+  const restoreHiddenBrief = useCallback(
+    (brief: Pick<DailyBrief, "syncKey" | "date" | "topic" | "text">) => {
+      api.update((d) => restoreBrief(d, brief));
     },
     [api],
   );
@@ -247,12 +322,14 @@ export function BoardView({
     openSession: onOpenSession,
     newSessionFor,
     openTask: setTaskId,
+    approveTaskById,
     completeTask,
     reopenTaskById,
     dismissTaskById,
     addManualBrief,
     editBriefText,
     removeBrief,
+    restoreHiddenBrief,
   };
 
   const createTask = () => {
@@ -270,6 +347,7 @@ export function BoardView({
       t &&
       !t.title.trim() &&
       !t.summary.trim() &&
+      !t.outcome.trim() &&
       t.subtasks.length === 0 &&
       t.sessionIds.length === 0 &&
       !t.notes
@@ -285,7 +363,7 @@ export function BoardView({
     <BoardContext.Provider value={ctx}>
       <div className="@container relative flex h-full min-h-0 flex-col">
         {/* Top bar: 3-mode switch with inline counts + search + sync + AI review + single primary button */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 px-5 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 px-5 py-2">
           <nav
             className="flex items-center rounded-lg border border-(--ui-stroke-tertiary) p-[3px]"
             aria-label={s.title}
@@ -329,7 +407,7 @@ export function BoardView({
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5">
-            <label className="relative flex items-center">
+            <div className="relative flex items-center">
               <Icon
                 name="search"
                 size={13}
@@ -338,10 +416,36 @@ export function BoardView({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    if (query) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setQuery("");
+                    } else {
+                      e.currentTarget.blur();
+                    }
+                  }
+                }}
                 placeholder={s.search}
-                className="h-7 w-40 rounded-md border border-(--ui-stroke-tertiary) bg-transparent pl-7 pr-2 text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary) @4xl:w-52"
+                aria-label={s.search}
+                className={cx(
+                  "h-7 w-40 rounded-md border border-(--ui-stroke-tertiary) bg-transparent pl-7 text-ellipsis text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary) @4xl:w-52",
+                  query ? "pr-6" : "pr-2",
+                )}
               />
-            </label>
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  title={s.clearSearch}
+                  aria-label={s.clearSearch}
+                  className="absolute right-1 grid size-5 place-items-center rounded-sm text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg"
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              )}
+            </div>
 
             <button
               type="button"
@@ -389,7 +493,7 @@ export function BoardView({
 
         {/* Workspace body: side-by-side split on >=768px container (covers both 1440x900 and 1084x655), bounded stacked panels below */}
         {mode === "split" ? (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3.5 overflow-y-auto px-5 py-3 @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] @3xl:overflow-hidden">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3.5 overflow-y-auto px-5 py-2.5 @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] @3xl:overflow-hidden">
             <div className="min-w-0 @3xl:h-full @3xl:min-h-0">
               <PendingQueuePanel query={query} scrollBody="split" />
             </div>
@@ -398,7 +502,7 @@ export function BoardView({
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-hidden px-5 py-3">
+          <div className="min-h-0 flex-1 overflow-hidden px-5 py-2.5">
             <div className="mx-auto h-full min-h-0 w-full max-w-[880px]">
               {mode === "queue" ? (
                 <PendingQueuePanel query={query} scrollBody="focus" />
@@ -406,6 +510,34 @@ export function BoardView({
                 <DailyDigestPanel query={query} scrollBody="focus" />
               )}
             </div>
+          </div>
+        )}
+
+        {undoNotice && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-auto absolute bottom-4 left-1/2 z-20 flex max-w-[min(92%,34rem)] -translate-x-1/2 items-center gap-2.5 rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-2 shadow-2xl"
+          >
+            <span className="min-w-0 flex-1 truncate text-aux text-fg">
+              {undoNotice.message}
+            </span>
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="inline-flex h-6 shrink-0 items-center gap-1 rounded-sm bg-ink-800 px-2 text-aux font-medium text-fg transition-colors hover:bg-ink-700"
+            >
+              <Icon name="rotate-ccw" size={11} />
+              {s.undo}
+            </button>
+            <button
+              type="button"
+              onClick={() => setUndoNotice(null)}
+              aria-label="close"
+              className="grid size-5 shrink-0 place-items-center rounded-sm text-fg-faint hover:text-fg"
+            >
+              <Icon name="x" size={12} />
+            </button>
           </div>
         )}
 

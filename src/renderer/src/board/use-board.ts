@@ -131,6 +131,7 @@ export function useBoard(sessions: Session[]): BoardApi {
       setDoc((d) => {
         const next = fn(d);
         pending.current = next;
+        queueMicrotask(() => announceBoard(next, "board"));
         return next;
       });
       if (timer.current) clearTimeout(timer.current);
