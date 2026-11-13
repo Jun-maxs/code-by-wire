@@ -4,14 +4,18 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
+  approveTaskToQueue,
   completeTaskWithBrief,
   dayKey,
+  reopenTask as reopenBoardTask,
   splitPendingQueue,
   tasksBySession,
+  toggleTaskSubtask,
   type BoardDoc,
   type BoardTask,
   type TaskLiveSummary,
@@ -28,6 +32,12 @@ import {
   requestBoardFlush,
 } from "./board-bus";
 
+export interface DockUndoInfo {
+  kind: "approved" | "completed";
+  taskId: string;
+  taskTitle: string;
+}
+
 interface SessionTasks {
   /** Open (not done) tasks first, then done ones, each in board order. */
   tasks: BoardTask[];
@@ -37,8 +47,18 @@ interface SessionTasks {
   executeCount: number;
   taskOf: (sessionId: string) => BoardTask | undefined;
   link: (sessionId: string, taskId: string | null) => Promise<void>;
+  /** Promote a `decide` item into the `todo` execution queue. */
+  approveTask: (taskId: string) => Promise<void>;
   /** Complete a task and log its implementation brief into today's daily digest. */
   completeTask: (taskId: string) => Promise<void>;
+  /** Reopen a completed task back into `todo`. */
+  reopenTask: (taskId: string) => Promise<void>;
+  /** Toggle a single subtask checkbox on a board task. */
+  toggleSubtask: (taskId: string, subtaskId: string) => Promise<void>;
+  /** Transient 1-click undo state after approving or completing a task from the session dock. */
+  lastUndo: DockUndoInfo | null;
+  undoLast: () => Promise<void>;
+  dismissUndo: () => void;
   /** Go to the board with this task's drawer open. */
   openTask: (taskId: string) => void;
   /** Go to the board. */
@@ -127,19 +147,100 @@ export function SessionTasksProvider({
     };
   }, [doc, sessions]);
 
+  const [undoEntry, setUndoEntry] = useState<
+    (DockUndoInfo & { snapshot: BoardDoc }) | null
+  >(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushUndo = useCallback((info: DockUndoInfo, snapshot: BoardDoc) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoEntry({ ...info, snapshot });
+    undoTimerRef.current = setTimeout(() => {
+      setUndoEntry(null);
+      undoTimerRef.current = null;
+    }, 6500);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
+
+  const dismissUndo = useCallback(() => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = null;
+    setUndoEntry(null);
+  }, []);
+
+  const undoLast = useCallback(async () => {
+    if (!undoEntry) return;
+    const snap = undoEntry.snapshot;
+    dismissUndo();
+    requestBoardFlush();
+    const saved = await window.api.saveBoard(snap);
+    announceBoard(saved, "link");
+  }, [undoEntry, dismissUndo]);
+
   const link = useCallback(async (sessionId: string, taskId: string | null) => {
     requestBoardFlush();
     const next = await window.api.linkSessionToTask(sessionId, taskId);
     announceBoard(next, "link");
   }, []);
 
-  const completeTask = useCallback(async (taskId: string) => {
-    requestBoardFlush();
-    const fresh = await window.api.readBoard();
-    const next = completeTaskWithBrief(fresh, taskId, dayKey(new Date()));
-    const saved = await window.api.saveBoard(next);
-    announceBoard(saved, "link");
-  }, []);
+  const approveTask = useCallback(
+    async (taskId: string) => {
+      requestBoardFlush();
+      const fresh = await window.api.readBoard();
+      const target = fresh.tasks.find((t) => t.id === taskId);
+      if (target) {
+        pushUndo({ kind: "approved", taskId, taskTitle: target.title }, fresh);
+      }
+      const next = approveTaskToQueue(fresh, taskId);
+      const saved = await window.api.saveBoard(next);
+      announceBoard(saved, "link");
+    },
+    [pushUndo],
+  );
+
+  const completeTask = useCallback(
+    async (taskId: string) => {
+      requestBoardFlush();
+      const fresh = await window.api.readBoard();
+      const target = fresh.tasks.find((t) => t.id === taskId);
+      if (target) {
+        pushUndo({ kind: "completed", taskId, taskTitle: target.title }, fresh);
+      }
+      const next = completeTaskWithBrief(fresh, taskId, dayKey(new Date()));
+      const saved = await window.api.saveBoard(next);
+      announceBoard(saved, "link");
+    },
+    [pushUndo],
+  );
+
+  const reopenTask = useCallback(
+    async (taskId: string) => {
+      dismissUndo();
+      requestBoardFlush();
+      const fresh = await window.api.readBoard();
+      const next = reopenBoardTask(fresh, taskId, "todo");
+      const saved = await window.api.saveBoard(next);
+      announceBoard(saved, "link");
+    },
+    [dismissUndo],
+  );
+
+  const toggleSubtask = useCallback(
+    async (taskId: string, subtaskId: string) => {
+      requestBoardFlush();
+      const fresh = await window.api.readBoard();
+      const next = toggleTaskSubtask(fresh, taskId, subtaskId);
+      const saved = await window.api.saveBoard(next);
+      announceBoard(saved, "link");
+    },
+    [],
+  );
 
   const openTask = useCallback(
     (taskId: string) => {
@@ -149,6 +250,18 @@ export function SessionTasksProvider({
     [onShowBoard],
   );
 
+  const lastUndo = useMemo<DockUndoInfo | null>(
+    () =>
+      undoEntry
+        ? {
+            kind: undoEntry.kind,
+            taskId: undoEntry.taskId,
+            taskTitle: undoEntry.taskTitle,
+          }
+        : null,
+    [undoEntry],
+  );
+
   const value = useMemo<SessionTasks>(
     () => ({
       tasks,
@@ -156,7 +269,13 @@ export function SessionTasksProvider({
       executeCount,
       taskOf: (id) => bySession.get(id),
       link,
+      approveTask,
       completeTask,
+      reopenTask,
+      toggleSubtask,
+      lastUndo,
+      undoLast,
+      dismissUndo,
       openTask,
       showBoard: onShowBoard,
       sessions,
@@ -168,7 +287,13 @@ export function SessionTasksProvider({
       executeCount,
       bySession,
       link,
+      approveTask,
       completeTask,
+      reopenTask,
+      toggleSubtask,
+      lastUndo,
+      undoLast,
+      dismissUndo,
       openTask,
       onShowBoard,
       sessions,

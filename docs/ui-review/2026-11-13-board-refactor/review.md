@@ -40,13 +40,29 @@
 | U3   | `1084×655` 下含长上线胶囊（`上线 myjp:wcj.yuanai.best`）的行把简述正文挤成 `55px` 竖条，首屏未露出首条「待定执行」；行内编辑与抽屉标题均为单行 `<input>` 截断长句；`TaskDrawer` 的 `<Field>` 用 `<label>` 包裹多按钮组导致点击被首个按钮劫持 | `cleanDeployTarget` 剥离 `myjp:` 等主机别名，并将来源/上线胶囊改为内联紧跟简述句末，释放约 `290px` 正文宽度；`<740px` 紧凑视口自动将待确认默认预览收至 2 条，使首屏稳定露出「待定执行」前排任务；日报行内编辑改为多行 `<textarea>`，抽屉标题与候选方案改为自适应高度多行 `<AutoTextarea>`；`<Field>` 改为 `<div>` 彻底消除 `<label>` 多按钮点击劫持，并在待确认抽屉底栏补齐 `确认并派会话` |
 | U4   | 顶部搜索框无清空按钮与 `Escape` 清空；`全部产品` 视图复制今日 Markdown 时多产品混排；长日志无法按日期折叠                                                                                                                                    | 搜索框补齐右侧 `×` 清空按钮与 `Escape` 快捷键；`formatDayMarkdown` 在单产品下保持扁平列表、多产品（`2+`）下自动按 `- **产品名**` 二级分组输出；日期分组头改为可折叠面板                                                                                                                                                                                                                    |
 
-## 4. 证据清单
+## 4. 会话底栏（`ActivityDock`）同步改造与响应式核验
+
+按用户指令「`同样的改法用到会话底栏`」，在不触碰兄弟工作树 `cbw-wt-jun` 脏文件的前提下，将看板双核心重构确立的视觉、排版与动作语义全量同步至会话工作区底栏（`ActivityDock`、`DockBoard`、`DockTasks`、`SubagentsTab`、`ShellsTab`、`MonitorsTab`、`Tabs`）及关联顶栏/会话菜单（`MiddleHeader`、`SessionMenuDropdown`）：
+
+1. **标签页与计数对比度对齐**：`Tabs` 计数角标从违规 `text-label text-fg-dim`（Lc 36）升级为 `text-meta tabular-nums text-fg-faint`（Lc 52），并支持 `dotClassName`（状态圆点）与 `swatchColor`（`size-2 rounded-[2px]` 产品小方块）；底栏第 5、6 页签统一为 `看板待办` 与 `所属产品`，空闲无会话内待办且已挂看板事项时自动展示 `看板待办`。
+2. **中点 `·` 清零与反引号行内代码统一**：折叠底栏 `DockTally` 改为无中点等宽间距排布并在右侧透出关联待办/产品胶囊；`DockTasks` 阻塞标记由 `阻塞·2` 改为 `阻塞 #2`；`SessionMenuDropdown` 改为 `看板任务：…` 加 `8px` 产品方块；底栏全部页签、顶栏 `TaskChip` 与会话菜单统一接入 `InlineCodeText` 渲染无描边代码短片。
+3. **`DockTaskDetail` / `TaskPicker` / `DockTopic` 交互与清洗闭环**：`DockTaskDetail` 支持标题行内联产品胶囊、状态感知主动作（`确认转执行` / `完成并记入今日清单` / `重新打开`）与 6.5s 行内一键 `撤回`、转入执行后隐去 `:decide:` 旧候选方案、优先级 `PRIORITY_TEXT` 与超期/临期高亮、交互式子步骤勾选落盘；`TaskPicker` 复用 `splitPendingQueue`（同产品置顶）与无描边 `bg-ink-900` 软胶囊；`DockTopic` 复用 `cleanCardDoing` 与 `splitCardLine` 剥离过期的脏树提示与引用日期尾巴。
+4. **紧凑视口（`1084×655`）双侧栏挤压防护**：中间栏在左右侧栏同开时宽 `584px`（高于 `@xl` 的 `576px`），将 `DockTaskDetail` 与 `DockTopic` 双栏断点上调至 `@2xl`（`672px`）并为按钮组换用 `min-w-0 flex-wrap`、在 `<1280px` 隐去顶栏冗余 `TaskChip`，确保 `1440×900` 双栏舒展、`1084×655` 单栏纵向叠放零碰撞。
+
+## 5. 证据清单
 
 - 改造前基线：`before/board-1440.png`、`before/board-kanban-1440.png`、`before/board-1084.png`
-- 二轮深度打磨与真机验证后：
+- 看板二轮深度打磨与真机验证后：
   - `after/board-1440.png`（`1440×900` 同屏总览：统一左对齐轴线、无描边反引号代码片、句末内联上线胶囊、无中点筛选）
   - `after/board-drawer-1440.png`（`1440×900` 详情抽屉：多行完整折行标题、`候选方案与背景` 与 `完工日报简述` 解耦、底栏 `确认并派会话` + `确认转执行`）
   - `after/board-queue-1440.png`（`1440×900` `880px` 居中待办队列 + 底栏浮动一键 `撤回` 条）
   - `after/board-digest-1440.png`（`1440×900` `880px` 居中每日实现清单 + `已复制` 反馈 + 底部 `已隐藏 1 条` 恢复入口）
   - `after/board-1084.png`（`1084×655` 紧凑双栏同屏：首行全宽快速录入、首屏同屏可见「待确认」与「待定执行」、右侧长句舒展排版）
   - `after/board-drawer-1084.png`（`1084×655` 紧凑视口详情抽屉）
+- 会话底栏（`ActivityDock`）同步验证后：
+  - `after/dock-task-decide-1440.png`（`1440×900` 会话工作区 + 底栏 `看板待办` 待确认态：`确认转执行`、候选方案副标题、子步骤与关联会话）
+  - `after/dock-task-1440.png`（`1440×900` 真机点击 `确认转执行` 与勾选子步骤后：行内一键 `撤回` 条、切换为完工简述 `outcome`、落盘持久化）
+  - `after/dock-picker-1440.png`（`1440×900` 更换关联待办选择器：同产品置顶、无描边 `ink-900` 软胶囊、`8px` 产品方块与状态圆点）
+  - `after/dock-topic-1440.png`（`1440×900` 底栏 `所属产品` 页签：清洗脏树噪音后的产品卡、同产品会话与未完成待办）
+  - `after/dock-tasks-1440.png`（`1440×900` 底栏会话内 `待办` 页签：反引号代码短片、无中点 `阻塞 #2` 标记）
+  - `after/dock-task-1084.png`（`1084×655` 紧凑视口：顶栏清爽无挤压、底栏 `@2xl` 自动纵向叠放零溢出）

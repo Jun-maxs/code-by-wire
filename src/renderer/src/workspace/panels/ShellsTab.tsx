@@ -1,6 +1,8 @@
 import type { BackgroundShell } from "@shared/types";
+import { stripInlineCode } from "@shared/board";
 import { cx } from "../../ui/atoms";
 import { useI18n } from "../../i18n";
+import { InlineCodeText } from "../../board/parts";
 import { EmptyState } from "./chrome";
 import { shellGlyph } from "./shell-view";
 import { DOCK_GUTTER, DockRow, MetricCell, MetricRack } from "./dock-row";
@@ -62,13 +64,15 @@ function ShellRow({
         className="min-w-0 flex-1 truncate text-aux"
         title={
           shell.description
-            ? `${shell.description}  ${shell.command}`
+            ? `${stripInlineCode(shell.description)}  ${shell.command}`
             : shell.command
         }
       >
         {shell.description ? (
           <>
-            <span className="text-fg-muted">{shell.description}</span>
+            <span className="text-fg-muted">
+              <InlineCodeText text={shell.description} />
+            </span>
             <span className="ml-2 font-mono text-meta text-fg-faint">
               {shell.command}
             </span>

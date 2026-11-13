@@ -1,4 +1,5 @@
 import { useContext, useLayoutEffect, useState } from "react";
+import { stripInlineCode } from "@shared/board";
 import { shortTopicName } from "@shared/products";
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
@@ -13,6 +14,7 @@ import {
   ProductsRefreshContext,
   useSessionProduct,
 } from "../products/products-context";
+import { InlineCodeText, STATUS_BG } from "../board/parts";
 import { useLinkTask, useSessionTasks } from "../board/session-tasks";
 
 /** The portaled dropdown body shared by every session-menu trigger: seven always-rendered action rows
@@ -169,7 +171,7 @@ export function SessionMenuDropdown({
                         >
                           <span
                             aria-hidden
-                            className="size-1.5 shrink-0 rounded-[2px]"
+                            className="size-2 shrink-0 rounded-[2px]"
                             style={{ background: p.color }}
                           />
                           <span className="min-w-0 flex-1 truncate">
@@ -187,7 +189,7 @@ export function SessionMenuDropdown({
                         onClick={() => assignTopic("")}
                         className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux text-fg-faint hover:bg-(--ui-row-hover-background) hover:text-fg"
                       >
-                        <span className="size-1.5 shrink-0" />
+                        <span className="size-2 shrink-0" />
                         <span className="flex-1">
                           {t.shell.sessionMenu.noTopic}
                         </span>
@@ -203,7 +205,7 @@ export function SessionMenuDropdown({
                     icon="square-kanban"
                     label={
                       currentTask
-                        ? `${t.shell.sessionMenu.task} · ${currentTask.title}`
+                        ? `${t.shell.sessionMenu.task}：${stripInlineCode(currentTask.title)}`
                         : t.shell.sessionMenu.task
                     }
                     onClick={() => setTasksOpen((v) => !v)}
@@ -217,7 +219,7 @@ export function SessionMenuDropdown({
                           role="menuitemradio"
                           aria-checked={currentTask?.id === task.id}
                           onClick={() => linkTask(task.id)}
-                          title={task.title}
+                          title={stripInlineCode(task.title)}
                           className={cx(
                             "flex items-center gap-2 rounded-md px-2 py-1 text-left text-aux hover:bg-(--ui-row-hover-background) hover:text-fg",
                             task.status === "done"
@@ -225,8 +227,15 @@ export function SessionMenuDropdown({
                               : "text-fg-muted",
                           )}
                         >
+                          <span
+                            aria-hidden
+                            className={cx(
+                              "size-1.5 shrink-0 rounded-full",
+                              STATUS_BG[task.status],
+                            )}
+                          />
                           <span className="min-w-0 flex-1 truncate">
-                            {task.title}
+                            <InlineCodeText text={task.title} />
                           </span>
                           {currentTask?.id === task.id && (
                             <Icon name="check" size={12} />

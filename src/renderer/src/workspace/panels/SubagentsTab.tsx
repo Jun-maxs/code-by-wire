@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import type { Subagent } from "@shared/types";
+import { stripInlineCode } from "@shared/board";
 import { cx } from "../../ui/atoms";
 import { FAMILY_LABEL } from "../../ui/meta";
 import { useI18n } from "../../i18n";
+import { InlineCodeText } from "../../board/parts";
 import { EmptyState } from "./chrome";
 import { flattenSubagents } from "./dock-tabs";
 import { DOCK_GUTTER, DockRow, MetricCell, MetricRack } from "./dock-row";
@@ -91,9 +93,9 @@ function SubagentRow({
       )}
       <span
         className="min-w-0 flex-1 truncate text-aux text-fg-muted"
-        title={primary}
+        title={stripInlineCode(primary)}
       >
-        {primary}
+        <InlineCodeText text={primary} />
       </span>
     </DockRow>
   );

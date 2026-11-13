@@ -538,6 +538,42 @@ export function splitPendingQueue(
   return { confirm, execute, done };
 }
 
+/** Approve a pending `decide` item into the front of the `todo` execution queue. */
+export function approveTaskToQueue(doc: BoardDoc, taskId: string): BoardDoc {
+  const target = doc.tasks.find((t) => t.id === taskId);
+  if (!target) return doc;
+  const frontOrder = Math.min(0, ...doc.tasks.map((x) => x.order)) - 1;
+  return {
+    ...doc,
+    tasks: doc.tasks.map((t) =>
+      t.id === taskId
+        ? { ...t, status: "todo" as const, order: frontOrder }
+        : t,
+    ),
+  };
+}
+
+/** Toggle a single subtask's completion state on a board task. */
+export function toggleTaskSubtask(
+  doc: BoardDoc,
+  taskId: string,
+  subtaskId: string,
+): BoardDoc {
+  return {
+    ...doc,
+    tasks: doc.tasks.map((t) =>
+      t.id === taskId
+        ? {
+            ...t,
+            subtasks: t.subtasks.map((st) =>
+              st.id === subtaskId ? { ...st, done: !st.done } : st,
+            ),
+          }
+        : t,
+    ),
+  };
+}
+
 /** Complete a task AND record its one-line implementation summary into `dailyLog` for `today`. */
 export function completeTaskWithBrief(
   doc: BoardDoc,
@@ -735,6 +771,72 @@ export function cleanDeployTarget(ref: string | null): string | null {
   const trimmed = ref.trim();
   if (!trimmed) return null;
   return trimmed.replace(/^[a-z0-9_-]+:(?=[a-z0-9.-]+\.[a-z]{2,})/i, "");
+}
+
+/** Strip inline Markdown backticks for plain-text attributes (`title`, `aria-label`, menu strings). */
+export function stripInlineCode(text: string): string {
+  return text.replace(/`([^`\n]+)`/g, "$1");
+}
+
+/** Repo-hygiene or outdated branch-chore lines in older cards that `drift_audit` already handles. */
+export const STALE_CARD_LINE_RE =
+  /未提交|工作树|worktree|STATUS\.md\s*未更新|分支.*未合并|合并.*分支.*时机|版本是否更新到\s*0\.1\.[0-5]\d|已结清|暂无阻断/i;
+
+const TRAILING_CARD_STAMP_RE =
+  /[（(][^（）()]{0,16}?(?:20\d{2}-)?\d{2}-\d{2}[）)]\s*$/u;
+
+/** Split a workbench card bullet into a clean title + optional 1-line context summary (or null if stale noise). */
+export function splitCardLine(raw: string): {
+  title: string;
+  summary: string;
+  due: string | null;
+} | null {
+  let text = raw.trim();
+  if (
+    !text ||
+    /^(?:无|暂无|—|-)$/.test(text) ||
+    STALE_CARD_LINE_RE.test(text)
+  ) {
+    return null;
+  }
+
+  // Strip trailing citation stamps FIRST like `（2026-11-11）` or `（被额度中断，11-09）`
+  // so citation dates are never mistaken for future deadlines.
+  text = text.replace(TRAILING_CARD_STAMP_RE, "").trim();
+  if (
+    !text ||
+    /^(?:无|暂无|—|-)$/.test(text) ||
+    STALE_CARD_LINE_RE.test(text)
+  ) {
+    return null;
+  }
+
+  let due: string | null = null;
+  const dueMatch = /(?<![/\-.\w])(20\d{2}-\d{2}-\d{2})(?![/\-.\w])/.exec(text);
+  if (dueMatch) due = dueMatch[1];
+
+  // Split `标题：选项/详情` into crisp title + summary when descriptive
+  const sep = text.indexOf("：");
+  if (sep >= 4 && sep <= 28 && text.length > 18) {
+    return {
+      title: text.slice(0, sep).trim(),
+      summary: text.slice(sep + 1).trim(),
+      due,
+    };
+  }
+  return {
+    title: text.slice(0, 110),
+    summary: text.length > 110 ? text.slice(110, 240) : "",
+    due,
+  };
+}
+
+/** Clean a workbench card's `doing` line for display (dropping trailing citation stamps & empty placeholders). */
+export function cleanCardDoing(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const text = raw.trim().replace(TRAILING_CARD_STAMP_RE, "").trim();
+  if (!text || /^(?:无|暂无|—|-)$/.test(text)) return null;
+  return text;
 }
 
 /**

@@ -1,6 +1,8 @@
 import type { Monitor } from "@shared/types";
+import { stripInlineCode } from "@shared/board";
 import { cx } from "../../ui/atoms";
 import { useI18n } from "../../i18n";
+import { InlineCodeText } from "../../board/parts";
 import { EmptyState } from "./chrome";
 import { monitorGlyph } from "./monitor-view";
 import { DOCK_GUTTER, DockRow, MetricCell, MetricRack } from "./dock-row";
@@ -61,13 +63,15 @@ function MonitorRow({
         className="min-w-0 flex-1 truncate text-aux"
         title={
           monitor.description
-            ? `${monitor.description}  ${monitor.command}`
+            ? `${stripInlineCode(monitor.description)}  ${monitor.command}`
             : monitor.command
         }
       >
         {monitor.description ? (
           <>
-            <span className="text-fg-muted">{monitor.description}</span>
+            <span className="text-fg-muted">
+              <InlineCodeText text={monitor.description} />
+            </span>
             <span className="ml-2 font-mono text-meta text-fg-faint">
               {monitor.command}
             </span>

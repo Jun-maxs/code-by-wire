@@ -8,7 +8,9 @@ import { Icon } from "../ui/icons";
 import { AgentIcon } from "../ui/agent-icons";
 import { useFullscreen } from "../ui/use-fullscreen";
 import { useI18n } from "../i18n";
+import { stripInlineCode } from "@shared/board";
 import { useSessionTasks } from "../board/session-tasks";
+import { InlineCodeText, STATUS_BG } from "../board/parts";
 import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
 
 /**
@@ -103,7 +105,7 @@ export function MiddleHeader({
             {title}
           </span>
         )}
-        <div className="no-drag ml-auto flex items-center gap-2">
+        <div className="no-drag ml-auto flex shrink-0 items-center gap-2">
           {session && !split && (
             <div
               role="group"
@@ -200,11 +202,16 @@ function TaskChip({ sessionId }: { sessionId: string }) {
     <button
       type="button"
       onClick={() => tasks.openTask(task.id)}
-      title={t.shell.sessionMenu.openTask}
-      className="no-drag inline-flex h-5 min-w-0 max-w-[16rem] shrink items-center gap-1 rounded-sm border border-(--ui-stroke-tertiary) px-1.5 text-meta text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
+      title={`${t.shell.sessionMenu.openTask}：${stripInlineCode(task.title)}`}
+      className="no-drag hidden h-5 min-w-0 max-w-52 shrink-[2] items-center gap-1.5 rounded-sm bg-ink-900 px-1.5 text-meta text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg xl:inline-flex"
     >
-      <Icon name="square-kanban" size={11} className="shrink-0" />
-      <span className="truncate">{task.title}</span>
+      <span
+        aria-hidden
+        className={cx("size-1.5 shrink-0 rounded-full", STATUS_BG[task.status])}
+      />
+      <span className="truncate">
+        <InlineCodeText text={task.title} />
+      </span>
     </button>
   );
 }

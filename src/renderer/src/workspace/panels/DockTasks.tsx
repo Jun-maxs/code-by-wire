@@ -1,6 +1,8 @@
 import type { Task } from "@shared/types";
+import { stripInlineCode } from "@shared/board";
 import { cx } from "../../ui/atoms";
 import { useI18n } from "../../i18n";
+import { InlineCodeText } from "../../board/parts";
 import { EmptyState } from "./chrome";
 import { DOCK_GUTTER, DockRow, MetricCell, MetricRack } from "./dock-row";
 import {
@@ -52,7 +54,7 @@ export function DockTasks({ tasks }: { tasks: Task[] }) {
               blockers.length > 0 ? (
                 <MetricRack>
                   <MetricCell>
-                    {i18n.dock.status.blocked}·{blockers.join(",")}
+                    {i18n.dock.status.blocked} #{blockers.join(", #")}
                   </MetricCell>
                 </MetricRack>
               ) : undefined
@@ -63,9 +65,9 @@ export function DockTasks({ tasks }: { tasks: Task[] }) {
                 "min-w-0 flex-1 truncate text-aux",
                 SUBJECT_TONE[task.status],
               )}
-              title={task.subject}
+              title={stripInlineCode(task.subject)}
             >
-              {task.subject}
+              <InlineCodeText text={task.subject} />
             </span>
           </DockRow>
         );

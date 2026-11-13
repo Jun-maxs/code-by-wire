@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   MAX_DAILY_LOG,
+  approveTaskToQueue,
   blankBrief,
   blankTask,
   completeTaskWithBrief,
@@ -190,15 +191,7 @@ export function BoardView({
       if (target) {
         pushUndo(s.undoApproved(target.title || s.untitled), api.doc);
       }
-      api.update((d) => {
-        const frontOrder = Math.min(0, ...d.tasks.map((x) => x.order)) - 1;
-        return {
-          ...d,
-          tasks: d.tasks.map((t) =>
-            t.id === id ? { ...t, status: "todo", order: frontOrder } : t,
-          ),
-        };
-      });
+      api.update((d) => approveTaskToQueue(d, id));
     },
     [api, pushUndo, s],
   );

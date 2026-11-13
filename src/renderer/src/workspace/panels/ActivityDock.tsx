@@ -11,10 +11,17 @@ import type {
   Monitor,
   Session,
 } from "@shared/types";
+import type { BoardTask } from "@shared/board";
+import type { ProductInfo } from "@shared/products";
 import { Icon } from "../../ui/icons";
+import { cx } from "../../ui/atoms";
 import { Tabs } from "../../ui/Tabs";
 import { SidebarPanelLabel } from "../../shell/SidebarPanelLabel";
 import type { DocState } from "../use-transcript";
+import { InlineCodeText, STATUS_BG, TopicChip } from "../../board/parts";
+import { useSessionTasks } from "../../board/session-tasks";
+import { boardStrings } from "../../board/strings";
+import { useSessionProduct } from "../../products/products-context";
 import { DockTasks } from "./DockTasks";
 import { SubagentsTab } from "./SubagentsTab";
 import { ShellsTab } from "./ShellsTab";
@@ -69,13 +76,24 @@ export function ActivityDock({
   onDrillShell: (shell: BackgroundShell) => void;
   onDrillMonitor: (monitor: Monitor) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const s = boardStrings(locale);
+  const boardCtx = useSessionTasks();
+  const sessionProduct = useSessionProduct(session);
+  const linkedTask = boardCtx?.taskOf(session.id);
+  const topicOpenCount = useMemo(() => {
+    if (!boardCtx || !sessionProduct) return 0;
+    return boardCtx.tasks.filter(
+      (x) => x.topic === sessionProduct.key && x.status !== "done",
+    ).length;
+  }, [boardCtx, sessionProduct]);
   const [collapseOverride, setCollapseOverride] =
     useState<DockCollapseOverride | null>(null);
+  const stats = useMemo(
+    () => subagentStats(doc?.subagents ?? []),
+    [doc?.subagents],
+  );
   const subagents = doc?.subagents ?? [];
-  // One forest walk feeds the count badge, the live tally, and the default tab. Memoized against the
-  // subagents identity (stable between polls) so the 3s render clock doesn't re-walk the forest.
-  const stats = useMemo(() => subagentStats(subagents), [subagents]);
   const alive = stats.working > 0;
   // The dock hides itself when idle and reveals itself while any tab has a live entry (a working
   // subagent, an in-progress task, or a running shell). A manual collapse/expand overrides that, but
@@ -94,6 +112,9 @@ export function ActivityDock({
   // While a lane is drilled, hold the Subagents tab so the originating lane (and its active ring) stays
   // visible above the drill surface — otherwise the fan-out finishing would auto-flip to Tasks and orphan
   // the open drill. An in-phase manual pick still wins, so the user can deliberately flip to Tasks.
+  const autoTab = defaultDockTab(stats, monitorsRunning);
+  const fallbackTab: DockTab =
+    autoTab === "tasks" && tasks.length === 0 && linkedTask ? "task" : autoTab;
   const tab =
     pick && pick.alive === alive
       ? pick.tab
@@ -103,7 +124,7 @@ export function ActivityDock({
           ? "monitors"
           : activeAgentId
             ? "subagents"
-            : defaultDockTab(stats, monitorsRunning);
+            : fallbackTab;
 
   // Drag-to-resize the expanded dock, persisted like a sidebar (shell/panes.ts, id "activity-dock").
   const heightOverride = useStore($paneHeightOverride("activity-dock"));
@@ -152,6 +173,8 @@ export function ActivityDock({
         stats={stats}
         shellCount={shells.length}
         monitorCount={monitors.length}
+        linkedTask={linkedTask}
+        sessionProduct={sessionProduct ?? undefined}
         onExpand={() => setCollapseOverride({ collapsed: false, active })}
       />
     );
@@ -179,6 +202,11 @@ export function ActivityDock({
         subagentCount={stats.total}
         shellCount={shells.length}
         monitorCount={monitors.length}
+        boardTaskLabel={s.dock.tabTask}
+        boardTopicLabel={s.dock.tabTopic}
+        linkedTask={linkedTask}
+        sessionProduct={sessionProduct ?? undefined}
+        topicOpenCount={topicOpenCount}
         onCollapse={() => setCollapseOverride({ collapsed: true, active })}
       />
       <OverlayScroll className="min-h-0 flex-1">
@@ -229,6 +257,11 @@ function DockTabBar({
   subagentCount,
   shellCount,
   monitorCount,
+  boardTaskLabel,
+  boardTopicLabel,
+  linkedTask,
+  sessionProduct,
+  topicOpenCount,
   onCollapse,
 }: {
   tab: DockTab;
@@ -237,12 +270,17 @@ function DockTabBar({
   subagentCount: number;
   shellCount: number;
   monitorCount: number;
+  boardTaskLabel: string;
+  boardTopicLabel: string;
+  linkedTask: BoardTask | undefined;
+  sessionProduct: ProductInfo | undefined;
+  topicOpenCount: number;
   onCollapse: () => void;
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex h-8 shrink-0 items-stretch gap-3 border-b border-(--ui-stroke-tertiary) pl-3 pr-2">
-      <span className="flex items-center">
+    <div className="flex h-8 shrink-0 items-stretch gap-3 overflow-x-auto border-b border-(--ui-stroke-tertiary) pl-3 pr-2">
+      <span className="flex shrink-0 items-center">
         <SidebarPanelLabel>{t.dock.label}</SidebarPanelLabel>
       </span>
       <Tabs<DockTab>
@@ -259,8 +297,17 @@ function DockTabBar({
             label: t.dock.tabs.monitors,
             count: monitorCount,
           },
-          { id: "task", label: t.dock.tabs.task },
-          { id: "topic", label: t.dock.tabs.topic },
+          {
+            id: "task",
+            label: boardTaskLabel,
+            dotClassName: linkedTask ? STATUS_BG[linkedTask.status] : undefined,
+          },
+          {
+            id: "topic",
+            label: boardTopicLabel,
+            swatchColor: sessionProduct?.color,
+            count: topicOpenCount > 0 ? topicOpenCount : undefined,
+          },
         ]}
         value={tab}
         onChange={onChange}
@@ -270,7 +317,7 @@ function DockTabBar({
         onClick={onCollapse}
         aria-label={t.dock.collapseAria}
         title={t.dock.collapseTitle}
-        className="my-auto ml-auto inline-flex size-6 items-center justify-center rounded-sm text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
+        className="my-auto ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-fg-faint transition-colors hover:bg-(--ui-control-hover-background) hover:text-fg"
       >
         <Icon name="chevron-down" size={14} />
       </button>
@@ -279,23 +326,29 @@ function DockTabBar({
 }
 
 /** The collapsed dock: a thin, full-width button that mirrors the expanded bar — the ACTIVITY overline
- *  on the left, a three-count summary where the tabs sit, and the expand chevron pinned right (the same
- *  slot as the collapse chevron; only the glyph direction flips). Clickable to expand. Carries the same
- *  `lg` width gate as the expanded dock. */
+ *  on the left, spacing-separated counts (no `·` separators per UI-TASTE-REDLINES), optional linked board
+ *  task/product context on the right, and the expand chevron pinned right. */
 function DockTally({
   taskCount,
   stats,
   shellCount,
   monitorCount,
+  linkedTask,
+  sessionProduct,
   onExpand,
 }: {
   taskCount: number;
   stats: SubagentStats;
   shellCount: number;
   monitorCount: number;
+  linkedTask: BoardTask | undefined;
+  sessionProduct: ProductInfo | undefined;
   onExpand: () => void;
 }) {
   const { t } = useI18n();
+  const segments = t.dock
+    .tally(taskCount, stats.total, shellCount, monitorCount)
+    .split(/\s*·\s*/);
   return (
     <button
       type="button"
@@ -305,9 +358,29 @@ function DockTally({
       className="hidden h-8 w-full shrink-0 items-center gap-3 border-t border-(--ui-stroke-tertiary) bg-(--ui-surface-background) pl-3 pr-2 text-left transition-colors hover:bg-(--ui-row-hover-background) lg:flex"
     >
       <SidebarPanelLabel>{t.dock.label}</SidebarPanelLabel>
-      <span className="min-w-0 flex-1 truncate font-mono text-meta tabular-nums text-fg-dim">
-        {t.dock.tally(taskCount, stats.total, shellCount, monitorCount)}
+      <span className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden font-mono text-meta tabular-nums text-fg-faint">
+        {segments.map((seg, i) => (
+          <span key={i} className="shrink-0">
+            {seg}
+          </span>
+        ))}
       </span>
+      {linkedTask ? (
+        <span className="flex min-w-0 max-w-64 items-center gap-1.5 text-aux text-fg-muted">
+          <span
+            aria-hidden
+            className={cx(
+              "size-1.5 shrink-0 rounded-full",
+              STATUS_BG[linkedTask.status],
+            )}
+          />
+          <span className="truncate">
+            <InlineCodeText text={linkedTask.title} />
+          </span>
+        </span>
+      ) : (
+        <TopicChip topic={sessionProduct} />
+      )}
       <Icon name="chevron-up" size={14} className="shrink-0 text-fg-faint" />
     </button>
   );

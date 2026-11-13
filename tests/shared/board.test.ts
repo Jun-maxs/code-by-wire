@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  approveTaskToQueue,
   blankBrief,
   blankTask,
   buildInsightPrompt,
+  cleanCardDoing,
   cleanDeployTarget,
   completeTaskWithBrief,
   dismissBrief,
@@ -18,7 +20,9 @@ import {
   reopenTask,
   restoreBrief,
   splitPendingQueue,
+  stripInlineCode,
   taskRisks,
+  toggleTaskSubtask,
   upsertBriefText,
 } from "../../src/shared/board";
 
@@ -308,5 +312,38 @@ describe("normalizeBoard / parseInsightReply / buildInsightPrompt", () => {
       risks: [{ level: "mid", title: "待确认" }],
     });
     expect(parseInsightReply("没有 JSON", 1, "manual")).toBeNull();
+  });
+
+  it("supports session-dock approveTaskToQueue, toggleTaskSubtask, and card line helpers", () => {
+    let doc = emptyBoard();
+    const existing = blankTask(doc, "已有排队任务", { order: 1 });
+    doc.tasks.push(existing);
+    const decide = blankTask(doc, "确认 `ActivityDock` 底栏方案", {
+      status: "decide",
+      order: 2,
+      subtasks: [
+        { id: "st-1", text: "统一 `InlineCodeText` 行内代码", done: false },
+        { id: "st-2", text: "移除中点分隔符", done: true },
+      ],
+    });
+    doc.tasks.push(decide);
+
+    doc = approveTaskToQueue(doc, decide.id);
+    const promoted = doc.tasks.find((t) => t.id === decide.id)!;
+    expect(promoted.status).toBe("todo");
+    expect(promoted.order).toBeLessThan(existing.order);
+
+    doc = toggleTaskSubtask(doc, decide.id, "st-1");
+    expect(doc.tasks.find((t) => t.id === decide.id)!.subtasks[0].done).toBe(
+      true,
+    );
+
+    expect(stripInlineCode("同步 `ActivityDock` 底栏")).toBe(
+      "同步 ActivityDock 底栏",
+    );
+    expect(cleanCardDoing("推进看板与会话底栏联动（2026-11-13）")).toBe(
+      "推进看板与会话底栏联动",
+    );
+    expect(cleanCardDoing("暂无")).toBeNull();
   });
 });

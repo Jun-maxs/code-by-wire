@@ -194,6 +194,8 @@ const zh = {
   weekday: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
   /** The session dock's Task and Topic tabs. */
   dock: {
+    tabTask: "看板待办",
+    tabTopic: "所属产品",
     noTask: "当前会话尚未关联看板待办。",
     pickTask: "关联到待办",
     sameTopicFirst: "同产品待办优先排列",
@@ -202,7 +204,9 @@ const zh = {
     openOnBoard: "在看板中查看",
     changeTask: "更换关联待办",
     unlink: "解除关联",
+    approveTask: "确认转执行",
     completeTask: "完成并记入今日清单",
+    reopenTask: "重新打开",
     priority: "优先级",
     due: "截止",
     subtasks: (done: number, all: number) => `子步骤 ${done}/${all}`,
@@ -215,6 +219,7 @@ const zh = {
     topicTasks: "同产品待办事项",
     noTaskShort: "未关联待办",
     noCard: "该产品暂无工作台卡片。",
+    cardClean: "当前卡片无未收尾或待拍板事项。",
     back: "返回",
   },
 };
@@ -392,6 +397,8 @@ const en: BoardStrings = {
   autoAt: (h) => (h === null ? "Auto review off" : `Auto review ${h}:00`),
   weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
   dock: {
+    tabTask: "Board item",
+    tabTopic: "Product",
     noTask: "This session isn't linked to a board item yet.",
     pickTask: "Link to item",
     sameTopicFirst: "Same product listed first",
@@ -400,7 +407,9 @@ const en: BoardStrings = {
     openOnBoard: "View on board",
     changeTask: "Change item",
     unlink: "Detach",
+    approveTask: "Approve to queue",
     completeTask: "Complete & log today",
+    reopenTask: "Reopen",
     priority: "Priority",
     due: "Due",
     subtasks: (done, all) => `Steps ${done}/${all}`,
@@ -413,6 +422,7 @@ const en: BoardStrings = {
     topicTasks: "Open items in product",
     noTaskShort: "Unlinked",
     noCard: "No workbench card yet.",
+    cardClean: "No loose threads or pending decisions on this card.",
     back: "Back",
   },
 };

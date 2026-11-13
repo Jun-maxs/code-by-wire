@@ -10,12 +10,14 @@ import {
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import {
+  STALE_CARD_LINE_RE,
   addDays,
   blankTask,
   cleanDeployTarget,
   dayKey,
   normalizeBrief,
   normalizeBriefTextKey,
+  splitCardLine,
   type BoardDoc,
   type BoardTask,
   type DailyBrief,
@@ -23,6 +25,8 @@ import {
   type TaskStatus,
 } from "@shared/board";
 import { parseProductCard, TOPIC_KEY_RE } from "@shared/products";
+
+export { splitCardLine };
 
 const execFileAsync = promisify(execFile);
 
@@ -47,10 +51,6 @@ export interface BoardWorkbench {
   /** Force an async refresh of the multi-repo git log cache (used by tests / manual refresh). */
   refreshGitCacheNow(): Promise<void>;
 }
-
-/** Repo-hygiene or outdated branch-chore lines in older cards that `drift_audit` already handles. */
-const STALE_CARD_LINE_RE =
-  /未提交|工作树|worktree|STATUS\.md\s*未更新|分支.*未合并|合并.*分支.*时机|版本是否更新到\s*0\.1\.[0-5]\d|已结清|暂无阻断/i;
 
 /** Noisy commit subjects that are bookkeeping rather than user-meaningful implementations. */
 const SKIP_COMMIT_SUBJECT_RE =
@@ -127,42 +127,6 @@ export function resolveRepoTopic(
   }
   if (norm.includes("/平台整合规划")) return "platform";
   return null;
-}
-
-/** Split a card bullet into a clean title + optional 1-line context summary. */
-export function splitCardLine(raw: string): {
-  title: string;
-  summary: string;
-  due: string | null;
-} | null {
-  let text = raw.trim();
-  if (!text || STALE_CARD_LINE_RE.test(text)) return null;
-
-  // Strip trailing citation stamps FIRST like `（2026-11-11）` or `（被额度中断，11-09）`
-  // so citation dates are never mistaken for future deadlines.
-  text = text
-    .replace(/[（(][^（）()]{0,16}?(?:20\d{2}-)?\d{2}-\d{2}[）)]\s*$/u, "")
-    .trim();
-  if (!text || STALE_CARD_LINE_RE.test(text)) return null;
-
-  let due: string | null = null;
-  const dueMatch = /(?<![/\-.\w])(20\d{2}-\d{2}-\d{2})(?![/\-.\w])/.exec(text);
-  if (dueMatch) due = dueMatch[1];
-
-  // Split `标题：选项/详情` into crisp title + summary when descriptive
-  const sep = text.indexOf("：");
-  if (sep >= 4 && sep <= 28 && text.length > 18) {
-    return {
-      title: text.slice(0, sep).trim(),
-      summary: text.slice(sep + 1).trim(),
-      due,
-    };
-  }
-  return {
-    title: text.slice(0, 110),
-    summary: text.length > 110 ? text.slice(110, 240) : "",
-    due,
-  };
 }
 
 function readJsonSafe(path: string): unknown {
