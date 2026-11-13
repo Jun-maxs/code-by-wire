@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
+import { createBoardWorkbench } from "./board-workbench";
 import { claudeLauncher } from "./terminal/command";
 import {
   MAX_INSIGHTS,
@@ -36,16 +37,35 @@ const INSIGHT_TIMEOUT_MS = 3 * 60_000;
 export function createBoardStore(deps: {
   dir: string;
   env?: NodeJS.ProcessEnv;
+  cardsDir?: string;
+  syncGit?: boolean;
 }): BoardStore {
   const file = join(deps.dir, "board.json");
   const env = deps.env ?? process.env;
+  const cardsDir =
+    deps.cardsDir ??
+    env.CBW_PRODUCT_CARDS ??
+    (env.VITEST ? "" : "E:/0项目/平台整合规划/workbench/cards");
+  const workbench = createBoardWorkbench({
+    userDataDir: deps.dir,
+    cardsDir,
+    syncGit: deps.syncGit,
+  });
+  if (cardsDir && deps.syncGit !== false && !env.VITEST) {
+    setTimeout(() => void workbench.refreshGitCacheNow(), 50);
+  }
   const state: InsightRunState = {
     running: false,
     startedAt: null,
     error: null,
   };
 
-  function read(): BoardDoc {
+  function writeDisk(doc: BoardDoc): void {
+    mkdirSync(deps.dir, { recursive: true });
+    writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
+  }
+
+  function readDisk(): BoardDoc {
     const raw = readTextOrNull(file);
     if (raw === null) return normalizeBoard(null);
     try {
@@ -55,11 +75,25 @@ export function createBoardStore(deps: {
     }
   }
 
+  function read(): BoardDoc {
+    const base = readDisk();
+    const synced = workbench.syncTasks(base);
+    if (synced.changed) {
+      try {
+        writeDisk(synced.doc);
+      } catch {
+        // non-fatal on read-only fs
+      }
+    }
+    const autoBriefs = workbench.readAutoBriefs();
+    return autoBriefs.length > 0 ? { ...synced.doc, autoBriefs } : synced.doc;
+  }
+
   function save(doc: unknown): BoardDoc {
     const next = normalizeBoard(doc);
-    mkdirSync(deps.dir, { recursive: true });
-    writeFileSync(file, JSON.stringify(next, null, 2) + "\n");
-    return next;
+    writeDisk(next);
+    const autoBriefs = workbench.readAutoBriefs();
+    return autoBriefs.length > 0 ? { ...next, autoBriefs } : next;
   }
 
   function finish(error: string | null, insight: Insight | null): void {

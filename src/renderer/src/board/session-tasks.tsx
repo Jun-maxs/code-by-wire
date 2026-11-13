@@ -7,66 +7,38 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { tasksBySession, type BoardDoc, type BoardTask } from "@shared/board";
+import {
+  completeTaskWithBrief,
+  dayKey,
+  splitPendingQueue,
+  tasksBySession,
+  type BoardDoc,
+  type BoardTask,
+  type TaskLiveSummary,
+} from "@shared/board";
 import type { Session } from "@shared/types";
 import {
   ProductsRefreshContext,
   useSessionProduct,
 } from "../products/products-context";
-
-/**
- * Sessions ↔ board tasks outside the board (fork feature, 2026-10-28): the sidebar, the session menu
- * and the session header show which task a session belongs to and can move it to another. The board
- * view owns its own copy of the document, so both sides talk through window events: the board
- * announces what it saved, and before a link is written the board is asked to flush pending edits
- * (main applies the link to the file, so neither side overwrites the other).
- */
-const CHANGED = "cbw:board-changed";
-const FLUSH = "cbw:board-flush";
-const OPEN_TASK = "cbw:board-open-task";
-
-export function announceBoard(doc: BoardDoc, source: "board" | "link"): void {
-  window.dispatchEvent(new CustomEvent(CHANGED, { detail: { doc, source } }));
-}
-
-export function onBoardChanged(
-  fn: (doc: BoardDoc, source: "board" | "link") => void,
-): () => void {
-  const h = (e: Event) => {
-    const d = (e as CustomEvent<{ doc: BoardDoc; source: "board" | "link" }>)
-      .detail;
-    fn(d.doc, d.source);
-  };
-  window.addEventListener(CHANGED, h);
-  return () => window.removeEventListener(CHANGED, h);
-}
-
-export function onBoardFlush(fn: () => void): () => void {
-  window.addEventListener(FLUSH, fn);
-  return () => window.removeEventListener(FLUSH, fn);
-}
-
-/** A task to open once the board view mounts (or now, if it's open). */
-let pendingTask: string | null = null;
-export function takePendingTask(): string | null {
-  const t = pendingTask;
-  pendingTask = null;
-  return t;
-}
-export function onOpenTask(fn: (id: string) => void): () => void {
-  const h = () => {
-    const id = takePendingTask();
-    if (id) fn(id);
-  };
-  window.addEventListener(OPEN_TASK, h);
-  return () => window.removeEventListener(OPEN_TASK, h);
-}
+import {
+  announceBoard,
+  onBoardChanged,
+  queueOpenTask,
+  requestBoardFlush,
+} from "./board-bus";
 
 interface SessionTasks {
   /** Open (not done) tasks first, then done ones, each in board order. */
   tasks: BoardTask[];
+  /** Number of items needing user confirmation (`decide` tasks + `waiting` sessions). */
+  confirmCount: number;
+  /** Number of queued/running execution tasks (`doing` + `todo`). */
+  executeCount: number;
   taskOf: (sessionId: string) => BoardTask | undefined;
   link: (sessionId: string, taskId: string | null) => Promise<void>;
+  /** Complete a task and log its implementation brief into today's daily digest. */
+  completeTask: (taskId: string) => Promise<void>;
   /** Go to the board with this task's drawer open. */
   openTask: (taskId: string) => void;
   /** Go to the board. */
@@ -95,11 +67,13 @@ export function SessionTasksProvider({
     const load = () =>
       void window.api.readBoard().then((d) => alive && setDoc(d));
     load();
+    // Re-read once shortly after launch so the background git-log cache refresh shows up promptly.
+    const warm = setTimeout(load, 1500);
     const off = onBoardChanged((d) => setDoc(d));
-    // The insight run and other windows write the file too; a slow refresh keeps up with them.
     const t = setInterval(load, 30_000);
     return () => {
       alive = false;
+      clearTimeout(warm);
       off();
       clearInterval(t);
     };
@@ -119,40 +93,97 @@ export function SessionTasksProvider({
         : [],
     [doc],
   );
+
+  const { confirmCount, executeCount } = useMemo(() => {
+    const byId = new Map(sessions.map((s) => [s.id, s]));
+    const liveByTask = new Map<string, TaskLiveSummary>();
+    const linkedOpenSessions = new Set<string>();
+    for (const t of doc?.tasks ?? []) {
+      if (t.status === "done") continue;
+      let working = 0;
+      let waiting = 0;
+      let last: number | undefined;
+      for (const id of t.sessionIds) {
+        linkedOpenSessions.add(id);
+        const s = byId.get(id);
+        if (!s) continue;
+        if (s.state === "working") working++;
+        else if (s.state === "waiting") waiting++;
+        last = Math.max(last ?? 0, s.lastActivityMs);
+      }
+      liveByTask.set(t.id, { working, waiting, lastActivityMs: last });
+    }
+    const unlinkedWaiting = sessions.filter(
+      (s) =>
+        !s.parentSessionId &&
+        s.state === "waiting" &&
+        !linkedOpenSessions.has(s.id),
+    ).length;
+    if (!doc) return { confirmCount: unlinkedWaiting, executeCount: 0 };
+    const groups = splitPendingQueue(doc.tasks, dayKey(new Date()), liveByTask);
+    return {
+      confirmCount: groups.confirm.length + unlinkedWaiting,
+      executeCount: groups.execute.length,
+    };
+  }, [doc, sessions]);
+
   const link = useCallback(async (sessionId: string, taskId: string | null) => {
-    window.dispatchEvent(new Event(FLUSH));
+    requestBoardFlush();
     const next = await window.api.linkSessionToTask(sessionId, taskId);
     announceBoard(next, "link");
   }, []);
+
+  const completeTask = useCallback(async (taskId: string) => {
+    requestBoardFlush();
+    const fresh = await window.api.readBoard();
+    const next = completeTaskWithBrief(fresh, taskId, dayKey(new Date()));
+    const saved = await window.api.saveBoard(next);
+    announceBoard(saved, "link");
+  }, []);
+
   const openTask = useCallback(
     (taskId: string) => {
-      pendingTask = taskId;
       onShowBoard();
-      window.dispatchEvent(new Event(OPEN_TASK));
+      queueOpenTask(taskId);
     },
     [onShowBoard],
   );
+
   const value = useMemo<SessionTasks>(
     () => ({
       tasks,
+      confirmCount,
+      executeCount,
       taskOf: (id) => bySession.get(id),
       link,
+      completeTask,
       openTask,
       showBoard: onShowBoard,
       sessions,
       openSession: onOpenSession,
     }),
-    [tasks, bySession, link, openTask, onShowBoard, sessions, onOpenSession],
+    [
+      tasks,
+      confirmCount,
+      executeCount,
+      bySession,
+      link,
+      completeTask,
+      openTask,
+      onShowBoard,
+      sessions,
+      onOpenSession,
+    ],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- paired context hook
 export function useSessionTasks(): SessionTasks | null {
   return useContext(Ctx);
 }
 
-/** Put `session` under a board task (null unlinks). The sidebar groups by topic, so the session also
- *  follows the task's topic and sits with its task. */
+// eslint-disable-next-line react-refresh/only-export-components -- paired context hook
 export function useLinkTask(session: {
   id: string;
   title: string;

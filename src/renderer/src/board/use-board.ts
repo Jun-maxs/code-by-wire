@@ -3,14 +3,18 @@ import {
   buildInsightPrompt,
   dayKey,
   emptyBoard,
+  mergedDailyBriefs,
   type BoardDoc,
   type Insight,
   type InsightRunState,
 } from "@shared/board";
 import { productForSession } from "@shared/products";
 import type { Session } from "@shared/types";
-import { ProductsContext } from "../products/products-context";
-import { announceBoard, onBoardChanged, onBoardFlush } from "./session-tasks";
+import {
+  ProductsContext,
+  ProductsRefreshContext,
+} from "../products/products-context";
+import { announceBoard, onBoardChanged, onBoardFlush } from "./board-bus";
 
 /** Edits land on screen at once and reach disk after this quiet spell (typing in a field). */
 const SAVE_DEBOUNCE_MS = 400;
@@ -19,8 +23,11 @@ const INSIGHT_POLL_MS = 1500;
 export interface BoardApi {
   doc: BoardDoc;
   loaded: boolean;
+  syncing: boolean;
   /** Apply an edit (immutably) and schedule a save. */
   update: (fn: (doc: BoardDoc) => BoardDoc) => void;
+  /** Re-read workbench cards, releases, and git cache from main. */
+  reload: () => Promise<void>;
   today: string;
   run: InsightRunState;
   runInsight: (trigger: Insight["trigger"]) => void;
@@ -61,6 +68,7 @@ export function useInsightPrompt(sessions: Session[]) {
 export function useBoard(sessions: Session[]): BoardApi {
   const [doc, setDoc] = useState<BoardDoc>(emptyBoard);
   const [loaded, setLoaded] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [run, setRun] = useState<InsightRunState>({
     running: false,
     startedAt: null,
@@ -70,13 +78,28 @@ export function useBoard(sessions: Session[]): BoardApi {
   const pending = useRef<BoardDoc | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prompt = useInsightPrompt(sessions);
+  const refreshProducts = useContext(ProductsRefreshContext);
 
   useEffect(() => {
+    let alive = true;
     void window.api.readBoard().then((d) => {
+      if (!alive) return;
       setDoc(d);
       setLoaded(true);
     });
-    void window.api.boardInsightState().then(setRun);
+    // Pick up the async git-log cache warm-up shortly after opening the board.
+    const warm = setTimeout(() => {
+      if (!pending.current) {
+        void window.api.readBoard().then((d) => {
+          if (alive && !pending.current) setDoc(d);
+        });
+      }
+    }, 1400);
+    void window.api.boardInsightState().then((s) => alive && setRun(s));
+    return () => {
+      alive = false;
+      clearTimeout(warm);
+    };
   }, []);
 
   const flush = useCallback(() => {
@@ -89,8 +112,7 @@ export function useBoard(sessions: Session[]): BoardApi {
         .saveBoard(next)
         .then((saved) => announceBoard(saved, "board"));
   }, []);
-  // Links made from the sidebar or a session's menu land in the file; pick them up here (the board
-  // flushed its pending edits just before, so there's nothing local to lose).
+
   useEffect(() => {
     const offFlush = onBoardFlush(flush);
     const offChanged = onBoardChanged((d, source) => {
@@ -101,7 +123,7 @@ export function useBoard(sessions: Session[]): BoardApi {
       offChanged();
     };
   }, [flush]);
-  // Never lose the last keystrokes when the view closes.
+
   useEffect(() => flush, [flush]);
 
   const update = useCallback(
@@ -117,7 +139,28 @@ export function useBoard(sessions: Session[]): BoardApi {
     [flush],
   );
 
-  // While a run is going, poll it; when it ends, pick up the insight main appended to the file.
+  const reload = useCallback(async () => {
+    setSyncing(true);
+    try {
+      flush();
+      refreshProducts();
+      const first = await window.api.readBoard();
+      if (!pending.current) {
+        setDoc(first);
+        announceBoard(first, "board");
+      }
+      // Wait briefly in case main kicked off a fresh git-log scan on `readBoard()`.
+      await new Promise((r) => setTimeout(r, 900));
+      const second = await window.api.readBoard();
+      if (!pending.current) {
+        setDoc(second);
+        announceBoard(second, "board");
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }, [flush, refreshProducts]);
+
   useEffect(() => {
     if (!run.running) return;
     const t = setInterval(() => {
@@ -142,13 +185,12 @@ export function useBoard(sessions: Session[]): BoardApi {
     [doc, today, prompt, flush],
   );
 
-  return { doc, loaded, update, today, run, runInsight };
+  return { doc, loaded, syncing, update, reload, today, run, runInsight };
 }
 
 /**
  * The daily automatic insight, mounted app-wide (the board view may never open that day): once a
- * minute, past the configured hour with no run since then today, start one. Reads the file each time
- * so it never works from a stale copy of the board.
+ * minute, past the configured hour with no run since then today, start one.
  */
 export function useBoardAutoInsight(sessions: Session[]): void {
   const prompt = useInsightPrompt(sessions);
@@ -157,7 +199,11 @@ export function useBoardAutoInsight(sessions: Session[]): void {
   useEffect(() => {
     const tick = async () => {
       const doc = await window.api.readBoard();
-      if (doc.insightHour === null || doc.tasks.length === 0) return;
+      if (
+        doc.insightHour === null ||
+        (doc.tasks.length === 0 && mergedDailyBriefs(doc).length === 0)
+      )
+        return;
       const now = new Date();
       if (now.getHours() < doc.insightHour) return;
       const since = new Date(now);
@@ -165,7 +211,6 @@ export function useBoardAutoInsight(sessions: Session[]): void {
       if (doc.insights.some((i) => i.at >= since.getTime())) return;
       const state = await window.api.boardInsightState();
       if (state.running) return;
-      // A failed run today waits for the next day or a manual run instead of retrying every minute.
       if (state.error && (state.startedAt ?? 0) >= since.getTime()) return;
       await window.api.runBoardInsight(
         promptRef.current(doc, dayKey(now)),

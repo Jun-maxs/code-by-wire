@@ -1,14 +1,6 @@
 import type { ReactNode } from "react";
-import type {
-  BoardTask,
-  Priority,
-  RiskLevel,
-  TaskRisk,
-  TaskStatus,
-} from "@shared/board";
+import type { Priority, RiskLevel, TaskStatus } from "@shared/board";
 import { shortTopicName, type ProductInfo } from "@shared/products";
-
-export { shortTopicName };
 import { cx } from "../ui/atoms";
 
 /** Status hues reuse the app's session-state colors: live teal, waiting amber, ok green, idle gray. */
@@ -18,18 +10,18 @@ export const STATUS_BG: Record<TaskStatus, string> = {
   decide: "bg-accent",
   done: "bg-ok",
 };
-export const STATUS_VAR: Record<TaskStatus, string> = {
-  todo: "var(--color-idle)",
-  doing: "var(--color-working)",
-  decide: "var(--color-accent)",
-  done: "var(--color-ok)",
-};
 
-/** Priority reads as weight, not hue (DESIGN.md): amber means "waiting on you", red means failed. */
+/** Priority reads as weight, not hue or circle dots (DESIGN.md): amber means "waiting on you", circles mean state. */
 export const PRIORITY_DOT: Record<Priority, string> = {
   P0: "bg-fg",
   P1: "bg-fg-faint",
   P2: "bg-ink-600",
+};
+
+export const PRIORITY_TEXT: Record<Priority, string> = {
+  P0: "font-semibold text-fg",
+  P1: "text-fg-muted",
+  P2: "text-fg-faint",
 };
 
 /** Risk levels mark a dot, not the whole chip (DESIGN.md: state hues only on state marks). */
@@ -44,10 +36,6 @@ export const LEVEL_TEXT: Record<RiskLevel, string> = {
   low: "text-fg-faint",
 };
 
-export function riskLevel(r: TaskRisk): RiskLevel {
-  return r === "overdue" ? "high" : r === "tight" ? "mid" : "low";
-}
-
 export function Dot({ className }: { className: string }) {
   return (
     <span
@@ -57,27 +45,35 @@ export function Dot({ className }: { className: string }) {
   );
 }
 
-/** A small outlined chip: tags, risk labels, topic names. */
+/** A small tag/status/topic pill. Topic pills use soft fill + sharp square mark (no harsh border). */
 export function Chip({
   children,
   tone = "plain",
   color,
+  className,
 }: {
   children: ReactNode;
-  tone?: "plain" | RiskLevel;
-  /** A topic color: tints the chip's dot. */
+  tone?: "plain" | RiskLevel | "ok";
+  /** A topic color: tints the chip's sharp square mark (DESIGN.md: square = topic, circle = state). */
   color?: string;
+  className?: string;
 }) {
   return (
     <span
       className={cx(
-        "inline-flex h-[18px] shrink-0 items-center gap-1 rounded-sm border border-(--ui-stroke-tertiary) px-1.5 text-meta leading-none",
-        tone === "plain"
-          ? "text-fg-faint"
-          : "bg-(--ui-bg-quaternary) text-fg-muted",
+        "inline-flex h-[18px] shrink-0 items-center gap-1.5 rounded-sm px-1.5 text-meta leading-none",
+        color
+          ? "bg-ink-900 text-fg-muted"
+          : tone === "plain"
+            ? "bg-ink-900 text-fg-faint"
+            : "bg-(--ui-bg-quaternary) text-fg-muted",
+        className,
       )}
     >
-      {tone !== "plain" && (
+      {tone === "ok" && (
+        <span aria-hidden className="size-1.5 rounded-full bg-ok" />
+      )}
+      {tone !== "plain" && tone !== "ok" && (
         <span
           aria-hidden
           className={cx("size-1.5 rounded-full", LEVEL_DOT[tone])}
@@ -86,7 +82,7 @@ export function Chip({
       {color && (
         <span
           aria-hidden
-          className="size-1.5 rounded-[2px]"
+          className="size-2 shrink-0 rounded-[2px]"
           style={{ background: color }}
         />
       )}
@@ -118,7 +114,6 @@ export function Progress({
       )}
     >
       <div
-        // Progress is a quantity, not a state: neutral like the board's other bars (DESIGN.md).
         className={cx(
           "h-full rounded-full",
           status === "done" ? "bg-fg/30" : "bg-fg/60",
@@ -151,12 +146,14 @@ export function Panel({
       )}
     >
       {title && (
-        <header className="flex items-start justify-between gap-3 px-4 pt-3.5">
-          <div className="min-w-0">
+        <header className="flex flex-col gap-1 border-b border-ink-850 px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-subhead font-semibold text-fg">{title}</h2>
-            {lede && <p className="mt-0.5 text-meta text-fg-faint">{lede}</p>}
+            {right}
           </div>
-          {right}
+          {lede && (
+            <p className="line-clamp-1 text-meta text-fg-faint">{lede}</p>
+          )}
         </header>
       )}
       {children}
@@ -219,17 +216,12 @@ export const btn = {
     "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-(--ui-stroke-tertiary) px-2.5 text-body text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
   primary:
     "inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-2.5 text-body font-medium text-ink-950 transition-colors duration-100 hover:bg-primary-bright disabled:opacity-50",
+  compact:
+    "inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-sm border border-(--ui-stroke-tertiary) px-2 text-aux text-fg-muted transition-colors duration-100 hover:bg-(--ui-control-hover-background) hover:text-fg disabled:opacity-50",
+  soft: "inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-sm bg-ink-900 px-2 text-aux text-fg-muted transition-colors duration-100 hover:bg-ink-800 hover:text-fg disabled:opacity-50",
 };
 
-export const input =
-  "h-7 w-full rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-body text-fg outline-none placeholder:text-fg-faint focus:border-(--ui-stroke-primary)";
+export const inputInline =
+  "h-7 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2 text-body text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)";
 
-export function taskMatches(t: BoardTask, q: string): boolean {
-  if (!q) return true;
-  const s = q.toLowerCase();
-  return (
-    t.title.toLowerCase().includes(s) ||
-    t.tags.some((x) => x.toLowerCase().includes(s)) ||
-    t.notes.toLowerCase().includes(s)
-  );
-}
+export const input = `${inputInline} w-full`;

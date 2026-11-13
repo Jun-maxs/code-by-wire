@@ -9,7 +9,7 @@ import {
   writeFileSync,
   appendFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   colorForProduct,
   parseProductCard,
@@ -44,7 +44,10 @@ export function readProducts(
 ): ProductsData | null {
   if (!cardsDir || !existsSync(cardsDir)) return null;
   const triggers = readTriggers(join(cardsDir, "triggers.json"));
-  const sources = readSources(join(cardsDir, "sources.json"));
+  const sources = mergeCatalogSources(
+    readSources(join(cardsDir, "sources.json")),
+    join(cardsDir, "..", "products.json"),
+  );
   const products: ProductsData["products"] = {};
   for (const name of safeList(cardsDir)) {
     const m = /^([a-z0-9_-]+)\.md$/.exec(name);
@@ -57,7 +60,7 @@ export function readProducts(
         ...parseProductCard(key, md, sources[key]?.color),
         hasCard: true,
         keywords: [],
-        repos: sources[key]?.repos ?? [],
+        repos: orderExistingRepos(sources[key]?.repos ?? []),
         updatedAt: statSync(path).mtimeMs,
       };
     } catch {
@@ -94,6 +97,63 @@ interface Source {
   repos?: string[];
 }
 
+function orderExistingRepos(repos: string[]): string[] {
+  const unique = [...new Set(repos.filter(Boolean))];
+  return [
+    ...unique.filter((r) => existsSync(r)),
+    ...unique.filter((r) => !existsSync(r)),
+  ];
+}
+
+/** Enrich `sources.json` with active owned entries from `workbench/products.json` (e.g. zhiyu, platform). */
+function mergeCatalogSources(
+  sources: Record<string, Source>,
+  catalogPath: string,
+): Record<string, Source> {
+  const raw = readJson(catalogPath) as {
+    products?: Record<
+      string,
+      {
+        name?: unknown;
+        status?: unknown;
+        status_path?: unknown;
+        git_repos?: unknown;
+      }
+    >;
+  } | null;
+  if (!raw?.products || typeof raw.products !== "object") return sources;
+  const out: Record<string, Source> = { ...sources };
+  for (const [key, item] of Object.entries(raw.products)) {
+    if (!TOPIC_KEY_RE.test(key) || !item || typeof item !== "object") continue;
+    const status = typeof item.status === "string" ? item.status : "";
+    if (/冻结|不算产品线/.test(status)) continue;
+    const gitRepos = Array.isArray(item.git_repos)
+      ? item.git_repos.filter((r): r is string => typeof r === "string" && !!r)
+      : [];
+    const statusPath =
+      typeof item.status_path === "string" && item.status_path
+        ? item.status_path
+        : null;
+    if (gitRepos.length === 0 && !statusPath) continue;
+    const fallbackRepo = statusPath ? [dirname(statusPath)] : [];
+    const prev = out[key];
+    out[key] = {
+      name:
+        prev?.name ??
+        (typeof item.name === "string" && item.name.trim()
+          ? item.name.trim().replace(/与.+$/, "")
+          : key),
+      color: prev?.color,
+      repos: orderExistingRepos([
+        ...(prev?.repos ?? []),
+        ...gitRepos,
+        ...fallbackRepo,
+      ]),
+    };
+  }
+  return out;
+}
+
 function bareTopic(
   key: string,
   src: Source | undefined,
@@ -108,7 +168,7 @@ function bareTopic(
     decide: [],
     hasCard: false,
     keywords,
-    repos: src?.repos ?? [],
+    repos: orderExistingRepos(src?.repos ?? []),
     updatedAt: null,
   };
 }

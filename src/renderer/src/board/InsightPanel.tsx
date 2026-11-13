@@ -1,19 +1,23 @@
-import { useState } from "react";
-import { aiLabel, blankTask, type BoardTask } from "@shared/board";
+import { useState, type ReactNode } from "react";
+import { aiLabel, mergedDailyBriefs } from "@shared/board";
 import { AiSettings } from "./AiSettings";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { useBoardCtx } from "./context";
-import { Chip, LEVEL_TEXT, Ring, btn, input, shortTopicName } from "./parts";
+import { Chip, LEVEL_TEXT, Ring, btn, input } from "./parts";
 import { Sheet } from "./TaskDrawer";
 
-/** The AI insight report: score, one-line verdict, what went well, risks, suggestions; history and
- *  the run settings at the foot. */
+/**
+ * The AI review drawer: evaluates pending confirmations, queued tasks, and the past 7 days of
+ * actual daily implementation briefs without manual hour-tracking settings.
+ */
 export function InsightPanel({ onClose }: { onClose: () => void }) {
-  const { doc, s, run, runInsight, update } = useBoardCtx();
+  const { rawDoc, s, run, runInsight, update } = useBoardCtx();
   const [index, setIndex] = useState(0);
   const [settings, setSettings] = useState(false);
-  const insight = doc.insights[Math.min(index, doc.insights.length - 1)];
+  const insight = rawDoc.insights[Math.min(index, rawDoc.insights.length - 1)];
+  const hasMaterial =
+    rawDoc.tasks.length > 0 || mergedDailyBriefs(rawDoc).length > 0;
 
   return (
     <Sheet onClose={onClose} label={s.insight} width={480}>
@@ -34,17 +38,16 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
           <Icon name="x" size={15} />
         </button>
       </div>
-      <p className="flex items-center gap-2 border-b border-ink-850 px-4 py-1.5 text-meta text-fg-faint">
+      <div className="flex items-center gap-2.5 border-b border-ink-850 px-4 py-1.5 text-meta text-fg-faint">
         <span
           className={cx(
             "size-1.5 rounded-full",
             run.running ? "animate-pulse bg-working" : "bg-ok",
           )}
         />
-        {aiLabel(doc.ai)}
-        <span className="opacity-50">·</span>
-        {s.autoAt(doc.insightHour)}
-      </p>
+        <span>{aiLabel(rawDoc.ai)}</span>
+        <span className="text-fg-dim">{s.autoAt(rawDoc.insightHour)}</span>
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
         {settings && (
@@ -52,24 +55,9 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
             <AiSettings />
             <div className="h-px bg-ink-850" />
             <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
-              {s.sCapacity}
-              <input
-                type="number"
-                min={1}
-                max={16}
-                step={0.5}
-                value={doc.capacityH}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (v > 0 && v <= 24) update((d) => ({ ...d, capacityH: v }));
-                }}
-                className={cx(input, "w-20 font-mono")}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
               {s.sHour}
               <select
-                value={doc.insightHour ?? ""}
+                value={rawDoc.insightHour ?? ""}
                 onChange={(e) =>
                   update((d) => ({
                     ...d,
@@ -86,17 +74,6 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="flex items-center justify-between gap-3 text-aux text-fg-muted">
-              {s.sWeekends}
-              <input
-                type="checkbox"
-                checked={doc.weekends}
-                onChange={(e) =>
-                  update((d) => ({ ...d, weekends: e.target.checked }))
-                }
-                className="size-3.5 accent-(--color-fg)"
-              />
             </label>
           </div>
         )}
@@ -118,16 +95,19 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
           <>
             <div className="flex items-center gap-3 rounded-lg border border-ink-800 bg-ink-950 px-3 py-3">
               <div className="min-w-0 flex-1">
-                <p className="text-meta text-fg-faint">
-                  {new Date(insight.at).toLocaleString(undefined, {
-                    month: "numeric",
-                    day: "numeric",
-                    weekday: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  {" · "}
-                  {insight.trigger === "auto" ? s.auto : s.manual}
+                <p className="flex items-center gap-2 text-meta text-fg-faint">
+                  <span>
+                    {new Date(insight.at).toLocaleString(undefined, {
+                      month: "numeric",
+                      day: "numeric",
+                      weekday: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="text-fg-dim">
+                    {insight.trigger === "auto" ? s.auto : s.manual}
+                  </span>
                 </p>
                 <h3 className="mt-0.5 text-subhead font-semibold leading-snug text-fg">
                   {insight.headline}
@@ -214,10 +194,10 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
               </Section>
             )}
 
-            {doc.insights.length > 1 && (
+            {rawDoc.insights.length > 1 && (
               <Section title={s.history}>
                 <div className="flex flex-wrap gap-1">
-                  {doc.insights.slice(0, 10).map((x, i) => (
+                  {rawDoc.insights.slice(0, 10).map((x, i) => (
                     <button
                       key={x.at}
                       type="button"
@@ -256,12 +236,12 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
         </button>
         <button
           type="button"
-          disabled={run.running || doc.tasks.length === 0}
+          disabled={run.running || !hasMaterial}
           onClick={() => {
             setIndex(0);
             runInsight("manual");
           }}
-          className={btn.primary}
+          className={btn.outline}
         >
           <Icon
             name={run.running ? "loader-circle" : "sparkles"}
@@ -275,13 +255,7 @@ export function InsightPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <h4 className="text-meta font-medium text-fg-faint">{title}</h4>
@@ -307,102 +281,5 @@ function SuggestionRow({
         {detail && <p className="text-aux text-fg-muted">{detail}</p>}
       </div>
     </div>
-  );
-}
-
-/** Pull candidate tasks from the topic cards: loose ends → 待办, decisions → 等我决定. */
-export function ImportDialog({ onClose }: { onClose: () => void }) {
-  const { doc, s, topics, update } = useBoardCtx();
-  const existing = new Set(doc.tasks.map((t) => t.title.trim()));
-  const rows = Object.values(topics).flatMap((p) => [
-    ...p.loose.map((line) => ({ topic: p, line, status: "todo" as const })),
-    ...p.decide.map((line) => ({ topic: p, line, status: "decide" as const })),
-  ]);
-  const keyOf = (r: (typeof rows)[number]) => `${r.topic.key}\u0000${r.line}`;
-  const [picked, setPicked] = useState<Set<string>>(() => new Set());
-  const add = () => {
-    update((d) => {
-      const tasks: BoardTask[] = [...d.tasks];
-      for (const r of rows) {
-        if (!picked.has(keyOf(r))) continue;
-        tasks.push(
-          blankTask({ ...d, tasks }, r.line.slice(0, 120), {
-            topic: r.topic.key,
-            status: r.status,
-          }),
-        );
-      }
-      return { ...d, tasks };
-    });
-    onClose();
-  };
-  return (
-    <Sheet onClose={onClose} label={s.importTitle} width={520}>
-      <div className="border-b border-ink-850 px-4 py-3">
-        <h2 className="text-subhead font-semibold text-fg">{s.importTitle}</h2>
-        <p className="mt-0.5 text-aux text-fg-faint">{s.importLede}</p>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-2">
-        {rows.length === 0 && (
-          <p className="px-2 py-6 text-center text-aux text-fg-faint">
-            {s.importEmpty}
-          </p>
-        )}
-        {rows.map((r) => {
-          const k = keyOf(r);
-          const exists = existing.has(r.line.slice(0, 120).trim());
-          return (
-            <label
-              key={k}
-              className={cx(
-                "flex items-start gap-2.5 rounded-md px-2 py-2",
-                exists
-                  ? "opacity-50"
-                  : "cursor-pointer hover:bg-(--ui-row-hover-background)",
-              )}
-            >
-              <input
-                type="checkbox"
-                disabled={exists}
-                checked={picked.has(k)}
-                onChange={() =>
-                  setPicked((p) => {
-                    const n = new Set(p);
-                    if (n.has(k)) n.delete(k);
-                    else n.add(k);
-                    return n;
-                  })
-                }
-                className="mt-1 size-3.5 accent-(--color-fg)"
-              />
-              <span className="min-w-0 flex-1 text-body leading-snug text-fg">
-                {r.line}
-              </span>
-              <span className="flex shrink-0 items-center gap-1">
-                <Chip color={r.topic.color}>
-                  {shortTopicName(r.topic.name)}
-                </Chip>
-                <Chip tone={r.status === "decide" ? "mid" : "plain"}>
-                  {exists ? s.importExists : s.status[r.status]}
-                </Chip>
-              </span>
-            </label>
-          );
-        })}
-      </div>
-      <div className="flex justify-end gap-2 border-t border-ink-850 px-4 py-2.5">
-        <button type="button" onClick={onClose} className={btn.ghost}>
-          <Icon name="x" size={14} />
-        </button>
-        <button
-          type="button"
-          disabled={picked.size === 0}
-          onClick={add}
-          className={btn.primary}
-        >
-          {s.importAdd(picked.size)}
-        </button>
-      </div>
-    </Sheet>
   );
 }

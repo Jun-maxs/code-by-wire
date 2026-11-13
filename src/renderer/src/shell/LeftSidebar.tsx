@@ -41,6 +41,7 @@ import { SessionRow } from "./SessionRow";
 import { PinnedSessionRow } from "./PinnedSessionRow";
 import { OVERVIEW_ID } from "../stats/sentinel";
 import { BOARD_ID } from "../board/sentinel";
+import { useSessionTasks } from "../board/session-tasks";
 import { SETTINGS_ID } from "../settings/sentinel";
 import { SidebarPanelLabel } from "./SidebarPanelLabel";
 import { OverlayScroll } from "../ui/OverlayScroll";
@@ -179,6 +180,7 @@ export function LeftSidebar({
   // Fork feature: group by product card instead of folder when chosen (and cards are present).
   const products = useContext(ProductsContext);
   const refreshProducts = useContext(ProductsRefreshContext);
+  const boardTasks = useSessionTasks();
   const byProduct = preferences.grouping !== "folder" && !!products;
   const groups = filterGroups(
     byProduct && products
@@ -581,7 +583,17 @@ export function LeftSidebar({
               size={16}
               className="shrink-0 opacity-70"
             />
-            {t.shell.sidebar.board}
+            <span className="truncate">{t.shell.sidebar.board}</span>
+            {boardTasks && boardTasks.confirmCount > 0 ? (
+              <span className="ml-auto inline-flex items-center gap-1 font-mono text-meta tabular-nums text-accent">
+                <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+                {boardTasks.confirmCount}
+              </span>
+            ) : boardTasks && boardTasks.executeCount > 0 ? (
+              <span className="ml-auto font-mono text-meta tabular-nums text-fg-dim">
+                {boardTasks.executeCount}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"

@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState, type ReactNode } from "react";
-import { remainingH, taskProgress, type BoardTask } from "@shared/board";
+import { taskProgress, type BoardTask } from "@shared/board";
 import { formatAgeShort } from "@shared/format";
 import { productForSession, type ProductInfo } from "@shared/products";
 import type { Session } from "@shared/types";
@@ -7,7 +7,7 @@ import { cx, Lamp } from "../../ui/atoms";
 import { Icon } from "../../ui/icons";
 import { useI18n } from "../../i18n";
 import { useLinkTask, useSessionTasks } from "../../board/session-tasks";
-import { boardStrings, fmtDay, fmtH } from "../../board/strings";
+import { boardStrings, fmtDay } from "../../board/strings";
 import { Chip, Progress, TopicChip } from "../../board/parts";
 import {
   ProductsContext,
@@ -63,6 +63,14 @@ export function DockTaskDetail({ session }: { session: Session }) {
             {s.status[task.status]}
           </Chip>
           <span className="ml-auto flex shrink-0 items-center gap-1">
+            {task.status !== "done" && (
+              <DockButton
+                icon="check"
+                onClick={() => void ctx.completeTask(task.id)}
+              >
+                {s.dock.completeTask}
+              </DockButton>
+            )}
             <DockButton
               icon="arrow-up-right"
               onClick={() => ctx.openTask(task.id)}
@@ -77,6 +85,9 @@ export function DockTaskDetail({ session }: { session: Session }) {
             </DockButton>
           </span>
         </div>
+        {task.summary.trim() && (
+          <p className="text-aux text-fg-muted">{task.summary.trim()}</p>
+        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-dim">
           <span>
             {s.dock.priority} {task.priority}
@@ -84,16 +95,6 @@ export function DockTaskDetail({ session }: { session: Session }) {
           {task.due && (
             <span>
               {s.dock.due} {fmtDay(task.due)}
-            </span>
-          )}
-          {task.plannedDate && (
-            <span>
-              {s.dock.planned} {fmtDay(task.plannedDate)}
-            </span>
-          )}
-          {task.estimateH > 0 && (
-            <span>
-              {s.dock.estimate(fmtH(task.estimateH), fmtH(remainingH(task)))}
             </span>
           )}
           {task.subtasks.length > 0 && (

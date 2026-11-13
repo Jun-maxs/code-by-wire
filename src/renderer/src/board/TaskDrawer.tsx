@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   PRIORITIES,
-  TASK_STATUSES,
   newId,
   type BoardTask,
+  type TaskStatus,
 } from "@shared/board";
 import type { Session } from "@shared/types";
 import { Lamp, cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { useBoardCtx } from "./context";
-import { Dot, PRIORITY_DOT, STATUS_BG, btn, input } from "./parts";
+import { Dot, PRIORITY_TEXT, STATUS_BG, btn, input } from "./parts";
+
+const ORDERED_STATUSES: TaskStatus[] = ["decide", "todo", "doing", "done"];
 
 /** The task's detail, a right-side sheet over the board. Every field saves as you type. */
 export function TaskDrawer({
@@ -20,9 +22,18 @@ export function TaskDrawer({
   onClose: () => void;
 }) {
   const ctx = useBoardCtx();
-  const { doc, s, update, topics } = ctx;
-  const task = doc.tasks.find((t) => t.id === taskId);
+  const {
+    rawDoc,
+    s,
+    update,
+    topics,
+    completeTask,
+    reopenTaskById,
+    dismissTaskById,
+  } = ctx;
+  const task = rawDoc.tasks.find((t) => t.id === taskId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [dueFocused, setDueFocused] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -33,24 +44,21 @@ export function TaskDrawer({
   }, [onClose]);
 
   if (!task) return null;
-  const set = (patch: Partial<BoardTask>) =>
+
+  const set = (patch: Partial<BoardTask>) => {
+    if (patch.status === "done" && task.status !== "done") {
+      completeTask(task.id);
+      return;
+    }
+    if (patch.status && patch.status !== "done" && task.status === "done") {
+      reopenTaskById(task.id, patch.status);
+      return;
+    }
     update((d) => ({
       ...d,
-      tasks: d.tasks.map((t) =>
-        t.id === task.id
-          ? {
-              ...t,
-              ...patch,
-              doneAt:
-                patch.status === undefined
-                  ? t.doneAt
-                  : patch.status === "done"
-                    ? (t.doneAt ?? Date.now())
-                    : null,
-            }
-          : t,
-      ),
+      tasks: d.tasks.map((t) => (t.id === task.id ? { ...t, ...patch } : t)),
     }));
+  };
 
   return (
     <Sheet onClose={onClose} label={task.title || s.untitled}>
@@ -61,8 +69,9 @@ export function TaskDrawer({
           autoFocus={!task.title}
           onChange={(e) => set({ title: e.target.value })}
           aria-label={s.fTitle}
-          className="min-w-0 flex-1 bg-transparent text-title font-semibold text-fg outline-none placeholder:text-fg-faint"
+          className="min-w-0 flex-1 rounded-md border border-(--ui-stroke-tertiary) bg-well px-2.5 py-1 text-subhead font-semibold text-fg outline-none placeholder:text-fg-dim focus:border-(--ui-stroke-primary)"
         />
+        <span className="shrink-0 text-meta text-fg-faint">{s.fAutoSaved}</span>
         <button
           type="button"
           onClick={onClose}
@@ -76,7 +85,7 @@ export function TaskDrawer({
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
         <Field label={s.fStatus}>
           <div className="flex flex-wrap gap-1">
-            {TASK_STATUSES.map((st) => (
+            {ORDERED_STATUSES.map((st) => (
               <button
                 key={st}
                 type="button"
@@ -85,7 +94,7 @@ export function TaskDrawer({
                 className={cx(
                   "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-aux transition-colors duration-100",
                   task.status === st
-                    ? "border-(--ui-stroke-primary) bg-(--ui-control-active-background) text-fg"
+                    ? "border-ink-700 bg-ink-800 font-medium text-fg"
                     : "border-(--ui-stroke-tertiary) text-fg-faint hover:text-fg",
                 )}
               >
@@ -94,6 +103,15 @@ export function TaskDrawer({
               </button>
             ))}
           </div>
+        </Field>
+
+        <Field label={s.fSummary}>
+          <input
+            value={task.summary}
+            placeholder={s.fSummaryPlaceholder}
+            onChange={(e) => set({ summary: e.target.value })}
+            className={input}
+          />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
@@ -106,13 +124,15 @@ export function TaskDrawer({
                   aria-pressed={task.priority === p}
                   onClick={() => set({ priority: p })}
                   className={cx(
-                    "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border text-aux transition-colors duration-100",
+                    "inline-flex h-7 flex-1 items-center justify-center rounded-md border font-mono text-aux transition-colors duration-100",
                     task.priority === p
-                      ? "border-(--ui-stroke-primary) bg-(--ui-control-active-background) text-fg"
-                      : "border-(--ui-stroke-tertiary) text-fg-faint hover:text-fg",
+                      ? "border-ink-700 bg-ink-800 font-semibold text-fg"
+                      : cx(
+                          "border-(--ui-stroke-tertiary) hover:text-fg",
+                          PRIORITY_TEXT[p],
+                        ),
                   )}
                 >
-                  <Dot className={PRIORITY_DOT[p]} />
                   {p}
                 </button>
               ))}
@@ -132,32 +152,18 @@ export function TaskDrawer({
               ))}
             </select>
           </Field>
-          <Field label={s.fEstimate}>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={task.estimateH || ""}
-              onChange={(e) =>
-                set({ estimateH: Math.max(0, Number(e.target.value) || 0) })
-              }
-              className={cx(input, "font-mono tabular-nums")}
-            />
-          </Field>
           <Field label={s.fDue}>
             <input
-              type="date"
+              type={task.due || dueFocused ? "date" : "text"}
               value={task.due ?? ""}
+              placeholder={s.fDuePlaceholder}
+              onFocus={() => setDueFocused(true)}
+              onBlur={() => setDueFocused(false)}
               onChange={(e) => set({ due: e.target.value || null })}
-              className={cx(input, "font-mono tabular-nums")}
-            />
-          </Field>
-          <Field label={s.fPlanned}>
-            <input
-              type="date"
-              value={task.plannedDate ?? ""}
-              onChange={(e) => set({ plannedDate: e.target.value || null })}
-              className={cx(input, "font-mono tabular-nums")}
+              className={cx(
+                input,
+                "font-mono tabular-nums [color-scheme:dark]",
+              )}
             />
           </Field>
           <Field label={s.fTags}>
@@ -183,29 +189,68 @@ export function TaskDrawer({
         </Field>
       </div>
 
-      <div className="flex items-center justify-between border-t border-ink-850 px-4 py-2.5">
+      <div className="flex items-center justify-between gap-2 border-t border-ink-850 px-4 py-2.5">
         <button
           type="button"
           onClick={() => {
             if (!confirmDelete) return setConfirmDelete(true);
-            update((d) => ({
-              ...d,
-              tasks: d.tasks.filter((t) => t.id !== task.id),
-              ideas: d.ideas.map((i) =>
-                i.taskId === task.id ? { ...i, taskId: null } : i,
-              ),
-            }));
+            dismissTaskById(task.id);
             onClose();
           }}
           onBlur={() => setConfirmDelete(false)}
           className={cx(
-            btn.ghost,
-            confirmDelete ? "text-danger" : "text-fg-faint",
+            "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-aux transition-colors",
+            confirmDelete
+              ? "bg-ink-800 text-danger"
+              : "text-fg-faint hover:text-danger",
           )}
         >
           <Icon name="trash" size={13} />
           {confirmDelete ? s.fDeleteConfirm : s.fDelete}
         </button>
+
+        <div className="flex items-center gap-1.5">
+          {task.status === "decide" && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  completeTask(task.id);
+                  onClose();
+                }}
+                className={btn.ghost}
+              >
+                <Icon name="check" size={13} />
+                {s.completeShort}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  set({ status: "todo" });
+                  onClose();
+                }}
+                className={btn.primary}
+              >
+                <Icon name="arrow-right" size={13} />
+                {s.approveToTodo}
+              </button>
+            </>
+          )}
+
+          {(task.status === "todo" || task.status === "doing") && (
+            <button
+              type="button"
+              onClick={() => {
+                completeTask(task.id);
+                onClose();
+              }}
+              className={btn.primary}
+            >
+              <Icon name="check" size={13} />
+              {s.completeAndLog}
+            </button>
+          )}
+        </div>
       </div>
     </Sheet>
   );
@@ -226,14 +271,14 @@ export function Sheet({
   return (
     <div className="absolute inset-0 z-30 flex justify-end">
       <div
-        className="absolute inset-0 bg-black/30 animate-[fade-in_120ms_ease-out]"
+        className="absolute inset-0 bg-black/50 animate-[fade-in_120ms_ease-out]"
         onClick={onClose}
       />
       <aside
         role="dialog"
         aria-label={label}
         style={{ width }}
-        className="relative flex h-full max-w-full flex-col border-l border-ink-800 bg-ink-925 shadow-2xl animate-[sheet-in_160ms_cubic-bezier(0.2,0.8,0.2,1)]"
+        className="relative flex h-full max-w-full flex-col border-l border-ink-800 bg-ink-900 shadow-2xl"
       >
         {children}
       </aside>
@@ -364,7 +409,7 @@ function Sessions({
     sessionTitle,
     openSession,
     newSessionFor,
-    doc,
+    rawDoc,
   } = ctx;
   const [picking, setPicking] = useState(false);
   const [q, setQ] = useState("");
@@ -372,10 +417,9 @@ function Sessions({
   const linked = task.sessionIds
     .map((id) => sessionsById.get(id))
     .filter((x): x is Session => !!x);
-  // Sessions already on some task are offered last; same-topic ones first.
   const onTask = useMemo(
-    () => new Set(doc.tasks.flatMap((t) => t.sessionIds)),
-    [doc.tasks],
+    () => new Set(rawDoc.tasks.flatMap((t) => t.sessionIds)),
+    [rawDoc.tasks],
   );
   const candidates = useMemo(() => {
     const ql = q.trim().toLowerCase();

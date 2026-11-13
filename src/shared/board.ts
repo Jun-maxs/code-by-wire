@@ -1,9 +1,13 @@
 /**
- * The work board (fork feature, 2026-10-28): tasks the user is pushing, each able to carry several
- * agent sessions, plus ideas, daily habits and AI insight runs. One JSON document under userData
- * (`board.json`) — durable user data, never the rebuildable SQLite index. This module is the JSX-free
- * half: the document shape, its sanitizer, and the derived numbers every board page reads (remaining
- * hours, risk, the 14-day load, the finish estimate, today's focus).
+ * The work board (fork feature, 2026-10-28; refactored 2026-11-13):
+ * focused on two things that need zero manual bookkeeping:
+ *   1. Pending confirmations & queued execution tasks (`decide` / `doing` / `todo`), linked to live
+ *      agent sessions and auto-synced with workbench product cards / STATUS milestones.
+ *   2. Daily implementation digest (`dailyLog` + runtime `autoBriefs` from git commits, releases,
+ *      and completed tasks), grouped by calendar day with one-click Markdown export.
+ *
+ * Persisted as `board.json` under userData. Legacy fields (`ideas`, `habits`, `estimateH`,
+ * `capacityH`, `weekends`) remain normalized so older `board.json` files never lose data.
  */
 
 export type TaskStatus = "todo" | "doing" | "decide" | "done";
@@ -26,11 +30,15 @@ export interface BoardTask {
   /** Product/topic key from the workbench cards, or null. */
   topic: string | null;
   tags: string[];
-  /** Estimated hours for the whole task. */
+  /** One-line decision context (when `decide`) or implementation summary (when completed). */
+  summary: string;
+  /** Stable key for deduplicating items synced from workbench cards / STATUS.md, or null. */
+  sourceKey: string | null;
+  /** Legacy estimated hours (preserved for backward compatibility). */
   estimateH: number;
   /** Deadline, local `YYYY-MM-DD`. */
   due: string | null;
-  /** The day the user plans to work on it, local `YYYY-MM-DD`. */
+  /** Legacy planned date, local `YYYY-MM-DD`. */
   plannedDate: string | null;
   subtasks: Subtask[];
   /** Agent sessions working on this task. */
@@ -38,8 +46,38 @@ export interface BoardTask {
   notes: string;
   createdAt: number;
   doneAt: number | null;
-  /** Sort key inside a column (smaller first). */
+  /** Sort key inside a group (smaller first). */
   order: number;
+}
+
+export type BriefSource = "task" | "commit" | "deploy" | "session" | "manual";
+
+export const BRIEF_SOURCES: BriefSource[] = [
+  "task",
+  "commit",
+  "deploy",
+  "session",
+  "manual",
+];
+
+export interface DailyBrief {
+  id: string;
+  /** Local calendar day `YYYY-MM-DD`. */
+  date: string;
+  /** Product/topic key, or null. */
+  topic: string | null;
+  /** Concise one-line implementation summary. */
+  text: string;
+  source: BriefSource;
+  /** Optional git short SHA or deployment target (e.g. `4a937cf` or `max.yuanhk.top`). */
+  ref: string | null;
+  /** Linked agent session id, if any. */
+  sessionId: string | null;
+  /** Originating board task id when `source === "task"`. */
+  taskId: string | null;
+  /** Stable key used to override or dismiss an auto-synced commit/release entry. */
+  syncKey: string | null;
+  createdAt: number;
 }
 
 export interface Idea {
@@ -135,13 +173,19 @@ export function aiLabel(ai: BoardAi): string {
 export interface BoardDoc {
   version: 1;
   tasks: BoardTask[];
+  /** Persisted daily implementation briefs (task completions, manual jots, user edits). */
+  dailyLog: DailyBrief[];
+  /** Sync keys (`sourceKey` / `syncKey`) dismissed by the user so auto-sync never re-adds them. */
+  dismissedSyncKeys: string[];
+  /** Runtime-merged auto-synced commit/deploy briefs from workbench & git (not written to board.json). */
+  autoBriefs?: DailyBrief[];
   ideas: Idea[];
   habits: Habit[];
   /** Newest first, at most {@link MAX_INSIGHTS}. */
   insights: Insight[];
-  /** Hours of task work per working day. */
+  /** Legacy hours of task work per working day. */
   capacityH: number;
-  /** Whether Saturday/Sunday count as working days. */
+  /** Legacy weekend workday toggle. */
   weekends: boolean;
   /** Local hour the daily insight runs (while the app is open); null turns it off. */
   insightHour: number | null;
@@ -149,11 +193,15 @@ export interface BoardDoc {
 }
 
 export const MAX_INSIGHTS = 30;
+export const MAX_DAILY_LOG = 1000;
+export const MAX_DISMISSED_KEYS = 2000;
 
 export function emptyBoard(): BoardDoc {
   return {
     version: 1,
     tasks: [],
+    dailyLog: [],
+    dismissedSyncKeys: [],
     ideas: [],
     habits: [],
     insights: [],
@@ -168,7 +216,7 @@ export function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-/** A new task at the end of its column. */
+/** A new task at the end of its group. */
 export function blankTask(
   doc: BoardDoc,
   title: string,
@@ -181,6 +229,8 @@ export function blankTask(
     priority: "P1",
     topic: null,
     tags: [],
+    summary: "",
+    sourceKey: null,
     estimateH: 0,
     due: null,
     plannedDate: null,
@@ -190,6 +240,27 @@ export function blankTask(
     createdAt: Date.now(),
     doneAt: null,
     order: Math.max(0, ...doc.tasks.map((t) => t.order)) + 1,
+    ...patch,
+  };
+}
+
+/** A new daily implementation brief. */
+export function blankBrief(
+  date: string,
+  text: string,
+  patch: Partial<DailyBrief> = {},
+): DailyBrief {
+  return {
+    id: newId(),
+    date,
+    topic: null,
+    text: text.trim(),
+    source: "manual",
+    ref: null,
+    sessionId: null,
+    taskId: null,
+    syncKey: null,
+    createdAt: Date.now(),
     ...patch,
   };
 }
@@ -224,6 +295,26 @@ function oneOf<T extends string>(v: unknown, all: readonly T[], d: T): T {
   return all.includes(v as T) ? (v as T) : d;
 }
 
+export function normalizeBrief(
+  raw: Record<string, unknown>,
+): DailyBrief | null {
+  const date = day(raw.date);
+  const text = str(raw.text).trim();
+  if (!date || !text) return null;
+  return {
+    id: str(raw.id) || newId(),
+    date,
+    topic: str(raw.topic) || null,
+    text,
+    source: oneOf(raw.source, BRIEF_SOURCES, "manual"),
+    ref: str(raw.ref) || null,
+    sessionId: str(raw.sessionId) || null,
+    taskId: str(raw.taskId) || null,
+    syncKey: str(raw.syncKey) || null,
+    createdAt: num(raw.createdAt, Date.now()),
+  };
+}
+
 export function normalizeBoard(raw: unknown): BoardDoc {
   const base = emptyBoard();
   if (!raw || typeof raw !== "object") return base;
@@ -235,6 +326,8 @@ export function normalizeBoard(raw: unknown): BoardDoc {
     priority: oneOf(t.priority, PRIORITIES, "P1"),
     topic: str(t.topic) || null,
     tags: strs(t.tags),
+    summary: str(t.summary),
+    sourceKey: str(t.sourceKey) || null,
     estimateH: Math.max(0, num(t.estimateH)),
     due: day(t.due),
     plannedDate: day(t.plannedDate),
@@ -249,6 +342,13 @@ export function normalizeBoard(raw: unknown): BoardDoc {
     doneAt: typeof t.doneAt === "number" ? t.doneAt : null,
     order: num(t.order, i),
   }));
+  const dailyLog: DailyBrief[] = arr(r.dailyLog)
+    .map(normalizeBrief)
+    .filter((x): x is DailyBrief => x !== null)
+    .slice(0, MAX_DAILY_LOG);
+  const dismissedSyncKeys = [
+    ...new Set(strs(r.dismissedSyncKeys).filter(Boolean)),
+  ].slice(-MAX_DISMISSED_KEYS);
   const ideas: Idea[] = arr(r.ideas).map((x) => ({
     id: str(x.id) || newId(),
     text: str(x.text),
@@ -271,6 +371,8 @@ export function normalizeBoard(raw: unknown): BoardDoc {
   return {
     version: 1,
     tasks,
+    dailyLog,
+    dismissedSyncKeys,
     ideas,
     habits,
     insights,
@@ -349,7 +451,323 @@ export function isWorkday(key: string, weekends: boolean): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Derived numbers
+// Pending confirmations & queued execution tasks
+
+export interface TaskLiveSummary {
+  working: number;
+  waiting: number;
+  lastActivityMs?: number;
+}
+
+const PRIORITY_RANK: Record<Priority, number> = { P0: 0, P1: 1, P2: 2 };
+
+export interface PendingQueueGroups {
+  /** Tasks needing user confirmation (`status === "decide"` or a linked session is `waiting`). */
+  confirm: BoardTask[];
+  /** Tasks queued or running (`doing` and `todo` without a waiting session). */
+  execute: BoardTask[];
+  /** Completed tasks, newest `doneAt` first. */
+  done: BoardTask[];
+}
+
+export function splitPendingQueue(
+  tasks: BoardTask[],
+  today: string,
+  liveByTask?: ReadonlyMap<string, TaskLiveSummary>,
+): PendingQueueGroups {
+  const confirm: BoardTask[] = [];
+  const execute: BoardTask[] = [];
+  const done: BoardTask[] = [];
+
+  for (const t of tasks) {
+    if (t.status === "done") {
+      done.push(t);
+      continue;
+    }
+    const live = liveByTask?.get(t.id);
+    if (t.status === "decide" || (live?.waiting ?? 0) > 0) {
+      confirm.push(t);
+    } else {
+      execute.push(t);
+    }
+  }
+
+  confirm.sort((a, b) => {
+    const aw = (liveByTask?.get(a.id)?.waiting ?? 0) > 0 ? 0 : 1;
+    const bw = (liveByTask?.get(b.id)?.waiting ?? 0) > 0 ? 0 : 1;
+    if (aw !== bw) return aw - bw;
+    const ao = a.due && a.due <= today ? 0 : 1;
+    const bo = b.due && b.due <= today ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    if (a.priority !== b.priority)
+      return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    const ad = a.due ?? "9999-99-99";
+    const bd = b.due ?? "9999-99-99";
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return a.order - b.order;
+  });
+
+  execute.sort((a, b) => {
+    const aw = (liveByTask?.get(a.id)?.working ?? 0) > 0 ? 0 : 1;
+    const bw = (liveByTask?.get(b.id)?.working ?? 0) > 0 ? 0 : 1;
+    if (aw !== bw) return aw - bw;
+    const as = a.status === "doing" ? 0 : 1;
+    const bs = b.status === "doing" ? 0 : 1;
+    if (as !== bs) return as - bs;
+    const ao = a.due && a.due < today ? 0 : 1;
+    const bo = b.due && b.due < today ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    if (a.priority !== b.priority)
+      return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    const ad = a.due ?? "9999-99-99";
+    const bd = b.due ?? "9999-99-99";
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return a.order - b.order;
+  });
+
+  done.sort((a, b) => (b.doneAt ?? b.createdAt) - (a.doneAt ?? a.createdAt));
+
+  return { confirm, execute, done };
+}
+
+/** Complete a task AND record its one-line implementation summary into `dailyLog` for `today`. */
+export function completeTaskWithBrief(
+  doc: BoardDoc,
+  taskId: string,
+  today: string,
+  now = Date.now(),
+): BoardDoc {
+  const target = doc.tasks.find((t) => t.id === taskId);
+  if (!target) return doc;
+  const tasks = doc.tasks.map((t) =>
+    t.id === taskId
+      ? { ...t, status: "done" as const, doneAt: t.doneAt ?? now }
+      : t,
+  );
+  const text = (target.summary.trim() || target.title.trim()).slice(0, 240);
+  if (!text) return { ...doc, tasks };
+  const existingIdx = doc.dailyLog.findIndex((b) => b.taskId === taskId);
+  const nextBrief: DailyBrief =
+    existingIdx >= 0
+      ? {
+          ...doc.dailyLog[existingIdx],
+          date: today,
+          topic: target.topic,
+          text,
+          sessionId:
+            target.sessionIds[0] ?? doc.dailyLog[existingIdx].sessionId,
+        }
+      : blankBrief(today, text, {
+          topic: target.topic,
+          source: "task",
+          taskId,
+          sessionId: target.sessionIds[0] ?? null,
+          syncKey: target.sourceKey,
+          createdAt: now,
+        });
+  const dailyLog =
+    existingIdx >= 0
+      ? doc.dailyLog.map((b, i) => (i === existingIdx ? nextBrief : b))
+      : [nextBrief, ...doc.dailyLog].slice(0, MAX_DAILY_LOG);
+  return { ...doc, tasks, dailyLog };
+}
+
+/** Reopen a completed task and drop its auto-created task completion brief if unchanged. */
+export function reopenTask(
+  doc: BoardDoc,
+  taskId: string,
+  status: Exclude<TaskStatus, "done"> = "todo",
+): BoardDoc {
+  return {
+    ...doc,
+    tasks: doc.tasks.map((t) =>
+      t.id === taskId ? { ...t, status, doneAt: null } : t,
+    ),
+    dailyLog: doc.dailyLog.filter(
+      (b) => !(b.taskId === taskId && b.source === "task"),
+    ),
+  };
+}
+
+/** Remove a task and remember `sourceKey` in `dismissedSyncKeys` so auto-sync never resurrects it. */
+export function dismissTask(doc: BoardDoc, taskId: string): BoardDoc {
+  const target = doc.tasks.find((t) => t.id === taskId);
+  if (!target) return doc;
+  const dismissedSyncKeys =
+    target.sourceKey && !doc.dismissedSyncKeys.includes(target.sourceKey)
+      ? [...doc.dismissedSyncKeys, target.sourceKey].slice(-MAX_DISMISSED_KEYS)
+      : doc.dismissedSyncKeys;
+  return {
+    ...doc,
+    tasks: doc.tasks.filter((t) => t.id !== taskId),
+    ideas: doc.ideas.map((i) =>
+      i.taskId === taskId ? { ...i, taskId: null } : i,
+    ),
+    dismissedSyncKeys,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Daily implementation digest (persisted `dailyLog` + runtime `autoBriefs`)
+
+export function normalizeBriefTextKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[，。；：！？、“”‘’（）()[\]【】·—\-.,;:!?]/g, "");
+}
+
+/** Update wording of any brief (persisting an override in `dailyLog` when editing an auto item). */
+export function upsertBriefText(
+  doc: BoardDoc,
+  brief: DailyBrief,
+  nextText: string,
+): BoardDoc {
+  const trimmed = nextText.trim();
+  if (!trimmed) return dismissBrief(doc, brief);
+  const idx = doc.dailyLog.findIndex(
+    (b) => b.id === brief.id || (brief.syncKey && b.syncKey === brief.syncKey),
+  );
+  const dailyLog =
+    idx >= 0
+      ? doc.dailyLog.map((b, i) => (i === idx ? { ...b, text: trimmed } : b))
+      : [{ ...brief, text: trimmed }, ...doc.dailyLog].slice(0, MAX_DAILY_LOG);
+  return { ...doc, dailyLog };
+}
+
+export function briefSuppressKey(
+  b: Pick<DailyBrief, "date" | "topic" | "text">,
+): string {
+  return `brief:${b.date}:${b.topic ?? ""}:${normalizeBriefTextKey(b.text)}`;
+}
+
+/** Remove a brief from `dailyLog` and suppress its `syncKey` + text fingerprint if auto-synced. */
+export function dismissBrief(
+  doc: BoardDoc,
+  brief: Pick<DailyBrief, "id" | "syncKey" | "date" | "topic" | "text">,
+): BoardDoc {
+  const keysToAdd = [
+    ...(brief.syncKey ? [brief.syncKey] : []),
+    briefSuppressKey(brief),
+  ].filter((k) => !doc.dismissedSyncKeys.includes(k));
+  const dismissedSyncKeys =
+    keysToAdd.length > 0
+      ? [...doc.dismissedSyncKeys, ...keysToAdd].slice(-MAX_DISMISSED_KEYS)
+      : doc.dismissedSyncKeys;
+  return {
+    ...doc,
+    dailyLog: doc.dailyLog.filter(
+      (b) =>
+        b.id !== brief.id && !(brief.syncKey && b.syncKey === brief.syncKey),
+    ),
+    dismissedSyncKeys,
+  };
+}
+
+/**
+ * Merge persisted `dailyLog` + runtime `autoBriefs`, honoring `dismissedSyncKeys`, user wording
+ * overrides, deploy-over-commit priority, and `(date, topic, normalizedText)` deduplication.
+ */
+export function mergedDailyBriefs(
+  doc: Pick<BoardDoc, "dailyLog" | "autoBriefs" | "dismissedSyncKeys">,
+  opts: { topic?: string; query?: string } = {},
+): DailyBrief[] {
+  const dismissed = new Set(doc.dismissedSyncKeys);
+  const overriddenSyncKeys = new Set(
+    doc.dailyLog.map((b) => b.syncKey).filter((k): k is string => !!k),
+  );
+
+  // Order candidates so user entries come first, then deploys, then commits/sessions.
+  const sourceRank: Record<BriefSource, number> = {
+    manual: 0,
+    task: 1,
+    deploy: 2,
+    session: 3,
+    commit: 4,
+  };
+
+  const isDismissed = (b: DailyBrief) =>
+    (!!b.syncKey && dismissed.has(b.syncKey)) ||
+    dismissed.has(briefSuppressKey(b));
+
+  const candidates: DailyBrief[] = [
+    ...doc.dailyLog.filter((b) => !isDismissed(b)),
+    ...(doc.autoBriefs ?? []).filter(
+      (b) =>
+        !isDismissed(b) && !(b.syncKey && overriddenSyncKeys.has(b.syncKey)),
+    ),
+  ].sort(
+    (a, b) =>
+      (a.date === b.date ? 0 : a.date > b.date ? -1 : 1) ||
+      sourceRank[a.source] - sourceRank[b.source] ||
+      b.createdAt - a.createdAt,
+  );
+
+  const seenText = new Set<string>();
+  const topicFilter = opts.topic ?? "all";
+  const q = (opts.query ?? "").trim().toLowerCase();
+  const out: DailyBrief[] = [];
+
+  for (const b of candidates) {
+    if (
+      topicFilter !== "all" &&
+      (topicFilter === "none" ? !!b.topic : b.topic !== topicFilter)
+    ) {
+      continue;
+    }
+    const textKey = `${b.date}\u0000${b.topic ?? ""}\u0000${normalizeBriefTextKey(b.text)}`;
+    if (seenText.has(textKey)) continue;
+    seenText.add(textKey);
+
+    if (q) {
+      const hay = `${b.text} ${b.ref ?? ""} ${b.topic ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) continue;
+    }
+    out.push(b);
+  }
+
+  return out.sort(
+    (a, b) =>
+      (a.date === b.date ? 0 : a.date > b.date ? -1 : 1) ||
+      b.createdAt - a.createdAt,
+  );
+}
+
+export interface DayBriefGroup {
+  date: string;
+  items: DailyBrief[];
+}
+
+export function groupBriefsByDay(briefs: DailyBrief[]): DayBriefGroup[] {
+  const map = new Map<string, DailyBrief[]>();
+  for (const b of briefs) {
+    const list = map.get(b.date);
+    if (list) list.push(b);
+    else map.set(b.date, [b]);
+  }
+  return [...map.entries()]
+    .sort((a, b) => (a[0] === b[0] ? 0 : a[0] > b[0] ? -1 : 1))
+    .map(([date, items]) => ({ date, items }));
+}
+
+export function formatDayMarkdown(
+  date: string,
+  items: DailyBrief[],
+  topicNames: Record<string, string>,
+  headingLabel = "任务实现简述清单",
+): string {
+  const lines = [`### ${date} ${headingLabel}`];
+  for (const item of items) {
+    const tag = item.topic ? `[${topicNames[item.topic] ?? item.topic}] ` : "";
+    const suffix =
+      item.source === "deploy" && item.ref ? `（上线 ${item.ref}）` : "";
+    lines.push(`- ${tag}${item.text}${suffix}`);
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Legacy derived helpers (kept for backward compatibility & existing unit tests)
 
 /** 0–1. Done is 1; otherwise the share of finished subtasks (0 without subtasks). */
 export function taskProgress(t: BoardTask): number {
@@ -364,12 +782,6 @@ export function remainingH(t: BoardTask): number {
 
 export type TaskRisk = "overdue" | "tight" | "stale";
 
-/**
- * Why a task needs attention, most serious first; empty when it's fine.
- * - overdue: past its deadline and not done.
- * - tight: what's left exceeds the working hours before the deadline.
- * - stale: in progress but none of its sessions moved for 3 days (only when it has sessions).
- */
 export function taskRisks(
   t: BoardTask,
   today: string,
@@ -398,17 +810,10 @@ export function taskRisks(
 export interface LoadDay {
   date: string;
   workday: boolean;
-  /** Hours the open tasks ask of this day. */
   hours: number;
-  /** Task ids contributing to this day. */
   taskIds: string[];
 }
 
-/**
- * The next `span` days' demand: each open task's remaining hours spread evenly over the working days
- * from today to its deadline (an overdue task lands on today in full); a task with only a planned day
- * puts its hours there; a task with neither isn't on the calendar.
- */
 export function loadDays(doc: BoardDoc, today: string, span = 14): LoadDay[] {
   const days: LoadDay[] = [];
   for (let i = 0; i < span; i++) {
@@ -448,7 +853,6 @@ export function loadDays(doc: BoardDoc, today: string, span = 14): LoadDay[] {
   return days;
 }
 
-/** The day all open work would be finished at full capacity, starting today. */
 export function finishEstimate(doc: BoardDoc, today: string): string {
   let left = doc.tasks.reduce(
     (s, t) => s + (t.status === "done" ? 0 : remainingH(t)),
@@ -463,9 +867,6 @@ export function finishEstimate(doc: BoardDoc, today: string): string {
   return d;
 }
 
-const PRIORITY_RANK: Record<Priority, number> = { P0: 0, P1: 1, P2: 2 };
-
-/** Open tasks in the order to work them: overdue first, then priority, then nearest deadline. */
 export function focusOrder(tasks: BoardTask[], today: string): BoardTask[] {
   return tasks
     .filter((t) => t.status !== "done")
@@ -479,7 +880,6 @@ export function focusOrder(tasks: BoardTask[], today: string): BoardTask[] {
     });
 }
 
-/** Consecutive checked days ending today (or yesterday, when today isn't checked yet). */
 export function habitStreak(h: Habit, today: string): number {
   const set = new Set(h.days);
   let d = set.has(today) ? today : addDays(today, -1);
@@ -492,7 +892,7 @@ export function habitStreak(h: Habit, today: string): number {
 }
 
 // ---------------------------------------------------------------------------------------------
-// AI insight: the prompt and the reply parser
+// AI insight: evaluates pending confirmations, queued tasks, and real daily implementation digest
 
 export interface InsightSessionFact {
   title: string;
@@ -507,58 +907,54 @@ export function buildInsightPrompt(
   sessions: InsightSessionFact[],
   topicNames: Record<string, string>,
 ): string {
-  const name = (k: string | null) => (k ? (topicNames[k] ?? k) : "");
-  const tasks = doc.tasks
-    .filter(
-      (t) => t.status !== "done" || (t.doneAt ?? 0) > Date.now() - 7 * 864e5,
-    )
-    .map((t) => ({
-      标题: t.title,
-      状态: {
-        todo: "待办",
-        doing: "进行中",
-        decide: "等我决定",
-        done: "已完成",
-      }[t.status],
-      优先级: t.priority,
-      主题: name(t.topic),
-      预估小时: t.estimateH,
-      剩余小时: Math.round(remainingH(t) * 10) / 10,
-      截止: t.due,
-      子任务: `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`,
-      风险: taskRisks(t, today, doc),
-      挂着的会话数: t.sessionIds.length,
+  const name = (k: string | null) => (k ? (topicNames[k] ?? k) : "未分类");
+  const { confirm, execute } = splitPendingQueue(doc.tasks, today);
+  const mapTask = (t: BoardTask) => ({
+    标题: t.title,
+    说明: t.summary || undefined,
+    状态: {
+      todo: "待定执行",
+      doing: "执行中",
+      decide: "待确认",
+      done: "已完成",
+    }[t.status],
+    优先级: t.priority,
+    主题: name(t.topic),
+    截止: t.due,
+    子任务:
+      t.subtasks.length > 0
+        ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`
+        : undefined,
+    关联会话数: t.sessionIds.length,
+  });
+  const cutoff = addDays(today, -6);
+  const recentBriefs = mergedDailyBriefs(doc)
+    .filter((b) => b.date >= cutoff)
+    .slice(0, 60)
+    .map((b) => ({
+      日期: b.date,
+      产品: name(b.topic),
+      实现简述: b.text,
+      来源: b.source,
     }));
-  const habits = doc.habits.map((h) => ({
-    名称: h.name,
-    近7天打卡: Array.from({ length: 7 }, (_, i) => addDays(today, -i)).filter(
-      (d) => h.days.includes(d),
-    ).length,
-    连续天数: habitStreak(h, today),
-  }));
-  const recent = sessions
+  const recentSessions = sessions
     .filter((s) => Date.now() - s.lastActivityMs < 2 * 864e5)
-    .slice(0, 30)
+    .slice(0, 25)
     .map((s) => ({
       标题: s.title,
       状态: s.state,
-      主题: name(s.topic),
+      产品: name(s.topic),
       距上次活动小时: Math.round((Date.now() - s.lastActivityMs) / 36e5),
     }));
-  const load = loadDays(doc, today, 7).map((d) => ({
-    日期: d.date,
-    需求小时: Math.round(d.hours * 10) / 10,
-    工作日: d.workday,
-  }));
   return [
-    `今天是 ${today}。你是用户的工作复盘助手。用户是一个人同时推进多条产品线的程序员，用 AI 编程助手（会话）干活。`,
-    `每日容量 ${doc.capacityH} 小时。根据下面的数据写一份今天的复盘，只输出一个 JSON 对象，不要代码块、不要别的文字。`,
-    `JSON 结构：{"score":0-100 的整数,"headline":"不超过 20 字的一句话结论","summary":"2-3 句总结","good":["做得不错的点，最多 4 条"],"risks":[{"level":"high|mid|low","title":"不超过 10 字","detail":"一句话说明，点名具体任务","action":"一句话建议动作"}],"suggestions":[{"tag":"工作|节奏|习惯|主题名","title":"不超过 10 字","detail":"一句话"}]}`,
-    `要求：简体中文；具体到任务名，不说空话；没有数据支撑的不写；风险按严重程度排序，最多 5 条；建议最多 4 条。`,
-    `任务：${JSON.stringify(tasks)}`,
-    `近 7 天负荷：${JSON.stringify(load)}`,
-    `日常习惯：${JSON.stringify(habits)}`,
-    `近两天的会话：${JSON.stringify(recent)}`,
+    `今天是 ${today}。你是用户的工作台复盘助手。用户独立推进多条产品线，通过 AI 编程会话并行交付，不手工填工时。`,
+    `请基于「待确认事项」「待定执行队列」「近 7 天每日实现简述清单」和「近两天会话状态」给出一份简明复盘，只输出一个 JSON 对象，不要代码块或额外文字。`,
+    `JSON 结构：{"score":0-100 的推进健康度整数,"headline":"不超过 22 字的一句话结论","summary":"2-3 句总结近期实际产出与当前焦点","good":["近几日真实落地的亮点，最多 4 条"],"risks":[{"level":"high|mid|low","title":"不超过 12 字","detail":"点名具体待确认或卡住的事项","action":"一句话建议动作"}],"suggestions":[{"tag":"拍板|收敛|推进|产品名","title":"不超过 12 字","detail":"一句话可执行建议"}]}`,
+    `要求：简体中文；依据实际每日实现简述与待确认队列评价，严禁编造工时或指责未填预估小时；风险最多 4 条，建议最多 4 条。`,
+    `待确认事项（${confirm.length} 项）：${JSON.stringify(confirm.slice(0, 20).map(mapTask))}`,
+    `待定执行队列（${execute.length} 项）：${JSON.stringify(execute.slice(0, 25).map(mapTask))}`,
+    `近 7 天每日实现简述（${recentBriefs.length} 条）：${JSON.stringify(recentBriefs)}`,
+    `近两天的会话：${JSON.stringify(recentSessions)}`,
   ].join("\n");
 }
 
