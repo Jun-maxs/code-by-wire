@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.1.64 - 2026-11-13
+
+### Changed
+
+- Overhauled the left-sidebar Board into a zero-maintenance two-core workspace:
+  a Pending Action Queue (auto-synced from workbench product cards, `STATUS.md`
+  milestones, and live `waiting` sessions, with one-click `Approve to queue`,
+  session dispatch, and completion) alongside a Daily Implementation Digest
+  (auto-aggregated from completed items, quick notes, `releases.jsonl`, and
+  21-day multi-repo `git log`, with inline multi-line editing, collapsible days,
+  hidden-entry restore, and product-grouped Markdown export).
+- Synced the session workspace's bottom Activity Dock (`DockBoard`, `DockTasks`,
+  `ActivityDock`, plus header and session-menu task badges) with the refactored
+  board: APCA-readable tab counts, borderless `ink-900` pills and inline backtick
+  code spans, status-aware primary actions with one-click undo, interactive
+  subtask checkboxes, cleaned product cards, zero middle-dot separators, and
+  `@2xl` single-column stacking on compact viewports.
+
 ## 0.1.63 - 2026-11-12
 
 ### Added
@@ -1244,7 +1262,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.63...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.64...HEAD
+[0.1.64]: https://github.com/luojiahai/code-by-wire/compare/v0.1.63...v0.1.64
 [0.1.63]: https://github.com/luojiahai/code-by-wire/compare/v0.1.62...v0.1.63
 [0.1.62]: https://github.com/luojiahai/code-by-wire/compare/v0.1.49...v0.1.62
 [0.1.49]: https://github.com/luojiahai/code-by-wire/compare/v0.1.48...v0.1.49
