@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.1.65 - 2026-11-14
+
+### Added
+
+- Qoder CLI (`qodercli`) as a fifth agent: start, resume, relaunch blank sessions, and
+  watch sessions from `~/.qoder` (`QODER_CONFIG_DIR`), including `workspace-directories`,
+  `runtime-config` (1M default context window, tier/model keys, effort), `ai-title`,
+  subagents, tasks, shells, monitors, and git/PR metrics.
+- Qoder sessions start and resume with `--dangerously-skip-permissions` by default, with
+  health checks in Settings → System, split-view quick-pick chips, and right-sidebar
+  Pressure / Spend / Session panels.
+
 ## 0.1.64 - 2026-11-13
 
 ### Changed
@@ -1262,7 +1274,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.64...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.65...HEAD
+[0.1.65]: https://github.com/luojiahai/code-by-wire/compare/v0.1.64...v0.1.65
 [0.1.64]: https://github.com/luojiahai/code-by-wire/compare/v0.1.63...v0.1.64
 [0.1.63]: https://github.com/luojiahai/code-by-wire/compare/v0.1.62...v0.1.63
 [0.1.62]: https://github.com/luojiahai/code-by-wire/compare/v0.1.49...v0.1.62
