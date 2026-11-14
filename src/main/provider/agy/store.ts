@@ -1,11 +1,21 @@
 import Database from "better-sqlite3";
-import { existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   readAgyHead,
   readAgyModel,
+  STEP_MODEL,
   STEP_USER,
+  type AgyGenRow,
   type AgyHead,
   type AgyStepRow,
 } from "./conversation";
@@ -90,6 +100,7 @@ interface RawStep {
   status: number;
   metadata: unknown;
   payload: unknown;
+  has_perm?: number;
 }
 
 const toStep = (r: RawStep): AgyStepRow => ({
@@ -98,6 +109,7 @@ const toStep = (r: RawStep): AgyStepRow => ({
   status: r.status,
   metadata: bytes(r.metadata),
   payload: bytes(r.payload),
+  ...(r.has_perm ? { hasPermissions: true } : {}),
 });
 
 export interface AgyConversationHead extends AgyHead {
@@ -124,6 +136,7 @@ export function readAgyConversationHead(
 export interface AgyConversationStats {
   /** Step metadata, plus the payload of user steps (the title) — tool outputs aren't read. */
   steps: AgyStepRow[];
+  genMeta: AgyGenRow[];
   model: { id: string; label: string } | null;
 }
 
@@ -149,12 +162,21 @@ export function readAgyConversationStats(
       db
         .prepare(
           `select idx, step_type, status, metadata,
-                  case when step_type = ${STEP_USER} then step_payload end as payload
+                  case when step_type = ${STEP_USER}
+                         or idx = (select max(idx) from steps where step_type = ${STEP_MODEL})
+                       then step_payload end as payload,
+                  case when permissions is not null and length(permissions) > 0 then 1 else 0 end as has_perm
              from steps order by idx`,
         )
         .all() as RawStep[]
     ).map(toStep);
-    return { steps, model: latestModel(db) };
+    const genMeta = (
+      db.prepare("select idx, data from gen_metadata order by idx").all() as {
+        idx: number;
+        data: unknown;
+      }[]
+    ).map((r) => ({ idx: r.idx, data: bytes(r.data) }));
+    return { steps, genMeta, model: latestModel(db) };
   });
 }
 
@@ -169,4 +191,122 @@ export function readAgySteps(path: string): AgyStepRow[] | null {
         .all() as RawStep[]
     ).map(toStep),
   );
+}
+
+export type AgyPresenceState = "locked" | "unlocked" | "absent";
+
+/**
+ * Checks whether an active `agy` process holds `<agyDir>/presence/<id>.lock`.
+ * On Windows, live `agy` holds an exclusive byte-range lock on its lockfile, so `readSync`
+ * fails with EBUSY/EACCES while the CLI is running and succeeds cleanly once it exits.
+ */
+export function readAgyPresence(agyDir: string, id: string): AgyPresenceState {
+  const lockPath = join(agyDir, "presence", `${id}.lock`);
+  let fd: number | null = null;
+  try {
+    fd = openSync(lockPath, "r");
+    const buf = Buffer.alloc(1);
+    readSync(fd, buf, 0, 1, 0);
+    return "unlocked";
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    if (code === "ENOENT" || code === "ENOTDIR") return "absent";
+    if (
+      code === "EBUSY" ||
+      code === "EACCES" ||
+      code === "EPERM" ||
+      code === "EAGAIN"
+    )
+      return "locked";
+    return "absent";
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Ignore close failures on OS handles.
+      }
+    }
+  }
+}
+
+export interface AgySummaryRow {
+  conversationId: string;
+  title: string;
+  status: string;
+  notFullyIdle: boolean;
+  killed: boolean;
+  parentConversationId: string;
+  agentName: string;
+  stepCount: number;
+  lastModifiedMs: number;
+}
+
+interface RawSummaryRow {
+  conversation_id: string;
+  title: string;
+  status: string;
+  not_fully_idle: number | boolean;
+  killed: number | boolean;
+  parent_conversation_id: string;
+  agent_name: string;
+  step_count: number;
+  last_modified_time: string;
+}
+
+const summaryFallback = new Map<string, Map<string, AgySummaryRow>>();
+
+/**
+ * Read live cascade status, title, and parent-subagent links from `<agyDir>/conversation_summaries.db`.
+ * Always queries SQLite directly so in-place page updates never hit stale stat caches, keeping the
+ * last successful map only as a transient lock-contention fallback.
+ */
+export function readAgySummaries(agyDir: string): Map<string, AgySummaryRow> {
+  const dbPath = join(agyDir, "conversation_summaries.db");
+  if (!existsSync(dbPath)) return new Map();
+
+  const rows = withDb<Map<string, AgySummaryRow>>(dbPath, (db) => {
+    const out = new Map<string, AgySummaryRow>();
+    const rawSummaries = db
+      .prepare(
+        `select conversation_id, title, status, not_fully_idle, killed,
+                parent_conversation_id, agent_name, step_count, last_modified_time
+           from conversation_summaries`,
+      )
+      .all() as RawSummaryRow[];
+    for (const r of rawSummaries) {
+      if (!r.conversation_id) continue;
+      const parsedModified = Date.parse(r.last_modified_time);
+      out.set(r.conversation_id, {
+        conversationId: r.conversation_id,
+        title: r.title || "",
+        status: r.status || "",
+        notFullyIdle: Boolean(r.not_fully_idle),
+        killed: Boolean(r.killed),
+        parentConversationId: r.parent_conversation_id || "",
+        agentName: r.agent_name || "",
+        stepCount: Number(r.step_count) || 0,
+        lastModifiedMs: Number.isFinite(parsedModified) ? parsedModified : 0,
+      });
+    }
+    try {
+      const parents = db
+        .prepare("select conversation_id, parent_id from conversation_parents")
+        .all() as { conversation_id: string; parent_id: string }[];
+      for (const p of parents) {
+        const hit = out.get(p.conversation_id);
+        if (hit && !hit.parentConversationId && p.parent_id)
+          hit.parentConversationId = p.parent_id;
+      }
+    } catch {
+      // Older DB schemas may omit conversation_parents.
+    }
+    return out;
+  });
+
+  if (!rows) {
+    return summaryFallback.get(agyDir) ?? new Map<string, AgySummaryRow>();
+  }
+  summaryFallback.set(agyDir, rows);
+  return rows;
 }

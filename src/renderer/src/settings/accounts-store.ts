@@ -4,6 +4,8 @@ import {
   type AccountQuota,
   type AccountsOverview,
 } from "@shared/account-switch";
+import type { AgyQuotaOverview } from "@shared/agy-quota";
+import type { AgentId } from "@shared/agents";
 import type { Session } from "@shared/types";
 
 /**
@@ -12,6 +14,24 @@ import type { Session } from "@shared/types";
  * panes' account badges, the right sidebar and the account switcher.
  */
 export const $accounts = atom<AccountsOverview | null>(null);
+
+/** Antigravity Tools multi-account pool quotas (`gemini` and `thirdParty`), hydrated from OverviewData. */
+export const $agyAccounts = atom<AgyQuotaOverview | null>(null);
+
+/**
+ * Resolve which agent owns the top sidebar quota panel at this moment. Only one quota family
+ * (`claude` or `agy`) renders at once so Claude and Antigravity quotas never overlap.
+ */
+export function activeSplitQuotaAgent(
+  agent: AgentId,
+  claudeAccounts: AccountsOverview | null,
+  agyAccounts: AgyQuotaOverview | null,
+): "claude" | "agy" | null {
+  if (agent === "claude" && claudeAccounts) return "claude";
+  if (agent === "agy" && agyAccounts && agyAccounts.accounts.length > 0)
+    return "agy";
+  return null;
+}
 
 /** The account a session runs on, when it is known and there is more than one to tell apart. */
 export function badgeAccount(

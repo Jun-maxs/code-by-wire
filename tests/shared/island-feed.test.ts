@@ -222,7 +222,7 @@ describe("buildIslandSnapshot", () => {
         account: {
           billingMode: "subscription",
           fiveHour: { usedPct: 41.6, resetsAt: NOW + HOUR + 0.7 },
-        } as Parameters<typeof buildIslandSnapshot>[0]["account"],
+        },
       }),
     );
     expect(snap.now).toBe(NOW);
@@ -243,5 +243,43 @@ describe("buildIslandSnapshot", () => {
       }),
     );
     expect(snap.sessions.map((s) => s.id)).toEqual(["parent"]);
+  });
+
+  it("appends Antigravity accounts with tier badges and stamps agy sessions", () => {
+    const snap = buildIslandSnapshot(
+      input({
+        sessions: [session("g1", { agent: "agy" })],
+        agyAccounts: {
+          accounts: [
+            {
+              id: "acc-1",
+              email: "jun.agy@gmail.com",
+              n: 1,
+              current: true,
+              tier: "ULTRA",
+              gemini: {
+                fiveHour: { usedPct: 24, resetsAt: NOW + 2 * HOUR },
+                sevenDay: { usedPct: 12, resetsAt: NOW + 96 * HOUR },
+              },
+              thirdParty: {},
+              seenAt: NOW - 1000,
+            },
+          ],
+        },
+      }),
+    );
+    expect(snap.accounts.items).toHaveLength(1);
+    expect(snap.accounts.items[0]).toEqual({
+      device: "agy:acc-1",
+      label: "Ultra",
+      color: "#1C7DFF",
+      email: "jun.agy@gmail.com",
+      current: true,
+      fiveHour: { usedPct: 24, resetsAt: NOW + 2 * HOUR },
+      sevenDay: { usedPct: 12, resetsAt: NOW + 96 * HOUR },
+      agent: "agy",
+      tier: "Ultra",
+    });
+    expect(snap.sessions[0].account).toBe("Ultra");
   });
 });

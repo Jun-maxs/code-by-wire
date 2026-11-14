@@ -1,4 +1,5 @@
 import type { AgentId } from "./agents";
+import type { AgyQuotaOverview } from "./agy-quota";
 import { compareRanked, STATE_RANK } from "./session-order";
 import {
   accountColor,
@@ -43,13 +44,15 @@ export interface IslandSession {
 
 export interface IslandAccount {
   device: string;
-  /** "#n", the badge the main window shows. */
+  /** "#n" for Claude, or "Ultra" / "A1" for Antigravity. */
   label: string;
   color: string;
   email: string;
   current: boolean;
   fiveHour: IslandWindow | null;
   sevenDay: IslandWindow | null;
+  agent?: AgentId;
+  tier?: string | null;
 }
 
 export interface IslandSnapshot {
@@ -66,6 +69,8 @@ export interface IslandSnapshotInput {
   accounts: AccountsOverview | null;
   /** The single account (overview().account), shown when there are no bindings. */
   account: Account | null;
+  /** Antigravity Tools accounts and Gemini/third-party rate windows, when installed. */
+  agyAccounts?: AgyQuotaOverview | null;
   products: ProductsData | null;
   /** The phone remote (HAPI runner) is up. */
   remoteOnline: boolean;
@@ -96,40 +101,87 @@ function islandWindow(
     : null;
 }
 
+const AGY_COLORS = ["#1C7DFF", "#0EA5E9", "#6366F1", "#14B8A6"];
+
+function formatAgyTier(raw: string | null | undefined): string | null {
+  switch (raw?.trim().toUpperCase()) {
+    case "ULTRA":
+      return "Ultra";
+    case "PRO":
+      return "Pro";
+    case "PLUS":
+      return "Plus";
+    default:
+      return null;
+  }
+}
+
+function agyIslandAccounts(
+  agyAccounts: AgyQuotaOverview | null | undefined,
+  now: number,
+): IslandAccount[] {
+  const list = agyAccounts?.accounts ?? [];
+  if (list.length === 0) return [];
+  return list.map((a, idx) => {
+    const tier = formatAgyTier(a.tier);
+    const label = list.length === 1 && tier ? tier : `A${a.n}`;
+    const five = a.gemini.fiveHour ?? a.thirdParty.fiveHour;
+    const seven = a.gemini.sevenDay ?? a.thirdParty.sevenDay;
+    return {
+      device: `agy:${a.id}`,
+      label,
+      color: AGY_COLORS[idx % AGY_COLORS.length],
+      email: a.email,
+      current: a.current,
+      fiveHour: islandWindow(five, now),
+      sevenDay: islandWindow(seven, now),
+      agent: "agy",
+      tier,
+    };
+  });
+}
+
 function islandAccounts(
   input: IslandSnapshotInput,
 ): IslandSnapshot["accounts"] {
-  const { accounts, account, now } = input;
+  const { accounts, account, agyAccounts, now } = input;
+  const agyItems = agyIslandAccounts(agyAccounts, now);
   if (accounts && accounts.accounts.length > 0)
     return {
       smartSwitch: accounts.smart.enabled && accounts.smart.available,
-      items: accounts.accounts.map((a) => ({
-        device: a.deviceId,
-        label: `#${a.n}`,
-        color: accountColor(a.n),
-        email: a.email,
-        current: a.current,
-        // An account never seen has no windows worth showing.
-        fiveHour: a.seenAt === undefined ? null : islandWindow(a.fiveHour, now),
-        sevenDay: a.seenAt === undefined ? null : islandWindow(a.sevenDay, now),
-      })),
+      items: [
+        ...accounts.accounts.map((a) => ({
+          device: a.deviceId,
+          label: `#${a.n}`,
+          color: accountColor(a.n),
+          email: a.email,
+          current: a.current,
+          // An account never seen has no windows worth showing.
+          fiveHour: a.seenAt === undefined ? null : islandWindow(a.fiveHour, now),
+          sevenDay: a.seenAt === undefined ? null : islandWindow(a.sevenDay, now),
+        })),
+        ...agyItems,
+      ],
     };
   // No bindings: the one account the main window shows.
   return {
     smartSwitch: false,
-    items: account
-      ? [
-          {
-            device: "",
-            label: "#1",
-            color: accountColor(1),
-            email: account.email ?? "",
-            current: true,
-            fiveHour: islandWindow(account.fiveHour, now),
-            sevenDay: islandWindow(account.sevenDay, now),
-          },
-        ]
-      : [],
+    items: [
+      ...(account
+        ? [
+            {
+              device: "",
+              label: "#1",
+              color: accountColor(1),
+              email: account.email ?? "",
+              current: true,
+              fiveHour: islandWindow(account.fiveHour, now),
+              sevenDay: islandWindow(account.sevenDay, now),
+            },
+          ]
+        : []),
+      ...agyItems,
+    ],
   };
 }
 
@@ -137,6 +189,11 @@ export function buildIslandSnapshot(
   input: IslandSnapshotInput,
 ): IslandSnapshot {
   const { products, now } = input;
+  const allAccounts = islandAccounts(input);
+  const currentAgyLabel =
+    allAccounts.items.find((a) => a.agent === "agy" && a.current)?.label ??
+    allAccounts.items.find((a) => a.agent === "agy")?.label ??
+    null;
   const badge = new Map(
     (input.accounts?.accounts ?? []).map((a) => [a.deviceId, `#${a.n}`]),
   );
@@ -149,6 +206,12 @@ export function buildIslandSnapshot(
     .map((s): IslandSession => {
       const key = products ? productForSession(products, s) : null;
       const topic = key ? products?.products[key] : undefined;
+      const resolvedAccount =
+        s.accountDevice !== undefined
+          ? (badge.get(s.accountDevice) ?? null)
+          : s.agent === "agy"
+            ? currentAgyLabel
+            : null;
       return {
         id: s.id,
         agent: s.agent,
@@ -158,10 +221,7 @@ export function buildIslandSnapshot(
         topicColor: topic?.color ?? null,
         // Codex/Pi take it from a file's mtime, which has a fraction on Windows; the island wants an integer.
         lastActivity: Math.round(s.lastActivityMs),
-        account:
-          s.accountDevice !== undefined
-            ? (badge.get(s.accountDevice) ?? null)
-            : null,
+        account: resolvedAccount,
         remote: s.remote === true,
       };
     });
@@ -169,7 +229,7 @@ export function buildIslandSnapshot(
     version: 1,
     now: Math.round(now),
     sessions,
-    accounts: islandAccounts(input),
+    accounts: allAccounts,
     remote: { online: input.remoteOnline },
   };
 }

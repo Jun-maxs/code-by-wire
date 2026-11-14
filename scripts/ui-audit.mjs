@@ -19,7 +19,7 @@ const files = [];
 
 const RULES = {
   "arbitrary font size": /\btext-\[\d[\d.]*(?:rem|px|em)\]/g,
-  "raw color literal": /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?|rgba?\([^)]*\)/g,
+  "raw color literal": /#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b|rgba?\([^)]*\)/g,
   "tailwind palette color":
     /\b(?:text|bg|border|ring|fill|stroke|from|to|via)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b/g,
   "font size token":

@@ -164,6 +164,7 @@ function createWindow(
   managed: ManagedRegistry,
   resolveResumeTarget: (id: string) => ResumeTarget | null,
   agentOf: (id: string) => AgentId,
+  isToolStillPending: (id: string, toolUseId: string) => Promise<boolean>,
   launchArgs: LaunchArgsStore,
   remoteSessions: RemoteSessionStore,
   accounts: TerminalAccounts,
@@ -192,6 +193,7 @@ function createWindow(
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       sandbox: false,
+      ...(OFFSCREEN ? { backgroundThrottling: false } : {}),
     },
   });
   if (isMac) win.setSheetOffset(HEADER_HEIGHT_PX);
@@ -244,6 +246,7 @@ function createWindow(
     accounts,
     agentEnv: (agent) => (agent === "agy" ? agyProxy().env() : undefined),
     posixShell: { isExecutable: isExecutableFile, findOnPath },
+    isToolStillPending,
   });
   registerRename(rename);
 
@@ -370,6 +373,11 @@ app
         managed,
         (id) => services.provider?.resolveResumeTarget(id) ?? null,
         (id) => services.agentOf?.(id) ?? "claude",
+        async (id, toolUseId) => {
+          if (!services.provider || !toolUseId) return true;
+          const detail = await services.provider.getToolResult(id, toolUseId);
+          return !detail.found || detail.status === "pending";
+        },
         launchArgs,
         remoteSessions,
         terminalAccounts,
@@ -502,6 +510,10 @@ app
         cwdOf: (id) => managed.cwdOf(id),
         codexEntries: () => managed.codexEntries(),
       },
+      remote: {
+        readTranscript: (rolloutPath, since) =>
+          parseWorker.call({ op: "readCodexTranscript", rolloutPath, since }),
+      },
     });
     // Pi: its session files, and its relay's usage when models.json points at one.
     const piDir = resolvePiDir();
@@ -519,6 +531,11 @@ app
     });
     // agy (Antigravity CLI): its conversation dbs, and the plan windows Antigravity Tools keeps.
     const agyDir = resolveAgyDir();
+    const agyQuota = createAgyQuotaReader({
+      agyDir,
+      fetchFn: net.fetch.bind(net),
+      cachePath: join(app.getPath("userData"), "agy-quota-cache.json"),
+    });
     const agyProvider = createAgyProvider({
       agyDir,
       recentWindowMs,
@@ -527,7 +544,11 @@ app
         cwdOf: (id) => managed.cwdOf(id),
         agyEntries: () => managed.agyEntries(),
       },
-      quota: createAgyQuotaReader(),
+      quota: agyQuota,
+      remote: {
+        parseTranscript: (mtimeMs, steps) =>
+          parseWorker.call({ op: "parseAgyTranscript", mtimeMs, steps }),
+      },
     });
     // qoder (Qoder CLI): JSONL transcripts, subagents and tasks under ~/.qoder.
     const qoderDir = resolveQoderDir();
@@ -881,6 +902,7 @@ app
       caffeinate,
       usage,
       accountSwitcher,
+      readAgyAccounts: () => agyQuota.readOverview?.() ?? null,
       sessionOverlays: [
         (sessions) => codexProvider.overlaySessions(sessions),
         (sessions) => piProvider.overlaySessions(sessions),
@@ -1005,6 +1027,7 @@ app
         sessions: o.sessions,
         accounts: accountView(),
         account: o.account,
+        agyAccounts: agyQuota.readOverview?.() ?? null,
         products: islandProducts.data,
         remoteOnline: remoteStatus().online,
         now,

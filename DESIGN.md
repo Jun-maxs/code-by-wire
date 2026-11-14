@@ -71,8 +71,11 @@
 
 - 会话底栏（`ActivityDock`）同步看板双核心规范（2026-11-13）：底栏标签计数角标由过暗的 `text-label text-fg-dim` 提至 `text-meta tabular-nums text-fg-faint`（APCA Lc 52），第 5、6 页签统一命名为 `看板待办`（配关联待办状态圆点）与 `所属产品`（配 `8px`、`2px` 圆角产品小方块与未完成待办数）；当空闲会话尚无会话内待办且已绑定看板待办时自动落焦 `看板待办`。移除折叠底栏、`DockTasks`（改为 `阻塞 #2`）及会话菜单中的全部中点 `·` 分隔符；会话底栏各页签、会话顶栏待办胶囊与右键菜单全面接入无描边反引号行内代码短片。`DockTaskDetail` 内联产品胶囊，按状态切换主动作（待确认态 `→ 确认转执行`、待定执行与执行中态 `✓ 完成并记入今日清单`、已完成态 `↺ 重新打开`）并配行内一键 `撤回`，待确认项转入执行队列后自动隐去未选中的候选方案说明，子步骤支持直接勾选落盘；关联待办选择器（`TaskPicker`）按队列优先级与同产品置顶排序并采用 `ink-900` 无描边软胶囊；`DockTopic` 自动清洗产品卡过期的未提交脏树提示与引用日期尾巴；窄于 `@2xl`（`672px`）的中间栏自动将右侧关联会话栏纵向叠放，窄于 `1280px` 窗口隐去顶栏冗余待办胶囊，消除紧凑视口挤压碰撞。（用户确认：「同样的改法用到会话底栏」；具体交互与断点 Agent 推断）
 
+- `CLI ⇄ Work` 双视图工作流（2026-11-14）：将单屏中间栏头部（`MiddleHeader`）与分屏每格标题栏（`SplitWorkspace`）原有的只读「`<Agent> / 记录`」切换统一升级为 `CLI / Work` 双态分段切换（快捷键 `Alt+W`）；切换时 `TerminalView` 在后台保持挂载存活不丢回滚与光标，`Work` 视图按会话保留未发送草稿、轮次展开态与滚动位置。`Work` 视图版心限宽 `48rem`（`768px`），人类指令与交付正文统一采用 `1.75` 行高，按每条真实指令归约为一轮：中间繁杂工具与思考默认折叠为无四边硬描边的单行执行脊（`#0c0c0c` 软底，运行中配 `working` 脉冲青点与实时动作，完成后收敛为步数、文件改动 `+M -N` 与耗时，点击按需展开明细与子代理钻取），执行报错的步骤自动以 `danger` 红点胶囊冒泡到表层，文件改动聚合为无硬框软底胶囊（点击弹出 `ink-900` Diff 对照层）。当会话处于 `waiting` 时，当前轮底部渲染全页唯一使用 `accent` 琥珀色（左侧 2px 状态竖条 + 呼吸圆点 + 主提交按钮）的 `WorkWaitingCard` 决策卡，支持单选、多选、多题步进、补充说明及终端权限批准/拒绝，经状态令牌校验后直写 `node-pty`；底部 `WorkComposer` 采用 `well #050505` 下沉输入底，锚定「产品 2px 小方块 + 关联看板待办 + 分支/目录 + 账号标号」（元数据间以留白分隔，不用中点 `·`），支持回车发送、运行中排队发话、粘贴截图、拖入路径、一键中断及 `ended` 会话自动续接。窄至 `350px` 的分屏格自动紧缩切换器与按钮内边距，确保会话标题可读且横向零溢出。（用户确认：升级 `CLI ⇄ Work` 深度双视图；具体视觉与交互细节 Agent 推断，经二轮 `ui-blind-critic` 盲审通过，见 `docs/ui-review/2026-11-14-work-view/review.md`）
+
 ## 迁移记录
 
+- 2026-11-14 单屏与分屏 `CLI ⇄ Work` 双视图切换（`src/shared/transcript.ts`、`src/renderer/src/workspace/WorkView.tsx`、`WorkTurnCard.tsx`、`WorkWaitingCard.tsx`、`WorkComposer.tsx`、`MiddleHeader.tsx`、`SplitWorkspace.tsx`）实现、真机 `node-pty` 闭环验证与二轮 `ui-blind-critic` 独立盲审完成，截图与验收记录见 `docs/ui-review/2026-11-14-work-view/`。（用户确认：新增 `CLI -> Work` 视图切换深度版）
 - 2026-11-13 会话底栏（`src/renderer/src/workspace/panels/ActivityDock.tsx`、`src/renderer/src/workspace/panels/DockBoard.tsx`、`src/renderer/src/workspace/panels/DockTasks.tsx`）与关联顶栏/菜单同步看板双核心视觉与交互规范完成，截图记录在 `docs/ui-review/2026-11-13-board-refactor/`。（用户确认：「同样的改法用到会话底栏」）
 - 2026-11-13 看板功能与结构全面重构及二轮深度打磨完成，截图与独立盲审记录见 `docs/ui-review/2026-11-13-board-refactor/`。（用户确认：选深度打磨）
 

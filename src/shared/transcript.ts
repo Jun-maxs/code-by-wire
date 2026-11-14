@@ -7,6 +7,89 @@
  * derived state). That one answers "what is this session"; this one answers "what does it look like".
  */
 import type { Subagent } from "./types";
+import { projectWorkTurns, type WorkTurn } from "./work-view";
+
+export { projectWorkTurns };
+export type {
+  WorkActiveStep,
+  WorkErrorItem,
+  WorkFileChange,
+  WorkPhase,
+  WorkSpine,
+  WorkTurn,
+} from "./work-view";
+
+/** One selectable option inside a structured agent question (`AskUserQuestion`, `request_user_input`, `ask_question`). */
+export interface WaitingOption {
+  label: string;
+  description?: string;
+}
+
+/** One question prompt with optional selectable choices. */
+export interface WaitingQuestion {
+  header?: string;
+  question: string;
+  multiSelect?: boolean;
+  options: WaitingOption[];
+}
+
+/** Structured representation of an unanswered prompt or pending tool permission at the tail of an active turn. */
+export type WaitingPrompt =
+  | {
+      kind: "question";
+      toolUseId: string;
+      toolName: string;
+      questions: WaitingQuestion[];
+    }
+  | {
+      kind: "permission";
+      toolUseId: string;
+      toolName: string;
+      summary: string;
+    };
+
+/** Normalize raw tool input `questions` across Claude (`AskUserQuestion`), Codex (`request_user_input`),
+ *  and Antigravity (`ask_question`, where `options` is `string[]` and `is_multi_select` is snake_case). */
+export function parseWaitingQuestions(raw: unknown): WaitingQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: WaitingQuestion[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const q = item as Record<string, unknown>;
+    const question = typeof q.question === "string" ? q.question.trim() : "";
+    if (!question) continue;
+    const header =
+      typeof q.header === "string" && q.header.trim()
+        ? q.header.trim()
+        : undefined;
+    const multiSelect =
+      q.multiSelect === true || q.is_multi_select === true ? true : undefined;
+    const rawOpts = Array.isArray(q.options) ? q.options : [];
+    const options: WaitingOption[] = [];
+    for (const opt of rawOpts) {
+      if (typeof opt === "string") {
+        const label = opt.trim();
+        if (label) options.push({ label });
+      } else if (opt && typeof opt === "object") {
+        const o = opt as Record<string, unknown>;
+        const label = typeof o.label === "string" ? o.label.trim() : "";
+        if (!label) continue;
+        const description =
+          typeof o.description === "string" && o.description.trim()
+            ? o.description.trim()
+            : undefined;
+        options.push(description ? { label, description } : { label });
+      }
+    }
+    out.push({
+      ...(header ? { header } : {}),
+      question,
+      ...(multiSelect ? { multiSelect } : {}),
+      options,
+    });
+  }
+  return out;
+}
 
 /** A minimal diff: the removed and added lines of an edit, already split on newline. */
 export interface DiffHunk {
@@ -39,7 +122,12 @@ export interface TurnSummary {
 
 /** One rendered item in the conversation, in file order. */
 export type TranscriptEvent =
-  | { kind: "user"; text: string }
+  | {
+      kind: "user";
+      text: string;
+      /** Set only when injected mid-turn (e.g. Claude `queued_command` while a turn was in flight). */
+      midTurn?: boolean;
+    }
   | { kind: "assistant"; text: string }
   | { kind: "thinking"; text: string }
   | {
@@ -92,6 +180,12 @@ export interface TranscriptDoc {
    *  dispatched from the main transcript; children nest under the agent that dispatched them. Empty
    *  when the session spawned no subagents. */
   subagents: Subagent[];
+  /** Structured unanswered question or tool permission at the tail of an open turn, when present. */
+  waitingPrompt?: WaitingPrompt | null;
+  /** Un-absorbed mid-turn prompts still sitting in the CLI input queue (`queue-operation`). */
+  queuedPrompts?: string[];
+  /** Pre-folded turn execution spine for the `Work` view, computed in `parse-worker` via `toTranscriptWire`. */
+  workTurns?: WorkTurn[];
 }
 
 /**
@@ -133,10 +227,13 @@ export type TranscriptReadWire =
  *  in-process fallback path), so the stringify cost lands off the main thread in the steady state. */
 export function toTranscriptWire(read: TranscriptRead): TranscriptReadWire {
   if (read.status !== "changed") return read;
+  const doc = read.doc.workTurns
+    ? read.doc
+    : { ...read.doc, workTurns: projectWorkTurns(read.doc) };
   return {
     status: "changed",
     mtimeMs: read.mtimeMs,
-    docJson: JSON.stringify(read.doc),
+    docJson: JSON.stringify(doc),
   };
 }
 

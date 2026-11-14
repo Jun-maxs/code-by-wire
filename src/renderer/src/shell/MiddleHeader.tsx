@@ -5,13 +5,13 @@ import { isMacPlatform } from "@shared/platform";
 import { AGENTS } from "@shared/agents";
 import { cx, ScrollHintShadow } from "../ui/atoms";
 import { Icon } from "../ui/icons";
-import { AgentIcon } from "../ui/agent-icons";
 import { useFullscreen } from "../ui/use-fullscreen";
 import { useI18n } from "../i18n";
 import { stripInlineCode } from "@shared/board";
 import { useSessionTasks } from "../board/session-tasks";
 import { InlineCodeText, STATUS_BG } from "../board/parts";
 import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
+import { viewToggleShortcutLabel } from "../workspace/view-mode";
 
 /**
  * The middle column's own in-column header: a draggable strip that carries the active session's
@@ -97,7 +97,7 @@ export function MiddleHeader({
           <>
             {leading}
             {menu}
-            <TaskChip sessionId={session.id} />
+            {!transcriptOn && <TaskChip sessionId={session.id} />}
             {!split && <SiblingTabs session={session} />}
           </>
         ) : (
@@ -113,9 +113,12 @@ export function MiddleHeader({
               className="flex shrink-0 items-center rounded-sm border border-(--ui-stroke-tertiary) bg-[color-mix(in_srgb,var(--color-fg)_5%,transparent)] p-[2px]"
             >
               <ViewSegment
-                icon={<AgentIcon agent={session.agent} size={13} />}
-                label={AGENTS[session.agent].label}
+                icon={<Icon name="square-terminal" size={12} />}
+                label={t.shell.middleHeader.cli}
                 active={!transcriptOn}
+                title={t.shell.middleHeader.toggleViewHint(
+                  viewToggleShortcutLabel(isMac),
+                )}
                 onSelect={() => {
                   if (transcriptOn) {
                     onToggleTranscript();
@@ -124,13 +127,15 @@ export function MiddleHeader({
                 }}
               />
               <ViewSegment
-                icon={<Icon name="scroll-text" size={13} />}
-                label={t.shell.middleHeader.transcript}
+                icon={<Icon name="list-tree" size={12} />}
+                label={t.shell.middleHeader.work}
                 active={transcriptOn}
                 disabled={!AGENTS[session.agent].capabilities.hasTranscript}
                 title={
                   AGENTS[session.agent].capabilities.hasTranscript
-                    ? undefined
+                    ? t.shell.middleHeader.toggleViewHint(
+                        viewToggleShortcutLabel(isMac),
+                      )
                     : t.common.comingSoon
                 }
                 onSelect={() => {

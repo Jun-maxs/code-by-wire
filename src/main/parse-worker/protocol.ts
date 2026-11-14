@@ -1,3 +1,4 @@
+import { readFileSync, statSync } from "node:fs";
 import type { PersistedSession, SessionCandidate } from "@shared/types";
 import type { ToolResultDetail, TranscriptReadWire } from "@shared/transcript";
 import { toTranscriptWire } from "@shared/transcript";
@@ -24,6 +25,9 @@ import {
   type ClaimableRollout,
 } from "../provider/codex/claim";
 import { listRollouts, readRolloutHead } from "../provider/codex/rollout";
+import { parseRolloutEvents } from "../provider/codex/transcript-events";
+import { parseAgyEvents, type AgyStepRow } from "../provider/agy/conversation";
+import { MAX_TEXT_FILE_BYTES } from "../util/file-size";
 
 /**
  * The parse-worker request vocabulary: every op is one poll-driven fs read the main thread used to
@@ -79,6 +83,16 @@ export type ParseRequestBody =
       codexDir: string;
       earliestMs: number;
       claimedPaths: string[];
+    }
+  | {
+      op: "readCodexTranscript";
+      rolloutPath: string;
+      since?: number;
+    }
+  | {
+      op: "parseAgyTranscript";
+      mtimeMs: number;
+      steps: AgyStepRow[];
     };
 
 export type ParseRequest = { seq: number } & ParseRequestBody;
@@ -99,6 +113,8 @@ export interface ParseOpResults {
   readMetrics: MetricsRead;
   readSessionFiles: RawSessionFile[];
   scanClaimableRollouts: ClaimableRollout[];
+  readCodexTranscript: TranscriptReadWire;
+  parseAgyTranscript: TranscriptReadWire;
 }
 
 export type ParseOp = keyof ParseOpResults;
@@ -207,6 +223,40 @@ export function createParseRequestHandler(
         return sessionFiles(req.claudeDir);
       case "scanClaimableRollouts":
         return scanRollouts(req.codexDir, req.earliestMs, req.claimedPaths);
+      case "readCodexTranscript": {
+        let mtimeMs: number;
+        let size: number;
+        try {
+          const st = statSync(req.rolloutPath);
+          mtimeMs = st.mtimeMs;
+          size = st.size;
+        } catch {
+          return { status: "absent" } satisfies TranscriptReadWire;
+        }
+        if (req.since !== undefined && mtimeMs === req.since) {
+          return { status: "unchanged", mtimeMs } satisfies TranscriptReadWire;
+        }
+        if (size > MAX_TEXT_FILE_BYTES) {
+          return { status: "absent" } satisfies TranscriptReadWire;
+        }
+        let text: string;
+        try {
+          text = readFileSync(req.rolloutPath, "utf8");
+        } catch {
+          return { status: "error" } satisfies TranscriptReadWire;
+        }
+        return toTranscriptWire({
+          status: "changed",
+          mtimeMs,
+          doc: { ...parseRolloutEvents(text), subagents: [] },
+        });
+      }
+      case "parseAgyTranscript":
+        return toTranscriptWire({
+          status: "changed",
+          mtimeMs: req.mtimeMs,
+          doc: { ...parseAgyEvents(req.steps), subagents: [] },
+        });
     }
   };
 

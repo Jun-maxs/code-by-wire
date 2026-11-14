@@ -17,6 +17,7 @@ export const TERMINAL = {
   exit: "terminal:exit",
   rename: "terminal:rename",
   reattach: "terminal:reattach",
+  dispatchWork: "terminal:dispatch-work",
 } as const;
 
 /**
@@ -128,6 +129,50 @@ export type ForkResult =
   | { ok: true; session: Session }
   | { ok: false; reason: "unresolvable" };
 
+/** One question's answer inside a structured `Work` view decision submission. */
+export interface WorkQuestionAnswer {
+  /** 0-based indices of selected predefined options. */
+  selectedIndices: number[];
+  /** Count of predefined options on this question (before the TUI's built-in "Other" entry). */
+  optionCount: number;
+  /** True when multiple options can be toggled via Space before confirming. */
+  multiSelect?: boolean;
+  /** Custom free-text answer (selects "Other" and pastes text). */
+  customText?: string;
+}
+
+export type WorkDispatchAction =
+  | { kind: "prompt"; text: string }
+  | { kind: "interrupt" }
+  | { kind: "paste-image" }
+  | {
+      kind: "permission";
+      toolUseId: string;
+      decision: "allow" | "allow-session" | "deny";
+    }
+  | {
+      kind: "question";
+      toolUseId: string;
+      answers: WorkQuestionAnswer[];
+    };
+
+export interface WorkDispatchRequest {
+  id: string;
+  action: WorkDispatchAction;
+  /** True when the renderer observed `session.state === "ended"` (main still verifies provider liveness). */
+  expectResume?: boolean;
+  /** Initial terminal dimensions used when auto-resuming an `ended` session on prompt send. */
+  cols?: number;
+  rows?: number;
+}
+
+export type WorkDispatchResult =
+  | { ok: true; resumed?: boolean; session?: Session }
+  | {
+      ok: false;
+      reason: "not-live" | "stale" | "alive" | "unresolvable" | "empty";
+    };
+
 /**
  * The Managed-terminal control + push surface, exposed on `window.api.terminal`. Spawning returns an
  * optimistic Managed draft Session the renderer shows until discovery indexes the real process.
@@ -138,6 +183,9 @@ export interface TerminalApi {
   resume(req: ResumeRequest): Promise<ResumeResult>;
   /** Fork a session by resuming it into a new id. Refused only if the source's cwd can't be resolved. */
   fork(req: ForkRequest): Promise<ForkResult>;
+  /** State-gated structured dispatch from `Work` view (prompt with split-frame paste, permission/question
+   *  with anti-replay token guard, interrupt, or automatic `gateResume` + prompt readiness wait on `ended`). */
+  dispatchWork(req: WorkDispatchRequest): Promise<WorkDispatchResult>;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;
   ack(id: string, charCount: number): void;

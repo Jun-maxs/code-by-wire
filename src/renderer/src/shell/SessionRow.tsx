@@ -184,14 +184,13 @@ export function SessionRow({
              *  read apart. Its color sits only on a small square (2026-11-01): colored words
              *  competed with the state colors and made the list hard to scan. */}
             {product && !hideProduct && (
-              <span className="text-fg-dim">
+              <span className="mr-1.5 text-fg-dim">
                 <span
                   aria-hidden
                   className="mr-1 inline-block size-1.5 -translate-y-px rounded-[1px] align-middle"
                   style={{ background: product.color }}
                 />
                 {shortTopicName(product.name)}
-                <span> · </span>
               </span>
             )}
             {displayTitle}

@@ -219,6 +219,9 @@ export function hydrate(p: PersistedSession): Session {
     lastActivityMs: p.lastActivityMs,
     createdMs: p.createdMs,
     sessionClockMs,
+    ...(p.apiDurationMs !== undefined
+      ? { apiDurationMs: p.apiDurationMs }
+      : {}),
     effortLevel: p.effortLevel,
     compactionCount: p.compactionCount,
     compactionTokensReclaimed: p.compactionTokensReclaimed,

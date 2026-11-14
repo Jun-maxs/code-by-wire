@@ -133,6 +133,11 @@ export const CODEX_MODEL_FAMILY_COLORS = {
   mini: "var(--color-model-codex-mini)",
 } as const;
 
+export const GEMINI_MODEL_FAMILY_COLORS = {
+  flash: "var(--color-model-gemini-flash)",
+  gemini: "var(--color-model-gemini)",
+} as const;
+
 /** The identity color for a raw model id: its family's fixed hue when recognized, else the neutral
  *  "other" tone. Drives the By-model bars, the daily stack-by-model, and the By-session model swatch. */
 export function modelColorOf(raw: string | null): string {
@@ -143,6 +148,9 @@ export function modelColorOf(raw: string | null): string {
   if (lower.includes("mini")) return CODEX_MODEL_FAMILY_COLORS.mini;
   if (lower.includes("-codex")) return CODEX_MODEL_FAMILY_COLORS.codex;
   if (lower.includes("gpt")) return CODEX_MODEL_FAMILY_COLORS.gpt;
+  if (lower.includes("gemini") && lower.includes("flash"))
+    return GEMINI_MODEL_FAMILY_COLORS.flash;
+  if (lower.includes("gemini")) return GEMINI_MODEL_FAMILY_COLORS.gemini;
   return MODEL_OTHER_COLOR;
 }
 

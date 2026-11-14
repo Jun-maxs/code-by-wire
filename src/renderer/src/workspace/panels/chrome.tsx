@@ -35,12 +35,15 @@ export function PanelHeading({
   info,
   right,
   icon,
+  iconNode,
 }: {
   children: ReactNode;
   info?: ReactNode;
   right?: ReactNode;
   /** The panel's dedicated lucide glyph (cockpit rail); omitted, the label wears the dither dot. */
   icon?: IconName;
+  /** Custom leading glyph node (e.g. AgentIcon) inside the label slot. */
+  iconNode?: ReactNode;
 }) {
   const { t } = useI18n();
   const title = typeof children === "string" ? children : undefined;
@@ -48,7 +51,9 @@ export function PanelHeading({
     <div className="relative -mx-2.5 flex h-7 shrink-0 items-center justify-between gap-2 px-2.5">
       <span className="flex min-w-0 items-center gap-1.5">
         <h2 className="flex min-w-0 items-center">
-          <SidebarPanelLabel icon={icon}>{children}</SidebarPanelLabel>
+          <SidebarPanelLabel icon={icon} iconNode={iconNode}>
+            {children}
+          </SidebarPanelLabel>
         </h2>
         {info && (
           // The popover is absolute against this outer relative strip, so left-0/right-0 span its full

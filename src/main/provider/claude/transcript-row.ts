@@ -58,6 +58,28 @@ export function tellingField(input: Record<string, unknown>): string | null {
   return null;
 }
 
+/** A short, human label for a tool call's input: the most telling field, else compact JSON. */
+export function summarizeInput(input: Record<string, unknown>): string {
+  const field = tellingField(input);
+  if (field !== null) return field;
+  try {
+    const json = JSON.stringify(input);
+    return json.length > 200 ? json.slice(0, 199) + "…" : json;
+  } catch {
+    return "";
+  }
+}
+
+/** True when a queued_command / queue-operation body is an internal notification envelope rather than a human prompt. */
+export function isInternalNotificationText(raw: string): boolean {
+  const t = raw.trimStart();
+  return (
+    t.startsWith("<task-notification>") ||
+    t.startsWith("<bash-notification>") ||
+    t.startsWith("[Request interrupted")
+  );
+}
+
 /** A user turn's text whether stored as a plain string or content blocks (text blocks only). */
 export function userText(content: unknown): string {
   if (typeof content === "string") return content;

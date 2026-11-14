@@ -26,6 +26,8 @@ export function CodexPanels({ session, metrics, doc }: SidebarPanelsProps) {
         rateLimits={session.rateLimits ?? (session.relayUsage ? {} : null)}
         windowRowsWhenFetchedOnly
         relayUsage={session.relayUsage ?? null}
+        rateAgent="codex"
+        rateLabel="Codex"
       />
       <SectionDivider />
       <SpendPanel

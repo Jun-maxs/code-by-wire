@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from "react";
+import type { AgentId } from "@shared/agents";
 import type { ContextBreakdown } from "@shared/transcript";
 import type {
   Account,
@@ -9,6 +10,7 @@ import type {
 } from "@shared/types";
 import { pickWindow, showRateRow } from "@shared/statusline";
 import { contextView } from "@shared/context";
+import { AgentIcon } from "../../ui/agent-icons";
 import { cx } from "../../ui/atoms";
 import { FillGauge } from "../../ui/charts";
 import { clampPct } from "../../ui/charts-geom";
@@ -79,6 +81,8 @@ export function PressurePanel({
   relayUsage,
   headingRight,
   hideRates = false,
+  rateAgent,
+  rateLabel,
 }: {
   live: ContextBreakdown | null;
   context: ContextBreakdown | null;
@@ -97,6 +101,10 @@ export function PressurePanel({
   headingRight?: ReactNode;
   /** Leave out the rate-limit rows (the split view's sidebar shows every account's above). */
   hideRates?: boolean;
+  /** Agent icon shown above the rate windows when rendered inside PressurePanel. */
+  rateAgent?: AgentId;
+  /** Optional text beside `rateAgent` (e.g. "Antigravity · Gemini"). */
+  rateLabel?: string;
 }) {
   const { t } = useI18n();
   const view = useMemo(
@@ -133,6 +141,16 @@ export function PressurePanel({
   // real windows (and their dynamic windowMinutes labels) arrive. Static rows keep their
   // labels untouched in every state.
   const windowsLoading = fetchedOnly && !windowsFetched;
+  const showFiveHour =
+    !hideRates &&
+    showRateRow(fetchedOnly, windowsFetched, rateLimits?.fiveHour);
+  const showSevenDay =
+    !hideRates &&
+    showRateRow(fetchedOnly, windowsFetched, rateLimits?.sevenDay);
+  const showSonnet = !hideRates && Boolean(sevenDaySonnet);
+  const showOpus = !hideRates && Boolean(sevenDayOpus);
+  const hasVisibleRates =
+    showFiveHour || showSevenDay || showSonnet || showOpus;
 
   return (
     <PanelSection>
@@ -174,30 +192,34 @@ export function PressurePanel({
         <p className="text-aux text-fg-dim">{t.dock.pressure.noContext}</p>
       )}
       <div className="mt-1 space-y-1.5">
-        {!hideRates &&
-          showRateRow(fetchedOnly, windowsFetched, rateLimits?.fiveHour) && (
-            <RateRow
-              label={windowsLoading ? "-" : t.dock.pressure.windowFiveHour}
-              window={fiveHour}
-              now={now}
-            />
-          )}
-        {!hideRates &&
-          showRateRow(fetchedOnly, windowsFetched, rateLimits?.sevenDay) && (
-            <RateRow
-              label={windowsLoading ? "-" : t.dock.pressure.windowSevenDay}
-              window={sevenDay}
-              now={now}
-            />
-          )}
-        {!hideRates && sevenDaySonnet && (
+        {hasVisibleRates && rateAgent && (
+          <div className="flex items-center gap-1.5 pt-1 text-tiny font-medium text-fg-faint">
+            <AgentIcon agent={rateAgent} size={11} />
+            <span className="truncate">{rateLabel}</span>
+          </div>
+        )}
+        {showFiveHour && (
+          <RateRow
+            label={windowsLoading ? "-" : t.dock.pressure.windowFiveHour}
+            window={fiveHour}
+            now={now}
+          />
+        )}
+        {showSevenDay && (
+          <RateRow
+            label={windowsLoading ? "-" : t.dock.pressure.windowSevenDay}
+            window={sevenDay}
+            now={now}
+          />
+        )}
+        {showSonnet && (
           <RateRow
             label={t.dock.pressure.windowSevenDaySonnet}
             window={sevenDaySonnet}
             now={now}
           />
         )}
-        {!hideRates && sevenDayOpus && (
+        {showOpus && (
           <RateRow
             label={t.dock.pressure.windowSevenDayOpus}
             window={sevenDayOpus}

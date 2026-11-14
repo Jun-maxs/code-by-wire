@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -6,6 +7,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { useStore } from "@nanostores/react";
 import type {
   Session,
   Subagent,
@@ -16,6 +18,13 @@ import { AGENTS } from "@shared/agents";
 import { useI18n } from "../i18n";
 import { AgentIcon } from "../ui/agent-icons";
 import { TranscriptView } from "./TranscriptView";
+import { WorkView } from "./WorkView";
+import {
+  $viewModes,
+  resolveSessionViewMode,
+  setSessionViewMode,
+  toggleSessionViewMode,
+} from "./view-mode";
 import { useTranscriptModals } from "./use-transcript-modals";
 import { TerminalView } from "../terminal/TerminalView";
 import { useTranscript, type DocState } from "./use-transcript";
@@ -43,6 +52,8 @@ export function Workspace({
   onEnd,
   onRename,
   onTogglePin,
+  onBeforeAutoResume,
+  onAfterAutoResume,
   leftEdgeExposed,
   rightEdgeExposed,
   leading,
@@ -58,6 +69,8 @@ export function Workspace({
   onRename: (id: string, title: string | null) => void;
   /** Persist (or clear) the pin mark for this session. Applies to any session. */
   onTogglePin: (id: string, pinned: boolean) => void;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
   /** Whether the left pane isn't actually docked next to the header — reserves the cluster inset. */
   leftEdgeExposed: boolean;
   /** Whether the right pane isn't docked — the header clears the fixed right toggle cluster. */
@@ -67,32 +80,22 @@ export function Workspace({
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
-  // Every session gets the Terminal ⇄ Transcript toggle. The Terminal side is the live in-app xterm only
-  // for a Managed session that's still running; otherwise — an Observed session running in another
-  // terminal, or any Ended session (including a just-exited Managed one that re-derives Observed) — it's
-  // the ObservedTerminal panel instead. A live Managed session opens on Terminal (transcriptOn = false);
-  // everything else opens on Transcript (transcriptOn = true), since its read-only conversation leads.
-  const hasLiveTerminal = s.management === "managed" && s.state !== "ended";
   const caps = AGENTS[s.agent].capabilities;
-  // No transcript capability → the switcher rests on the agent segment always; a dead session
-  // shows the placeholder there instead of landing on the disabled Transcript side.
-  const [transcriptOn, setTranscriptOn] = useState(
-    !hasLiveTerminal && caps.hasTranscript,
+  const modes = useStore($viewModes);
+  const viewMode = resolveSessionViewMode(s, modes, caps.hasTranscript);
+  const transcriptOn = viewMode === "work";
+  const setTranscriptOn = useCallback(
+    (next: boolean) => {
+      setSessionViewMode(s.id, next ? "work" : "cli");
+    },
+    [s.id],
   );
-  useEffect(() => {
-    if (!caps.hasTranscript) setTranscriptOn(false);
-  }, [caps.hasTranscript]);
-  // Lifted from WorkspaceBody so the header's "Claude Code" tab can clear a subagent drill on select —
-  // it needs to live above the toggle it composes with, not just above the CenterView that renders it.
+  // Lifted from WorkspaceBody so the header's CLI tab can clear a subagent drill on select.
   const [drill, setDrill] = useState<DrillCrumb[]>([]);
 
-  // Follow the live terminal when it stands up in place. Resume resumes this same id, so Workspace never
-  // remounts and `transcriptOn` keeps its seeded value, but `hasLiveTerminal` flips to true once the pty
-  // is live. Switch only toward the terminal: a session ending shouldn't yank the user off the transcript
-  // they were reading, and a manual toggle on a live session stays put.
-  useEffect(() => {
-    if (hasLiveTerminal) setTranscriptOn(false);
-  }, [hasLiveTerminal]);
+  // When a live terminal stands up via an explicit Resume (from CLI/ObservedTerminal or SessionMenu) and
+  // the user hasn't explicitly pinned Work view on this session, resolveSessionViewMode naturally lands on
+  // CLI (`!explicit && hasLiveTerminal => "cli"`).
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
@@ -100,7 +103,7 @@ export function Workspace({
         title={s.title}
         session={s}
         transcriptOn={transcriptOn}
-        onToggleTranscript={() => setTranscriptOn((v) => !v)}
+        onToggleTranscript={() => toggleSessionViewMode(s, caps.hasTranscript)}
         onExitDrill={() => setDrill([])}
         drilled={drill.length > 0}
         leftEdgeExposed={leftEdgeExposed}
@@ -126,6 +129,8 @@ export function Workspace({
           canSpawn={canSpawn}
           onResume={onResume}
           onFork={onFork}
+          onBeforeAutoResume={onBeforeAutoResume}
+          onAfterAutoResume={onAfterAutoResume}
           transcriptOn={transcriptOn}
           setTranscriptOn={setTranscriptOn}
           drill={drill}
@@ -147,6 +152,8 @@ function WorkspaceBody({
   canSpawn,
   onResume,
   onFork,
+  onBeforeAutoResume,
+  onAfterAutoResume,
   transcriptOn,
   setTranscriptOn,
   drill,
@@ -157,10 +164,12 @@ function WorkspaceBody({
   canSpawn: boolean;
   onResume: (id: string) => Promise<void>;
   onFork: (session: Session) => Promise<void>;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
   transcriptOn: boolean;
   setTranscriptOn: (transcriptOn: boolean) => void;
   /** The subagent drill-stack: empty = the Session transcript; a crumb = a drilled Subagent. Lifted to
-   *  Workspace so the header's "Claude Code" tab can clear it on select. */
+   *  Workspace so the header's CLI tab can clear it on select. */
   drill: DrillCrumb[];
   setDrill: Dispatch<SetStateAction<DrillCrumb[]>>;
 }) {
@@ -224,6 +233,7 @@ function WorkspaceBody({
       <div className="min-h-0 flex-1">
         <CenterView
           session={s}
+          now={now}
           doc={doc}
           subagentDoc={subagentDoc}
           drill={drill}
@@ -232,6 +242,8 @@ function WorkspaceBody({
           canSpawn={canSpawn}
           onResume={onResume}
           onFork={onFork}
+          onBeforeAutoResume={onBeforeAutoResume}
+          onAfterAutoResume={onAfterAutoResume}
           transcriptOn={transcriptOn}
           setTranscriptOn={setTranscriptOn}
         />
@@ -244,6 +256,7 @@ function WorkspaceBody({
           shells={shells ?? []}
           monitors={monitors ?? []}
           now={now}
+          hideContextInTally={transcriptOn && drill.length === 0}
           activeAgentId={activeAgentId}
           activeShellId={activeShellId}
           activeMonitorId={activeMonitorId}
@@ -296,6 +309,7 @@ function WorkspaceBody({
  *  never touches this toggle. */
 function CenterView({
   session: s,
+  now,
   doc,
   subagentDoc,
   drill,
@@ -304,10 +318,13 @@ function CenterView({
   canSpawn,
   onResume,
   onFork,
+  onBeforeAutoResume,
+  onAfterAutoResume,
   transcriptOn,
   setTranscriptOn,
 }: {
   session: Session;
+  now: number;
   doc: DocState;
   subagentDoc: DocState;
   drill: DrillCrumb[];
@@ -316,6 +333,8 @@ function CenterView({
   canSpawn: boolean;
   onResume: (id: string) => Promise<void>;
   onFork: (session: Session) => Promise<void>;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
   transcriptOn: boolean;
   setTranscriptOn: (transcriptOn: boolean) => void;
 }) {
@@ -339,16 +358,11 @@ function CenterView({
   const drilled = drill.length > 0;
   const drilledKey = top?.agentId;
 
-  // Drilling into a Subagent always surfaces its transcript in the Transcript side of the toggle.
+  // Drilling into a Subagent always surfaces its transcript in the Work side of the toggle.
   useEffect(() => {
     if (drilledKey) setTranscriptOn(true);
   }, [drilledKey, setTranscriptOn]);
 
-  // The Terminal side is the live in-app xterm only for a Managed session that's still running;
-  // otherwise — an Observed session running in another terminal, or any Ended session (including a
-  // just-exited Managed one that re-derives Observed) — it's the ObservedTerminal panel: Fork shows
-  // whenever the agent's canFork capability is on (disabled with a coming-soon tooltip otherwise),
-  // Resume only once the session has Ended.
   const hasLiveTerminal = s.management === "managed" && s.state !== "ended";
   const caps = AGENTS[s.agent].capabilities;
   const terminalSlot = hasLiveTerminal ? (
@@ -376,10 +390,15 @@ function CenterView({
       ) : drilled ? (
         drilledView
       ) : (
-        <RenderedTranscript
+        <WorkView
           session={s}
           doc={doc}
+          now={now}
+          canSpawn={canSpawn}
+          onFork={onFork}
           dispatchDrill={dispatchDrill}
+          onBeforeAutoResume={onBeforeAutoResume}
+          onAfterAutoResume={onAfterAutoResume}
         />
       )}
     </div>

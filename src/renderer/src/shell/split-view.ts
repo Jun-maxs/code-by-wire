@@ -254,7 +254,7 @@ export function paneLine(
       : start === null
         ? tx.stepsAtLeast(steps)
         : tx.steps(steps);
-  const join = (...parts: string[]) => parts.filter(Boolean).join(" · ");
+  const join = (...parts: string[]) => parts.filter(Boolean).join("  ");
   switch (s.state) {
     case "working":
       return {
@@ -273,7 +273,7 @@ export function paneLine(
         pct: null,
         tone: "accent",
         indeterminate: false,
-        doing: tool ? `${tx.waiting} · ${tool}` : tx.waiting,
+        doing: tool ? `${tx.waiting} ${tool}` : tx.waiting,
         meta: stepsText,
         label: tx.waiting,
       };

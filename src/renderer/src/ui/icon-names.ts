@@ -40,6 +40,7 @@ export type IconName =
   | "id-card"
   | "info"
   | "layout-grid"
+  | "list-tree"
   | "loader-circle"
   | "maximize"
   | "monitor"

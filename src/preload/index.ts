@@ -32,8 +32,8 @@ const api: AppApi = {
   clipboardWriteText: (text) =>
     ipcRenderer.invoke(IPC.clipboardWriteText, text),
   clipboardReadText: (type) => ipcRenderer.invoke(IPC.clipboardReadText, type),
-  clipboardProbe: (sessionId) =>
-    ipcRenderer.invoke(IPC.clipboardProbe, sessionId),
+  clipboardProbe: (sessionId, saveImage) =>
+    ipcRenderer.invoke(IPC.clipboardProbe, sessionId, saveImage),
   renameSession: (id, title) =>
     ipcRenderer.invoke(IPC.renameSession, id, title),
   setSessionPinned: (id, pinned) =>
@@ -176,6 +176,7 @@ const api: AppApi = {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
     resume: (req) => ipcRenderer.invoke(TERMINAL.resume, req),
     fork: (req) => ipcRenderer.invoke(TERMINAL.fork, req),
+    dispatchWork: (req) => ipcRenderer.invoke(TERMINAL.dispatchWork, req),
     write: (id, data) => ipcRenderer.send(TERMINAL.write, id, data),
     resize: (id, cols, rows) =>
       ipcRenderer.send(TERMINAL.resize, id, cols, rows),

@@ -3,6 +3,7 @@ import type {
   MoveCandidate,
   SmartSwitchPrefs,
 } from "./account-switch";
+import type { AgyQuotaOverview } from "./agy-quota";
 import type { TrashResult } from "./session-trash";
 import type { TurnActivity } from "./turn-activity";
 import type {
@@ -216,6 +217,8 @@ export interface OverviewData extends IndexOverview {
   /** Fork (2026-11-03): the reclaude accounts with their 5h / 7d windows and the smart switch state;
    *  null without reclaude bindings. */
   accounts?: AccountsOverview | null;
+  /** Antigravity Tools' accounts and pool quotas (Gemini vs Claude/GPT), read from disk when present. */
+  agyAccounts?: AgyQuotaOverview | null;
 }
 
 /** Fork (2026-11-03): the smart switch's periodic answer — the accounts, and the idle sessions still
@@ -408,8 +411,13 @@ export interface IpcApi {
    *  the Linux X11 selection clipboard (Shift+Insert); only ever requested on Linux. */
   clipboardReadText(type?: "selection"): Promise<string>;
   /** What the clipboard holds when it has no text (a screenshot, Explorer-copied files), so a
-   *  terminal paste can hand the CLI its image key or the file paths. */
-  clipboardProbe(sessionId?: string): Promise<ClipboardProbe>;
+   *  terminal paste can hand the CLI its image key or the file paths. When `saveImage` is true (e.g.
+   *  from `Work` view's composer), a clipboard bitmap is persisted to `clipboard-images/` so it can be
+   *  attached as a path chip regardless of agent or OS. */
+  clipboardProbe(
+    sessionId?: string,
+    saveImage?: boolean,
+  ): Promise<ClipboardProbe>;
   /** Persist a display-name override for a session id (null or a value that trims to empty clears it,
    *  reverting to the derived/live name), then return the fresh overview with the override applied.
    *  Both overview() and refresh() also carry the override, since it is applied in overviewNow(). */

@@ -37,6 +37,8 @@ export interface RolloutTelemetry {
   effortLevel: string | null;
   compactionCount: number;
   tokenEvents: CodexTokenEvent[];
+  /** True when the latest open turn ended on an unanswered `request_user_input` call. */
+  awaitingUser?: boolean;
 }
 
 /** The shared breakdown rule — transcript-events.ts uses this too, so the transcript's context split
@@ -68,6 +70,7 @@ export function scanRolloutTelemetry(jsonl: string): RolloutTelemetry {
   let effortLevel: string | null = null;
   let compactionCount = 0;
   const tokenEvents: CodexTokenEvent[] = [];
+  const pendingQuestions = new Set<string>();
   // Insertion-ordered per-model buckets; null key = "no model reported yet".
   const buckets = new Map<string | null, RawTotals>();
 
@@ -93,6 +96,42 @@ export function scanRolloutTelemetry(jsonl: string): RolloutTelemetry {
       const effort = payload.effort ?? payload.reasoning_effort;
       if (typeof effort === "string" && effort) effortLevel = effort;
       continue;
+    }
+
+    if (row.type === "response_item") {
+      const kind = payload.type;
+      if (
+        (kind === "function_call" || kind === "custom_tool_call") &&
+        (payload.name === "request_user_input" ||
+          payload.name === "request_user_input_async")
+      ) {
+        const callId =
+          typeof payload.call_id === "string" && payload.call_id
+            ? payload.call_id
+            : `q_${pendingQuestions.size}`;
+        pendingQuestions.add(callId);
+      } else if (
+        kind === "function_call_output" ||
+        kind === "custom_tool_call_output"
+      ) {
+        if (typeof payload.call_id === "string")
+          pendingQuestions.delete(payload.call_id);
+      } else if (kind === "message" && payload.role === "user") {
+        pendingQuestions.clear();
+      }
+      continue;
+    }
+
+    if (row.type === "event_msg") {
+      if (
+        payload.type === "task_started" ||
+        payload.type === "turn_started" ||
+        payload.type === "task_complete" ||
+        payload.type === "turn_complete"
+      ) {
+        pendingQuestions.clear();
+        continue;
+      }
     }
 
     if (row.type !== "event_msg" || payload.type !== "token_count") continue;
@@ -135,6 +174,7 @@ export function scanRolloutTelemetry(jsonl: string): RolloutTelemetry {
     effortLevel,
     compactionCount,
     tokenEvents,
+    ...(pendingQuestions.size > 0 ? { awaitingUser: true } : {}),
   };
 }
 

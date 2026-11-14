@@ -5,14 +5,30 @@ import type { IconName } from "../ui/icon-names";
  *  program (tests) can import it. */
 const TOOL_ICONS: Record<string, IconName> = {
   Bash: "terminal",
+  exec: "terminal",
+  shell: "terminal",
+  run_command: "terminal",
   Read: "code",
+  read_file: "code",
+  view_file: "code",
   Edit: "pencil",
   Write: "pencil",
   MultiEdit: "pencil",
+  apply_patch: "pencil",
+  edit_file: "pencil",
+  write_file: "pencil",
+  replace_file_content: "pencil",
+  multi_replace_file_content: "pencil",
+  write_to_file: "pencil",
   Grep: "search",
   Glob: "search",
+  grep_search: "search",
+  find_by_name: "search",
+  list_dir: "folder",
   WebFetch: "globe",
   WebSearch: "globe",
+  search_web: "globe",
+  web_search: "globe",
 };
 
 export function toolIcon(name: string): IconName {

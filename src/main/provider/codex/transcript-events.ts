@@ -1,9 +1,13 @@
-import type {
-  ContextBreakdown,
-  ToolEvent,
-  TranscriptDoc,
-  TranscriptEvent,
-  TurnSummary,
+import {
+  parseWaitingQuestions,
+  type ContextBreakdown,
+  type DiffEvent,
+  type DiffHunk,
+  type ToolEvent,
+  type TranscriptDoc,
+  type TranscriptEvent,
+  type TurnSummary,
+  type WaitingPrompt,
 } from "@shared/transcript";
 import { asRecord } from "./rollout";
 import { breakdownFromTokenUsage } from "./usage";
@@ -156,6 +160,123 @@ function promptLine(text: string): string {
   return "";
 }
 
+const QUESTION_TOOL_NAMES = new Set([
+  "request_user_input",
+  "request_user_input_async",
+]);
+
+function parseJsonObject(raw: unknown): Record<string, unknown> | null {
+  if (raw && typeof raw === "object" && !Array.isArray(raw))
+    return raw as Record<string, unknown>;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    return asRecord(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+/** Extract per-file hunks from Codex V4A `*** Begin Patch` blocks (either direct `apply_patch` input
+ *  or an `apply_patch` heredoc inside an `exec` / `shell` command). */
+export function parseApplyPatchBlocks(
+  raw: string,
+): { file: string; hunk: DiffHunk }[] {
+  if (!raw.includes("*** Begin Patch")) return [];
+  const results: { file: string; hunk: DiffHunk }[] = [];
+  let inPatch = false;
+  let currentFile: string | null = null;
+  let mode: "add" | "delete" | "update" | null = null;
+  let removed: string[] = [];
+  let added: string[] = [];
+
+  const flushFile = (): void => {
+    if (currentFile !== null) {
+      results.push({
+        file: currentFile,
+        hunk: { removed, added },
+      });
+    }
+    currentFile = null;
+    mode = null;
+    removed = [];
+    added = [];
+  };
+
+  for (const rawLine of raw.split(/\r?\n/)) {
+    if (rawLine.startsWith("*** Begin Patch")) {
+      flushFile();
+      inPatch = true;
+      continue;
+    }
+    if (!inPatch) continue;
+    if (rawLine.startsWith("*** End Patch")) {
+      flushFile();
+      inPatch = false;
+      continue;
+    }
+    if (rawLine.startsWith("*** Add File:")) {
+      flushFile();
+      currentFile = rawLine.slice("*** Add File:".length).trim();
+      mode = "add";
+      continue;
+    }
+    if (rawLine.startsWith("*** Delete File:")) {
+      flushFile();
+      currentFile = rawLine.slice("*** Delete File:".length).trim();
+      mode = "delete";
+      continue;
+    }
+    if (rawLine.startsWith("*** Update File:")) {
+      flushFile();
+      currentFile = rawLine.slice("*** Update File:".length).trim();
+      mode = "update";
+      continue;
+    }
+    if (rawLine.startsWith("*** Move to:")) {
+      const moved = rawLine.slice("*** Move to:".length).trim();
+      if (moved) currentFile = moved;
+      continue;
+    }
+    if (
+      rawLine.startsWith("@@") ||
+      rawLine.startsWith("*** End of File") ||
+      currentFile === null
+    ) {
+      continue;
+    }
+    if (mode === "add") {
+      added.push(rawLine.startsWith("+") ? rawLine.slice(1) : rawLine);
+    } else if (mode === "delete") {
+      if (rawLine.startsWith("-")) removed.push(rawLine.slice(1));
+    } else if (mode === "update") {
+      if (rawLine.startsWith("+") && !rawLine.startsWith("+++")) {
+        added.push(rawLine.slice(1));
+      } else if (rawLine.startsWith("-") && !rawLine.startsWith("---")) {
+        removed.push(rawLine.slice(1));
+      }
+    }
+  }
+  flushFile();
+  return results;
+}
+
+function extractPatchText(
+  name: string,
+  payload: Record<string, unknown>,
+  commandText: string,
+): string {
+  if (name === "apply_patch") {
+    if (typeof payload.input === "string" && payload.input)
+      return payload.input;
+    const args = parseJsonObject(payload.arguments);
+    if (args) {
+      const patch = args.patch ?? args.input ?? args.diff;
+      if (typeof patch === "string") return patch;
+    }
+  }
+  return commandText;
+}
+
 /**
  * Project a rollout's JSONL into render-ready events — the codex analog of claude's
  * parseTranscriptEvents, targeting the same shared doc so the renderer needs no codex wiring.
@@ -171,8 +292,13 @@ export function parseRolloutEvents(
   jsonl: string,
 ): Omit<TranscriptDoc, "subagents"> {
   const events: TranscriptEvent[] = [];
-  // Tool events keyed by call_id so the matching *_output line can back-patch status + output size.
+  // Tool and diff events keyed by call_id so the matching *_output line can back-patch status + output size.
   const byCallId = new Map<string, ToolEvent>();
+  const diffsByCallId = new Map<string, DiffEvent[]>();
+  const pendingQuestions = new Map<
+    string,
+    { reason: string; prompt: WaitingPrompt }
+  >();
   // Timeline: task_started opens a turn, task_complete closes it. A started-but-uncompleted tail
   // turn (still running, or aborted) finalizes as-is — endMs stays startMs, durationMs 0, the
   // shared type's in-flight rule. Older files without these events simply yield no turns.
@@ -205,6 +331,7 @@ export function parseRolloutEvents(
     if (row.type === "event_msg") {
       const kind = payload.type;
       if (kind === "task_started" || kind === "turn_started") {
+        pendingQuestions.clear();
         finalizeOpen();
         open = {
           index: turns.length + 1,
@@ -215,6 +342,7 @@ export function parseRolloutEvents(
           toolCount: 0,
         };
       } else if (kind === "task_complete" || kind === "turn_complete") {
+        pendingQuestions.clear();
         if (open) {
           open.endMs = Math.max(open.endMs, tsMs);
           const reported = num(payload.duration_ms);
@@ -239,6 +367,7 @@ export function parseRolloutEvents(
       if (payload.role === "user") {
         const text = contentText(payload.content).trim();
         if (!text || CONTEXT_PREFIXES.some((p) => text.startsWith(p))) continue;
+        pendingQuestions.clear();
         events.push({ kind: "user", text });
         if (open && !open.prompt) open.prompt = promptLine(text);
       } else if (payload.role === "assistant") {
@@ -264,10 +393,49 @@ export function parseRolloutEvents(
         (typeof payload.name === "string" && payload.name
           ? payload.name
           : "tool");
+      const cmdText = toolCommand(payload);
+
+      if (QUESTION_TOOL_NAMES.has(name)) {
+        const args = parseJsonObject(payload.arguments ?? payload.input);
+        const questions = parseWaitingQuestions(args?.questions);
+        const reason = questions.length
+          ? questions.map((q) => q.question).join(" · ")
+          : "Waiting on a question";
+        const key = callId || `q_${events.length}`;
+        pendingQuestions.set(key, {
+          reason,
+          prompt: {
+            kind: "question",
+            toolUseId: callId,
+            toolName: name,
+            questions:
+              questions.length > 0
+                ? questions
+                : [{ question: reason, options: [] }],
+          },
+        });
+      }
+
+      const patches = parseApplyPatchBlocks(
+        extractPatchText(name, payload, cmdText),
+      );
+      if (patches.length > 0) {
+        const diffEvents: DiffEvent[] = patches.map((p) => ({
+          kind: "diff",
+          tool: name === "apply_patch" ? "apply_patch" : name,
+          file: p.file,
+          hunk: p.hunk,
+          status: "pending",
+        }));
+        events.push(...diffEvents);
+        if (callId) diffsByCallId.set(callId, diffEvents);
+        continue;
+      }
+
       const event: ToolEvent = {
         kind: "tool",
         name,
-        input: toolCommand(payload),
+        input: cmdText,
         toolUseId: callId,
         status: "pending",
         outputLines: 0,
@@ -278,11 +446,20 @@ export function parseRolloutEvents(
     }
     if (typeof kind === "string" && TOOL_OUTPUT_TYPES.has(kind)) {
       const callId = typeof payload.call_id === "string" ? payload.call_id : "";
+      if (callId) pendingQuestions.delete(callId);
+      const { text, error } = normalizeOutput(payload.output);
       const event = callId ? byCallId.get(callId) : undefined;
       if (event) {
-        const { text, error } = normalizeOutput(payload.output);
         event.status = error ? "error" : "ok";
         event.outputLines = outputLineCount(text);
+      }
+      const diffs = callId ? diffsByCallId.get(callId) : undefined;
+      if (diffs) {
+        const isPatchErr =
+          error ||
+          text.startsWith("patch failed") ||
+          text.startsWith("apply_patch verification failed");
+        for (const d of diffs) d.status = isPatchErr ? "error" : "ok";
       }
       // orphan outputs (no matching call): ignored
     }
@@ -290,5 +467,14 @@ export function parseRolloutEvents(
   }
   finalizeOpen();
 
-  return { events, waitingReason: null, turns, context };
+  let activeQuestion: { reason: string; prompt: WaitingPrompt } | undefined;
+  for (const q of pendingQuestions.values()) activeQuestion = q;
+
+  return {
+    events,
+    waitingReason: activeQuestion?.reason ?? null,
+    turns,
+    context,
+    ...(activeQuestion ? { waitingPrompt: activeQuestion.prompt } : {}),
+  };
 }

@@ -21,7 +21,10 @@ import {
   type ForkRequest,
   type ForkResult,
   type ReattachSnapshot,
+  type WorkDispatchRequest,
+  type WorkDispatchResult,
 } from "@shared/terminal";
+import { createWorkDispatcher } from "./work-input";
 import {
   validateExtraArgs,
   extraArgsErrorMessage,
@@ -118,6 +121,7 @@ export function registerTerminalIpc({
   remoteCommand,
   accounts,
   agentEnv,
+  isToolStillPending,
 }: {
   window: BrowserWindow;
   managed: ManagedRegistry;
@@ -152,6 +156,12 @@ export function registerTerminalIpc({
   /** Extra env a non-Claude agent's spawn and resume start with (agy: the system proxy, see
    *  agy-proxy.ts). Claude's env comes from `accounts`. */
   agentEnv?: (agent: AgentId) => Record<string, string> | undefined;
+  /** Optional transcript-level pending check for `Work` view decision cards: returns false when
+   *  `toolUseId` has already recorded a tool_result on disk (e.g. answered via remote/CLI). */
+  isToolStillPending?: (
+    id: string,
+    toolUseId: string,
+  ) => Promise<boolean> | boolean;
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data, offset) => {
@@ -250,7 +260,7 @@ export function registerTerminalIpc({
   // the guarantee behind the Ended-only state gate — a session that came back to life since the last
   // sync is refused, so two processes never share one Transcript. cwd (and, for codex, the rollout
   // claim binding) is resolved in main, not trusted from the renderer.
-  ipcMain.handle(TERMINAL.resume, (_e, req: ResumeRequest): ResumeResult => {
+  function resumeSession(req: ResumeRequest): ResumeResult {
     const agent = agentOf(req.id);
     const target = resolveResumeTarget(req.id);
     const stored = launchArgs?.get(req.id) ?? "";
@@ -321,7 +331,37 @@ export function registerTerminalIpc({
       rows: req.rows,
     });
     return { ok: true };
+  }
+
+  ipcMain.handle(
+    TERMINAL.resume,
+    (_e, req: ResumeRequest): ResumeResult => resumeSession(req),
+  );
+
+  const dispatchWork = createWorkDispatcher({
+    hasPty: (id) => manager.has(id),
+    modes: (id) => manager.modes(id),
+    writeFrames: (id, frames) => manager.writeFrames(id, frames),
+    waitForPromptReady: (id) => manager.waitForPromptReady(id),
+    resumeSession,
+    agentOf,
+    isToolStillPending,
+    isSessionEnded: (id, expectResume) => {
+      const entry = managed.entryOf(id);
+      if (!expectResume && entry && Date.now() - entry.spawnedAtMs < 1_500) {
+        return false;
+      }
+      const target = resolveResumeTarget(id);
+      return Boolean(target && target.transcript !== false && !target.alive);
+    },
+    waitForPtyClosed: (id) => manager.waitForExit(id),
   });
+
+  ipcMain.handle(
+    TERMINAL.dispatchWork,
+    (_e, req: WorkDispatchRequest): Promise<WorkDispatchResult> =>
+      dispatchWork(req),
+  );
   // Fork a session: resume its conversation into a NEW id with --fork-session, so the source Transcript
   // is left untouched. No liveness gate — unlike resume, a fork writes its own Transcript, so it's safe
   // even while the source is still running. cwd is resolved in main from the source id, not trusted from
@@ -426,6 +466,7 @@ export function registerTerminalIpc({
     ipcMain.removeHandler(TERMINAL.spawn);
     ipcMain.removeHandler(TERMINAL.resume);
     ipcMain.removeHandler(TERMINAL.fork);
+    ipcMain.removeHandler(TERMINAL.dispatchWork);
     ipcMain.removeHandler(TERMINAL.pickDirectory);
     ipcMain.removeHandler(TERMINAL.reattach);
     ipcMain.removeListener(TERMINAL.write, onWrite);

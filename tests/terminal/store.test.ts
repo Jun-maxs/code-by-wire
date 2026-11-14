@@ -64,6 +64,7 @@ function harness(os: OsKind = "mac", clipboardProbe?: ClipboardIpc["probe"]) {
     spawn: vi.fn(),
     resume: vi.fn(),
     fork: vi.fn(),
+    dispatchWork: vi.fn(),
     write: vi.fn(),
     resize: vi.fn(),
     ack: vi.fn(),

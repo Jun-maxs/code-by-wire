@@ -56,6 +56,7 @@ export function ActivityDock({
   shells,
   monitors,
   now,
+  hideContextInTally = false,
   activeAgentId,
   activeShellId,
   activeMonitorId,
@@ -69,6 +70,7 @@ export function ActivityDock({
   shells: BackgroundShell[];
   monitors: Monitor[];
   now: number;
+  hideContextInTally?: boolean;
   activeAgentId?: string;
   activeShellId?: string;
   activeMonitorId?: string;
@@ -173,8 +175,10 @@ export function ActivityDock({
         stats={stats}
         shellCount={shells.length}
         monitorCount={monitors.length}
-        linkedTask={linkedTask}
-        sessionProduct={sessionProduct ?? undefined}
+        linkedTask={hideContextInTally ? undefined : linkedTask}
+        sessionProduct={
+          hideContextInTally ? undefined : (sessionProduct ?? undefined)
+        }
         onExpand={() => setCollapseOverride({ collapsed: false, active })}
       />
     );

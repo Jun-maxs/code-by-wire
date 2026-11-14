@@ -33,6 +33,8 @@ export function ClaudePanels({
         account={account}
         rateLimits={session.rateLimits ?? null}
         hideRates={ratesElsewhere}
+        rateAgent="claude"
+        rateLabel="Claude"
         headingRight={
           ratesElsewhere ? undefined : (
             <ClaudeAccountSwitch

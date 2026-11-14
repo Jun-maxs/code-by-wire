@@ -1,10 +1,15 @@
-import type { ContextBreakdown } from "@shared/transcript";
-import { usageBreakdown } from "./transcript-row";
+import {
+  parseWaitingQuestions,
+  type ContextBreakdown,
+  type WaitingPrompt,
+} from "@shared/transcript";
+import { summarizeInput, usageBreakdown } from "./transcript-row";
 
 /** A pending tool_use's reason and whether it's a direct question to the user. */
 export interface PendingReason {
   reason: string;
   question: boolean;
+  prompt?: WaitingPrompt;
 }
 
 /** A waiting reason for one unanswered tool_use: the question(s) for AskUserQuestion, else a permission
@@ -12,19 +17,35 @@ export interface PendingReason {
 export function reasonForTool(
   name: string,
   input: Record<string, unknown>,
+  toolUseId = "",
 ): PendingReason {
   if (name === "AskUserQuestion") {
-    const qs = Array.isArray(input.questions)
-      ? input.questions
-          .map((q) => (typeof q?.question === "string" ? q.question : ""))
-          .filter(Boolean)
-      : [];
+    const questions = parseWaitingQuestions(input.questions);
+    const qs = questions.map((q) => q.question);
     return {
       reason: qs.length ? qs.join(" · ") : "Waiting on a question",
       question: true,
+      prompt: {
+        kind: "question",
+        toolUseId,
+        toolName: name,
+        questions:
+          questions.length > 0
+            ? questions
+            : [{ question: "Waiting on a question", options: [] }],
+      },
     };
   }
-  return { reason: `Permission: ${name}`, question: false };
+  return {
+    reason: `Permission: ${name}`,
+    question: false,
+    prompt: {
+      kind: "permission",
+      toolUseId,
+      toolName: name,
+      summary: summarizeInput(input),
+    },
+  };
 }
 
 /**
@@ -49,12 +70,25 @@ export interface TailTracker {
   /** The surfaced reason: the actual question when a turn blocks on several tools at once, else the first
    *  pending tool in turn order. null when nothing is pending. */
   waitingReason(): string | null;
+  /** Structured prompt payload for the active pending question or tool permission, or null when idle/done. */
+  waitingPrompt(): WaitingPrompt | null;
 }
 
 export function createTailTracker(): TailTracker {
   let pending = new Map<string, PendingReason>();
   let turn: string | undefined;
   let context: ContextBreakdown | null = null;
+  const pickActive = (): PendingReason | undefined => {
+    let pick: PendingReason | undefined;
+    for (const r of pending.values()) {
+      if (!pick) pick = r;
+      if (r.question) {
+        pick = r;
+        break;
+      }
+    }
+    return pick;
+  };
   return {
     beginAssistantTurn(id) {
       if (id === undefined || id !== turn) {
@@ -67,7 +101,7 @@ export function createTailTracker(): TailTracker {
       if (bd) context = bd;
     },
     noteToolUse(id, name, input) {
-      pending.set(id, reasonForTool(name, input));
+      pending.set(id, reasonForTool(name, input, id));
     },
     resolveToolResult(id) {
       pending.delete(id);
@@ -79,15 +113,10 @@ export function createTailTracker(): TailTracker {
       return context;
     },
     waitingReason() {
-      let pick: PendingReason | undefined;
-      for (const r of pending.values()) {
-        if (!pick) pick = r;
-        if (r.question) {
-          pick = r;
-          break;
-        }
-      }
-      return pick?.reason ?? null;
+      return pickActive()?.reason ?? null;
+    },
+    waitingPrompt() {
+      return pickActive()?.prompt ?? null;
     },
   };
 }

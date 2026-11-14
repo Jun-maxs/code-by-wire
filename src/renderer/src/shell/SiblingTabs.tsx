@@ -24,7 +24,7 @@ export function SiblingTabs({ session }: { session: Session }) {
     <div
       role="group"
       aria-label={t.shell.middleHeader.siblingsLabel}
-      className="no-drag flex min-w-0 shrink items-center gap-1 overflow-hidden"
+      className="no-drag hidden min-w-0 shrink items-center gap-1 overflow-hidden xl:flex"
     >
       {siblings.map((s) => {
         const title = isUnsentSession(s)

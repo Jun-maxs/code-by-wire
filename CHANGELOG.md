@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.1.66 - 2026-11-14
+
+### Added
+
+- `CLI ⇄ Work` 任务视图：中部顶栏新增分段切换与 `Alt+W`（macOS 为 `Ctrl+Shift+E`）快捷键，可在原生 CLI 终端与结构化任务时间线之间无缝切换，支持文件 diff 胶囊点击查看改动、`ask_question` 结构化交互提问、执行步骤实时推进、独立输入框派发与分屏多窗格联动。
+- Antigravity 额度看板与实时同步：右侧分屏栏 `Antigravity` 账号卡片（Gemini 与 Claude/GPT 双配额池切换）及账户管理面板、DeskTidy 灵动岛聚合、会话长思考/吞吐率/API 耗时统计。
+
+### Fixed
+
+- 修复 Antigravity（`agy`）本地 Tools/standalone 凭证失效或过期重置窗口滞后导致额度显示为空或 `-` 倒计时的问题，改为按需单飞静默刷新 Google Cloud Code OAuth 与配额接口并持久化非敏感配额缓存，同步叠加到侧栏与灵动岛总览。
+
 ## 0.1.65 - 2026-11-14
 
 ### Added

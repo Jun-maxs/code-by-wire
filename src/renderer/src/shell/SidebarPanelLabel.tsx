@@ -11,10 +11,13 @@ export function SidebarPanelLabel({
   children,
   className,
   icon,
+  iconNode,
 }: {
   children: ReactNode;
   className?: string;
   icon?: IconName;
+  /** Custom leading icon node (e.g. brand AgentIcon); takes precedence over `icon`. */
+  iconNode?: ReactNode;
 }) {
   return (
     <span
@@ -23,7 +26,11 @@ export function SidebarPanelLabel({
         className,
       )}
     >
-      {icon ? (
+      {iconNode ? (
+        <span className="grid size-3.5 shrink-0 place-items-center">
+          {iconNode}
+        </span>
+      ) : icon ? (
         <span className="grid size-3.5 shrink-0 place-items-center text-(--theme-primary)">
           <Icon name={icon} size={12} />
         </span>

@@ -7,6 +7,12 @@ import {
   type AccountsOverview,
   type SmartSwitchPrefs,
 } from "@shared/account-switch";
+import {
+  agyPoolQuota,
+  type AgyAccountQuota,
+  type AgyPoolKind,
+} from "@shared/agy-quota";
+import type { RateLimit } from "@shared/types";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { FillGauge } from "../ui/charts";
@@ -329,6 +335,101 @@ export function AccountQuotaRow({ account }: { account: AccountQuota }) {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+function AgyWindowBar({
+  label,
+  window: w,
+  now,
+}: {
+  label: string;
+  window?: RateLimit;
+  now: number;
+}) {
+  const { t } = useI18n();
+  const rawPct = windowPct(w, now);
+  const pct = clampPct(Math.round(rawPct ?? 0));
+  return (
+    <div
+      className={cx(
+        "flex items-center gap-1 pl-5",
+        rawPct === null && "opacity-40",
+      )}
+    >
+      <span className="w-6 shrink-0 text-meta text-fg-faint">{label}</span>
+      <div className="min-w-0 flex-1">
+        <FillGauge
+          pct={pct}
+          fill={ctxColor(pct)}
+          caution={CONTEXT_WARN_PCT}
+          danger={CONTEXT_DANGER_PCT}
+          height={4}
+        />
+      </div>
+      <span className="w-9 shrink-0 text-right font-mono text-aux tabular-nums text-fg-muted">
+        {rawPct === null ? "-" : `${pct}%`}
+      </span>
+      <span className="w-17 shrink-0 text-right font-mono text-meta tabular-nums text-fg-faint">
+        {w && rawPct !== null && rawPct > 0
+          ? t.time.countdown(w.resetsAt, now)
+          : rawPct === null
+            ? t.settings.accounts.notSeen
+            : "-"}
+      </span>
+    </div>
+  );
+}
+
+/** One Antigravity Tools account in the split sidebar: numbered fill badge, email, tier tag, and its
+ *  active pool's 5h / weekly gauges. Mirrors AccountQuotaRow's density and column rhythm. */
+export function AgyQuotaRow({
+  account,
+  index,
+  pool,
+}: {
+  account: AgyAccountQuota;
+  index: number;
+  pool: AgyPoolKind;
+}) {
+  const { t } = useI18n();
+  const a = t.settings.accounts;
+  const now = Date.now();
+  const windows = agyPoolQuota(account, pool);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="grid size-3.5 shrink-0 place-items-center rounded-xs font-mono text-tiny font-semibold leading-none tabular-nums text-white"
+          style={{ backgroundColor: accountColor(index + 1) }}
+        >
+          {index + 1}
+        </span>
+        <span
+          className={cx(
+            "min-w-0 flex-1 truncate text-aux",
+            account.current ? "text-fg" : "text-fg-muted",
+          )}
+          title={account.email || undefined}
+        >
+          {account.email || "-"}
+        </span>
+        {account.tier && (
+          <span className="shrink-0 rounded-sm border border-(--ui-stroke-tertiary) px-1 py-0.5 font-mono text-tiny uppercase leading-none text-fg-faint">
+            {account.tier}
+          </span>
+        )}
+        {account.current && (
+          <span className="flex shrink-0 items-center gap-1 text-meta text-fg-faint">
+            <Icon name="check" size={11} />
+            {a.current}
+          </span>
+        )}
+      </div>
+      <AgyWindowBar label={a.windowFive} window={windows.fiveHour} now={now} />
+      <AgyWindowBar label={a.windowSeven} window={windows.sevenDay} now={now} />
     </div>
   );
 }

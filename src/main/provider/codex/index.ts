@@ -8,7 +8,7 @@ import type {
   Usage,
 } from "@shared/types";
 import { normalizeModelId } from "@shared/models";
-import { toTranscriptWire } from "@shared/transcript";
+import { toTranscriptWire, type TranscriptReadWire } from "@shared/transcript";
 import { deriveSessionState } from "../claude/state";
 import { projectFromCwd } from "../../project-name";
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -71,6 +71,13 @@ export interface CodexProviderDeps {
   relay?: { read(): RelayUsage | null };
   /** Stable App Server thread metadata. Optional for older Codex versions and focused tests. */
   threadMetadata?: { read(id: string): CodexThreadMetadata | null };
+  /** Off-thread transcript parsing via parse-worker, with in-process fallback when absent or rejected. */
+  remote?: {
+    readTranscript?: (
+      rolloutPath: string,
+      since?: number,
+    ) => Promise<TranscriptReadWire>;
+  };
 }
 
 const ZERO_USAGE: Usage = {
@@ -142,14 +149,21 @@ export function createCodexProvider(
   const isFresh = (mtimeMs: number): boolean =>
     now() - mtimeMs < CODEX_WORKING_WINDOW_MS;
 
-  // Same signal split as claude's registry status: a fresh rollout is "busy"; deriveSessionState
-  // maps alive+busy → working, alive → idle, dead → ended.
-  const signalsFor = (mtimeMs: number, isManaged: boolean) => {
+  // Same signal split as claude's registry status: a fresh rollout is "busy" unless an unanswered
+  // request_user_input blocks the turn ("waiting"); deriveSessionState maps alive+busy → working,
+  // alive+waiting → waiting, alive → idle, dead → ended.
+  const signalsFor = (
+    mtimeMs: number,
+    isManaged: boolean,
+    awaitingUser = false,
+  ) => {
     const fresh = isFresh(mtimeMs);
+    const alive = isManaged || fresh;
+    const waiting = alive && awaitingUser;
     return {
-      alive: isManaged || fresh,
-      status: fresh ? "busy" : undefined,
-      awaitingUser: false,
+      alive,
+      status: waiting ? "waiting" : fresh ? "busy" : undefined,
+      awaitingUser: waiting,
     };
   };
 
@@ -221,6 +235,11 @@ export function createCodexProvider(
       : null;
     const tel = c.transcriptPath ? telemetry.read(c.transcriptPath) : null;
     const fallbackName = projectFromCwd(c.cwd);
+    const sig = signalsFor(
+      c.transcriptMtimeMs,
+      managed.has(c.id),
+      tel?.awaitingUser === true,
+    );
     return {
       id: c.id,
       agent: "codex",
@@ -233,9 +252,7 @@ export function createCodexProvider(
       // never rewrites it), so the live and frozen values coincide for this agent.
       originCwd: c.cwd,
       branch: undefined,
-      state: deriveSessionState(
-        signalsFor(c.transcriptMtimeMs, managed.has(c.id)),
-      ),
+      state: deriveSessionState(sig),
       management: managed.has(c.id) ? "managed" : "observed",
       // The raw turn_context model is the honest label (SessionPanel prefers modelRaw); the
       // normalized family stays inert for codex — the context window rides the overlay, not it.
@@ -243,7 +260,7 @@ export function createCodexProvider(
       modelRaw: tel?.modelRaw ?? undefined,
       lastActivityMs: c.transcriptMtimeMs || c.updatedAt || 0,
       createdMs: c.updatedAt || 0,
-      awaitingUser: false,
+      awaitingUser: sig.awaitingUser,
       transcriptMtimeMs: c.transcriptMtimeMs,
       usage: tel?.usage ?? ZERO_USAGE,
       usageByModel: tel?.usageByModel ?? [],
@@ -263,50 +280,55 @@ export function createCodexProvider(
       const rolloutTitle = c.transcriptPath
         ? headFor(c.transcriptPath, c.transcriptMtimeMs)?.title
         : null;
+      const sig = signalsFor(
+        c.transcriptMtimeMs,
+        managed.has(c.id),
+        prev.awaitingUser,
+      );
       return {
         ...prev,
         threadKind: c.threadKind,
         parentSessionId: c.parentSessionId,
         title: titleFor(c.id, rolloutTitle, prev.project),
         management: managed.has(c.id) ? "managed" : "observed",
-        state: deriveSessionState(
-          signalsFor(c.transcriptMtimeMs, managed.has(c.id)),
-        ),
+        state: deriveSessionState(sig),
+        awaitingUser: sig.awaitingUser,
       };
     },
     readTranscript: (id, sinceMtimeMs) => {
       const path = rolloutPathFor(id);
       if (!path) return { status: "absent" };
-      let mtimeMs: number;
-      let size: number;
-      try {
-        const st = statSync(path);
-        mtimeMs = st.mtimeMs;
-        size = st.size;
-      } catch {
-        return { status: "absent" }; // vanished between resolve and stat
+      const localRead = (): TranscriptReadWire => {
+        let mtimeMs: number;
+        let size: number;
+        try {
+          const st = statSync(path);
+          mtimeMs = st.mtimeMs;
+          size = st.size;
+        } catch {
+          return { status: "absent" }; // vanished between resolve and stat
+        }
+        if (sinceMtimeMs !== undefined && mtimeMs === sinceMtimeMs)
+          return { status: "unchanged", mtimeMs };
+        if (size > MAX_TEXT_FILE_BYTES) return { status: "absent" };
+        let text: string;
+        try {
+          text = readFileSync(path, "utf8");
+        } catch {
+          return { status: "error" }; // transient read failure on an existing file
+        }
+        return toTranscriptWire({
+          status: "changed",
+          mtimeMs,
+          doc: { ...parseRolloutEvents(text), subagents: [] },
+        });
+      };
+      if (deps.remote?.readTranscript) {
+        return deps.remote
+          .readTranscript(path, sinceMtimeMs)
+          .catch(() => localRead());
       }
-      if (sinceMtimeMs !== undefined && mtimeMs === sinceMtimeMs)
-        return { status: "unchanged", mtimeMs };
-      // Too big to turn into a string: the read below aborts the process outright rather than
-      // throwing (see MAX_TEXT_FILE_BYTES), so opening one runaway rollout would take the app down.
-      // Settled as `absent`, not `error`: `error` is the TRANSIENT contract (keep the last value and
-      // retry), and this condition never resolves on its own — with no last value to keep, the panel
-      // would hold blank forever while re-polling. `absent` reaches the empty state on the first read.
-      if (size > MAX_TEXT_FILE_BYTES) return { status: "absent" };
-      let text: string;
-      try {
-        text = readFileSync(path, "utf8");
-      } catch {
-        return { status: "error" }; // transient read failure on an existing file
-      }
-      // Wire form for the renderer relay (see TranscriptReadWire). Codex parses in-process — a
-      // rollout is head+tail-bounded, not a growing 59MB transcript — so the stringify rides here.
-      return toTranscriptWire({
-        status: "changed",
-        mtimeMs,
-        doc: { ...parseRolloutEvents(text), subagents: [] },
-      });
+      return localRead();
     },
     getToolResult: (id, toolUseId) => {
       const path = rolloutPathFor(id);

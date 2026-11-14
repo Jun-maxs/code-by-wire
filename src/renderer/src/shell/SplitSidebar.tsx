@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useStore } from "@nanostores/react";
+import { agyPoolKindForModel, type AgyPoolKind } from "@shared/agy-quota";
 import type { Session } from "@shared/types";
 import { AGENTS } from "@shared/agents";
 import { useI18n } from "../i18n";
@@ -7,9 +9,15 @@ import { AgentIcon } from "../ui/agent-icons";
 import { SidebarPanelLabel } from "./SidebarPanelLabel";
 import { ctxTone, CONTEXT_WARN_PCT } from "../ui/meta";
 import { PanelHeading, PanelSection } from "../workspace/panels/chrome";
-import { $accounts, sessionMarks } from "../settings/accounts-store";
+import {
+  $accounts,
+  $agyAccounts,
+  activeSplitQuotaAgent,
+  sessionMarks,
+} from "../settings/accounts-store";
 import {
   AccountQuotaRow,
+  AgyQuotaRow,
   SessionAccountMark,
   SmartSwitchControl,
 } from "../settings/AccountBadge";
@@ -44,7 +52,29 @@ export function SplitSidebar({
   const { t } = useI18n();
   const s = t.shell.split;
   const accounts = useStore($accounts);
+  const agyAccounts = useStore($agyAccounts);
+  const quotaAgent = activeSplitQuotaAgent(
+    session.agent,
+    accounts,
+    agyAccounts,
+  );
   const many = (accounts?.accounts.length ?? 0) >= 2;
+  const sessionPool = agyPoolKindForModel(
+    session.modelDisplayName ?? session.modelRaw ?? "",
+  );
+  const [poolOverride, setPoolOverride] = useState<{
+    sessionId: string;
+    pool: AgyPoolKind;
+  } | null>(null);
+  const activePool =
+    poolOverride?.sessionId === session.id ? poolOverride.pool : sessionPool;
+  const hasBothAgyPools = Boolean(
+    agyAccounts?.accounts.some(
+      (a) =>
+        (a.gemini.fiveHour || a.gemini.sevenDay) &&
+        (a.thirdParty.fiveHour || a.thirdParty.sevenDay),
+    ),
+  );
   const Panels = SIDEBAR_PANELS[session.agent];
   const selectedMarks = sessionMarks(accounts, session);
   return (
@@ -125,15 +155,15 @@ export function SplitSidebar({
         </ul>
       </PanelSection>
 
-      {accounts && (
+      {quotaAgent === "claude" && accounts && (
         <>
           <SectionDivider />
           <PanelSection>
             <PanelHeading
-              icon="circle-user"
+              iconNode={<AgentIcon agent="claude" size={12} />}
               right={<ClaudeAccountSwitch mark={null} />}
             >
-              {s.accountsHeading}
+              {s.claudeAccountsHeading}
             </PanelHeading>
             <div className="flex flex-col gap-3">
               {accounts.accounts.map((a) => (
@@ -149,11 +179,64 @@ export function SplitSidebar({
         </>
       )}
 
+      {quotaAgent === "agy" && agyAccounts && (
+        <>
+          <SectionDivider />
+          <PanelSection>
+            <PanelHeading
+              iconNode={<AgentIcon agent="agy" size={12} />}
+              right={
+                hasBothAgyPools ? (
+                  <div className="flex items-center rounded-sm border border-(--ui-stroke-tertiary) p-0.5">
+                    {(["gemini", "third-party"] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() =>
+                          setPoolOverride({ sessionId: session.id, pool: kind })
+                        }
+                        className={cx(
+                          "rounded-xs px-1.5 py-0.5 text-tiny leading-none transition-colors duration-100",
+                          activePool === kind
+                            ? "bg-(--ui-control-active-background) font-medium text-fg"
+                            : "text-fg-faint hover:text-fg",
+                        )}
+                      >
+                        {kind === "gemini" ? s.poolGemini : s.poolThirdParty}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-meta text-fg-faint">
+                    {activePool === "gemini" ? s.poolGemini : s.poolThirdParty}
+                  </span>
+                )
+              }
+            >
+              {s.agyAccountsHeading}
+            </PanelHeading>
+            <div className="flex flex-col gap-3">
+              {agyAccounts.accounts.map((a, idx) => (
+                <AgyQuotaRow
+                  key={a.id}
+                  account={a}
+                  index={idx}
+                  pool={activePool}
+                />
+              ))}
+            </div>
+          </PanelSection>
+        </>
+      )}
+
       <SectionDivider />
       {/* The selected pane's own panels follow under its name, which stays pinned while they scroll,
           so every number below reads as that pane's. */}
       <div className="sticky top-0 z-10 -mx-1.5 mt-2 flex h-8 min-w-0 items-center gap-1.5 border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-4">
-        <SidebarPanelLabel icon="app-window" className="shrink-0">
+        <SidebarPanelLabel
+          iconNode={<AgentIcon agent={session.agent} size={12} />}
+          className="shrink-0"
+        >
           {s.currentPane}
         </SidebarPanelLabel>
         {selectedMarks && <SessionAccountMark marks={selectedMarks} />}
@@ -167,7 +250,7 @@ export function SplitSidebar({
           metrics={metrics}
           account={account}
           doc={doc}
-          ratesElsewhere={accounts !== null}
+          ratesElsewhere={quotaAgent !== null}
         />
       ) : (
         <p className="px-2.5 py-3 text-body text-fg-faint">

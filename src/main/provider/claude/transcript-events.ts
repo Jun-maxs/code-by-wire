@@ -12,10 +12,11 @@ import {
   stripCommandEnvelope,
 } from "./command-envelope";
 import {
+  isInternalNotificationText,
   parseJsonlRows,
-  userText,
+  summarizeInput,
   toolResultText,
-  tellingField,
+  userText,
 } from "./transcript-row";
 import { createTailTracker } from "./transcript-tail";
 
@@ -27,18 +28,6 @@ const SUBAGENT_TOOLS = new Set(["Task", "Agent"]);
 /** Split a possibly-multiline string into lines; a non-string or '' → [] so that side renders nothing. */
 function lines(s: unknown): string[] {
   return typeof s === "string" && s.length ? s.split("\n") : [];
-}
-
-/** A short, human label for a tool call's input: the most telling field, else compact JSON. */
-function summarizeInput(input: Record<string, unknown>): string {
-  const field = tellingField(input);
-  if (field !== null) return field;
-  try {
-    const json = JSON.stringify(input);
-    return json.length > 200 ? json.slice(0, 199) + "…" : json;
-  } catch {
-    return "";
-  }
 }
 
 /** The removed/added lines for an edit tool's input (Edit / Write / MultiEdit). */
@@ -79,10 +68,18 @@ export function parseTranscriptEventsFromRows(
   // Timeline accumulators. `open` is the turn being built (a user prompt and the assistant work up to
   // the next prompt); finalized into `turns` on the next prompt and at EOF.
   const turns: TurnSummary[] = [];
+  const queuedPrompts: string[] = [];
   let open: TurnSummary | null = null;
   let lastTs = 0; // most recent valid timestamp; a fallback for a row that lacks one
   let sawTs = false; // has any row carried a parseable timestamp yet?
   let openStartPending = false; // the open turn began before any timestamp existed; adopt the first one
+
+  const dropQueuedPrompt = (text: string): void => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const idx = queuedPrompts.findIndex((q) => q.trim() === trimmed);
+    if (idx !== -1) queuedPrompts.splice(idx, 1);
+  };
 
   const finalizeOpen = (): void => {
     if (!open) return;
@@ -118,6 +115,56 @@ export function parseTranscriptEventsFromRows(
 
     const content = row.message?.content;
 
+    if (row.type === "queue-operation") {
+      const op = row.operation;
+      if (op === "popAll") {
+        queuedPrompts.length = 0;
+      } else if (op === "enqueue") {
+        const qText = userText(row.content);
+        if (qText && !isInternalNotificationText(qText)) {
+          queuedPrompts.push(
+            stripCommandEnvelope(qText).trim() || qText.trim(),
+          );
+        }
+      } else if (op === "remove" || op === "dequeue") {
+        const qText = userText(row.content);
+        if (qText)
+          dropQueuedPrompt(stripCommandEnvelope(qText).trim() || qText);
+        else queuedPrompts.shift();
+      }
+      continue;
+    }
+
+    if (
+      (row.type === "attachment" || row.attachment !== undefined) &&
+      row.attachment?.type === "queued_command" &&
+      row.attachment?.commandMode !== "task-notification"
+    ) {
+      const raw = userText(row.attachment?.prompt);
+      if (raw && !isInternalNotificationText(raw)) {
+        const cleaned =
+          extractCommandName(raw) || stripCommandEnvelope(raw).trim();
+        if (cleaned) {
+          dropQueuedPrompt(cleaned);
+          finalizeOpen();
+          const start = hasTs ? tsParsed : lastTs;
+          open = {
+            index: turns.length + 1,
+            prompt: promptLabel(raw),
+            startMs: start,
+            endMs: start,
+            durationMs: 0,
+            toolCount: 0,
+          };
+          openStartPending = !hasTs && !sawTs;
+          events.push({ kind: "user", text: cleaned, midTurn: true });
+        }
+      } else if (hasTs) {
+        extendClock(tsParsed);
+      }
+      continue;
+    }
+
     if (row.type === "user") {
       if (Array.isArray(content)) {
         for (const b of content) {
@@ -142,7 +189,14 @@ export function parseTranscriptEventsFromRows(
       }
       const raw = userText(content);
       if (raw) {
+        if (isInternalNotificationText(raw)) {
+          if (hasTs) extendClock(tsParsed);
+          continue;
+        }
         // A real user prompt closes the previous turn and opens a new one.
+        const command = extractCommandName(raw);
+        const cleaned = command || stripCommandEnvelope(raw).trim();
+        dropQueuedPrompt(cleaned);
         finalizeOpen();
         const start = hasTs ? tsParsed : lastTs;
         open = {
@@ -154,10 +208,9 @@ export function parseTranscriptEventsFromRows(
           toolCount: 0,
         };
         openStartPending = !hasTs && !sawTs;
-        const command = extractCommandName(raw);
         events.push({
           kind: "user",
-          text: command || stripCommandEnvelope(raw).trim(),
+          text: cleaned,
         });
         continue;
       }
@@ -236,11 +289,14 @@ export function parseTranscriptEventsFromRows(
 
   finalizeOpen();
 
+  const waitingPrompt = tail.waitingPrompt();
   return {
     events,
     waitingReason: tail.waitingReason(),
     turns,
     context: tail.context,
+    ...(waitingPrompt ? { waitingPrompt } : {}),
+    ...(queuedPrompts.length > 0 ? { queuedPrompts } : {}),
   };
 }
 

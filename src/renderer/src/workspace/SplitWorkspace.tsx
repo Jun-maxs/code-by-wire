@@ -26,7 +26,12 @@ import {
   type StripTone,
 } from "../shell/split-view";
 import { ObservedTerminal } from "./ObservedTerminal";
-import { RenderedTranscript } from "./Workspace";
+import { WorkView } from "./WorkView";
+import {
+  $viewModes,
+  resolveSessionViewMode,
+  setSessionViewMode,
+} from "./view-mode";
 import { useTasks } from "./use-tasks";
 import { useTranscript } from "./use-transcript";
 import { useTurnActivity } from "./use-turn-activity";
@@ -61,6 +66,8 @@ export function SplitWorkspace({
   onEnd,
   onRename,
   onTogglePin,
+  onBeforeAutoResume,
+  onAfterAutoResume,
   leftEdgeExposed,
   rightEdgeExposed,
 }: {
@@ -83,6 +90,8 @@ export function SplitWorkspace({
   onEnd: (id: string) => void;
   onRename: (id: string, title: string | null) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
   leftEdgeExposed: boolean;
   rightEdgeExposed: boolean;
 }) {
@@ -147,6 +156,8 @@ export function SplitWorkspace({
             onMaximize={onMaximize}
             onResume={onResume}
             onFork={onFork}
+            onBeforeAutoResume={onBeforeAutoResume}
+            onAfterAutoResume={onAfterAutoResume}
             now={now}
           />
         ))}
@@ -173,6 +184,8 @@ function SplitPane({
   onMaximize,
   onResume,
   onFork,
+  onBeforeAutoResume,
+  onAfterAutoResume,
   now,
 }: {
   session: Session;
@@ -184,29 +197,27 @@ function SplitPane({
   onMaximize: (id: string) => void;
   onResume: (id: string) => Promise<void>;
   onFork: (session: Session) => Promise<void>;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
   now: number;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const hasLiveTerminal = s.management === "managed" && s.state !== "ended";
   const caps = AGENTS[s.agent].capabilities;
-  // Seeded like Workspace: a live session opens on its terminal, everything else on its transcript.
-  const [transcriptOn, setTranscriptOn] = useState(
-    !hasLiveTerminal && caps.hasTranscript,
-  );
-  useEffect(() => {
-    if (hasLiveTerminal) setTranscriptOn(false);
-  }, [hasLiveTerminal]);
-  useEffect(() => {
-    if (!caps.hasTranscript) setTranscriptOn(false);
-  }, [caps.hasTranscript]);
+  const modes = useStore($viewModes);
+  const viewMode = resolveSessionViewMode(s, modes, caps.hasTranscript);
+  const workOn = viewMode === "work";
 
   const tasks = useTasks(s.id);
   const boardTask = useSessionTasks()?.taskOf(s.id);
   const progress = paneProgress(tasks, boardTask);
-  // Only Claude transcripts are read for turn activity (an ended one reads once, then sits on its
-  // unchanged token — the task card still lists its history).
-  const activity = useTurnActivity(s.id, s.agent === "claude");
+  // Only Claude and Antigravity read native turn activity (an ended one reads once, then sits
+  // on its unchanged token — the task card still lists its history).
+  const activity = useTurnActivity(
+    s.id,
+    s.agent === "claude" || s.agent === "agy",
+  );
   const line = paneLine(s, progress, activity, now, t);
   // Fork (2026-11-03): which account the pane runs on, once there are two to tell apart — and, as a
   // button, where this pane alone moves to another account.
@@ -214,7 +225,7 @@ function SplitPane({
   const marks = sessionMarks(accounts, s);
 
   // Focused from elsewhere (Ctrl+Tab, the sidebar, DeskTidy's island): put the keyboard in this pane's terminal.
-  const showsTerminal = !transcriptOn && hasLiveTerminal;
+  const showsTerminal = !workOn && hasLiveTerminal;
   useEffect(() => {
     if (!active || !showsTerminal) return;
     if (ref.current?.contains(document.activeElement)) return;
@@ -227,8 +238,15 @@ function SplitPane({
     onActivate(s.id);
   };
 
-  const body = transcriptOn ? (
-    <PaneTranscript session={s} />
+  const body = workOn ? (
+    <PaneWork
+      session={s}
+      now={now}
+      canSpawn={canSpawn}
+      onFork={onFork}
+      onBeforeAutoResume={onBeforeAutoResume}
+      onAfterAutoResume={onAfterAutoResume}
+    />
   ) : hasLiveTerminal ? (
     <TerminalView sessionId={s.id} autoFocus={active} />
   ) : caps.hasTranscript ? (
@@ -288,21 +306,62 @@ function SplitPane({
           )}
           <span
             className={cx(
-              "min-w-0 max-w-[50%] shrink-0 truncate text-aux font-medium",
+              "min-w-0 flex-1 truncate text-aux font-medium",
               active ? "text-fg" : "text-fg-muted",
             )}
           >
             {sessionDisplayTitle(s, t)}
           </span>
-          <span className="min-w-0 flex-1 truncate text-meta text-fg-faint">
-            {line.doing}
-          </span>
+          {line.doing && (
+            <span className="hidden shrink-0 text-meta text-fg-faint @min-[36rem]/pane:inline @min-[36rem]/pane:max-w-36 @min-[36rem]/pane:truncate">
+              {line.doing}
+            </span>
+          )}
           {line.meta && (
-            <span className="hidden shrink-0 font-mono text-meta tabular-nums text-fg-faint @min-[26rem]/pane:inline">
+            <span className="hidden shrink-0 font-mono text-meta tabular-nums text-fg-faint @min-[28rem]/pane:inline">
               {line.meta}
             </span>
           )}
         </PaneTaskCard>
+        {caps.hasTranscript && (
+          <div
+            role="group"
+            aria-label={t.shell.middleHeader.viewGroupLabel}
+            {...{ [PANE_ACTION]: "" }}
+            className="flex shrink-0 items-center rounded-xs bg-[color-mix(in_srgb,var(--color-fg)_5%,transparent)] p-[1px]"
+          >
+            <button
+              type="button"
+              aria-pressed={!workOn}
+              title={t.shell.split.showCli}
+              onClick={() => setSessionViewMode(s.id, "cli")}
+              className={cx(
+                "inline-flex h-5 items-center gap-1 rounded-[2px] px-1.5 text-meta font-medium transition-colors duration-100",
+                !workOn
+                  ? "bg-ink-700 text-fg"
+                  : "text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg",
+              )}
+            >
+              <Icon name="square-terminal" size={10} />
+              <span>{t.shell.split.cli}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={workOn}
+              title={t.shell.split.showWork}
+              onClick={() => setSessionViewMode(s.id, "work")}
+              className={cx(
+                "inline-flex h-5 items-center gap-1 rounded-[2px] px-1.5 text-meta font-medium transition-colors duration-100",
+                workOn
+                  ? "bg-ink-700 text-fg"
+                  : "text-fg-faint hover:bg-(--ui-control-hover-background) hover:text-fg",
+              )}
+            >
+              <Icon name="list-tree" size={10} />
+              <span>{t.shell.split.work}</span>
+            </button>
+          </div>
+        )}
         <div
           className={cx(
             "flex shrink-0 items-center transition-opacity duration-100",
@@ -311,17 +370,6 @@ function SplitPane({
               : "opacity-0 focus-within:opacity-100 group-hover/pane:opacity-100",
           )}
         >
-          {caps.hasTranscript && (
-            <PaneAction
-              icon={transcriptOn ? "square-terminal" : "scroll-text"}
-              label={
-                transcriptOn
-                  ? t.shell.split.showTerminal
-                  : t.shell.split.showTranscript
-              }
-              onClick={() => setTranscriptOn((v) => !v)}
-            />
-          )}
           <PaneAction
             icon="maximize"
             label={t.shell.split.maximize}
@@ -402,10 +450,35 @@ function PaneAction({
   );
 }
 
-/** A pane's transcript side; mounted only while shown, so hidden panes don't poll their transcript. */
-function PaneTranscript({ session }: { session: Session }) {
+/** A pane's Work view side; mounted only while shown, so CLI panes don't poll their transcript. */
+function PaneWork({
+  session,
+  now,
+  canSpawn,
+  onFork,
+  onBeforeAutoResume,
+  onAfterAutoResume,
+}: {
+  session: Session;
+  now: number;
+  canSpawn: boolean;
+  onFork: (session: Session) => Promise<void>;
+  onBeforeAutoResume?: (id: string) => void;
+  onAfterAutoResume?: (id: string, draft?: Session) => void;
+}) {
   const doc = useTranscript(session.id);
-  return <RenderedTranscript session={session} doc={doc} />;
+  return (
+    <WorkView
+      session={session}
+      doc={doc}
+      now={now}
+      canSpawn={canSpawn}
+      compactPane
+      onFork={onFork}
+      onBeforeAutoResume={onBeforeAutoResume}
+      onAfterAutoResume={onAfterAutoResume}
+    />
+  );
 }
 
 /** The grid's leftover cell(s): the add list in place, so a 5-pane grid's sixth slot is useful. */

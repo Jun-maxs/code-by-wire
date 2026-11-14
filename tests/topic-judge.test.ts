@@ -89,7 +89,7 @@ describe("judging rules", () => {
 });
 
 describe("createTopicJudge", () => {
-  const products: ProductsData = {
+  const products = {
     products: {
       cockpit: {
         key: "cockpit",

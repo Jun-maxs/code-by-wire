@@ -16,6 +16,7 @@ import type { PosixShellDeps } from "./shell-command";
 // graph and break `pnpm test`. The real factory is injected at the composition root (the IPC layer).
 import type { PtyProcess, SpawnOptions } from "./pty-process";
 import type { Recorder } from "./recorder";
+import type { PtyWriteFrame } from "./work-input";
 
 interface Term {
   /** The session id this pty currently writes. Mutable: a `/clear` rotates it (see `rename`), and the
@@ -163,6 +164,8 @@ export interface TerminalManagerDeps {
   /** Fork feature: the command remote sessions start through (see command.ts asRemote). Defaults to
    *  `claude-r`; a thunk so a settings/env change applies to the next spawn. */
   remoteCommand?: () => string;
+  /** Delay helper for multi-frame `Work` input dispatch; injectable so unit tests run synchronously. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface TerminalManager {
@@ -179,7 +182,16 @@ export interface TerminalManager {
   /** Spawn a literal argv (shell terminals): same start() machinery — cwd guard, bufferer, flow
    *  control, exit — no launchForm shim and no model. */
   launch(req: LaunchRequest): void;
+  has(id: string): boolean;
   write(id: string, data: string): void;
+  /** Write a sequence of timed PTY frames (e.g. bracketed paste followed by a separate `\r` frame). */
+  writeFrames(id: string, frames: PtyWriteFrame[]): Promise<boolean>;
+  /** Inspect the live headless recorder's input modes (`bracketedPasteMode`) after flushing the bufferer. */
+  modes(id: string): Promise<{ bracketedPasteMode: boolean } | null>;
+  /** Wait until a newly spawned/resumed TUI enables bracketed paste (or settles initial output) before sending a prompt. */
+  waitForPromptReady(id: string, timeoutMs?: number): Promise<boolean>;
+  /** Wait for a draining PTY handle (whose child CLI has already exited) to finish closing, reaping it if wedged. */
+  waitForExit(id: string, timeoutMs?: number): Promise<boolean>;
   resize(id: string, cols: number, rows: number): void;
   /** Credit `charCount` of consumed output back; resumes node-pty if the backlog drains enough. */
   ack(id: string, charCount: number): void;
@@ -217,6 +229,8 @@ export function createTerminalManager(
   const createBufferer = deps.createBufferer ?? createDataBufferer;
   const platform = deps.platform ?? process.platform;
   const statDir = deps.statDir ?? isDirectory;
+  const sleep =
+    deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const posixShellDeps = (): PosixShellDeps => {
     if (!deps.posixShell) {
       throw new Error(
@@ -463,13 +477,95 @@ export function createTerminalManager(
     terms.set(to, term);
   }
 
+  async function modes(
+    id: string,
+  ): Promise<{ bracketedPasteMode: boolean } | null> {
+    const term = terms.get(id);
+    if (!term) return null;
+    term.bufferer.flush();
+    await term.recorder.drain?.();
+    return term.recorder.modes?.() ?? { bracketedPasteMode: true };
+  }
+
+  async function writeFrames(
+    id: string,
+    frames: PtyWriteFrame[],
+  ): Promise<boolean> {
+    if (!terms.has(id)) return false;
+    for (const frame of frames) {
+      const live = terms.get(id);
+      if (!live) return false;
+      live.pty.write(frame.data);
+      if (frame.delayAfterMs > 0) await sleep(frame.delayAfterMs);
+    }
+    return terms.has(id);
+  }
+
+  async function waitForPromptReady(
+    id: string,
+    timeoutMs = 8_000,
+  ): Promise<boolean> {
+    const startMs = Date.now();
+    let lastOut = -1;
+    let quietSinceMs = 0;
+    while (Date.now() - startMs < timeoutMs) {
+      const term = terms.get(id);
+      if (!term) return false;
+      term.bufferer.flush();
+      await term.recorder.drain?.();
+      if (!terms.has(id)) return false;
+      if (term.recorder.modes) {
+        if (term.recorder.modes().bracketedPasteMode) {
+          await sleep(100);
+          return terms.has(id);
+        }
+      } else {
+        // Test recorder without mode tracking: ready immediately while alive.
+        return true;
+      }
+      if (term.out > 0) {
+        if (term.out !== lastOut) {
+          lastOut = term.out;
+          quietSinceMs = Date.now();
+        } else if (Date.now() - quietSinceMs >= 500) {
+          return terms.has(id);
+        }
+      }
+      await sleep(60);
+    }
+    return terms.has(id);
+  }
+
+  async function waitForExit(id: string, timeoutMs = 1_800): Promise<boolean> {
+    const startMs = Date.now();
+    while (terms.has(id) && Date.now() - startMs < timeoutMs) {
+      await sleep(40);
+    }
+    const lingering = terms.get(id);
+    if (lingering) {
+      terms.delete(id);
+      lingering.pty.kill();
+      lingering.bufferer.flush();
+      lingering.bufferer.dispose();
+      lingering.recorder.dispose();
+      deps.onClosed(id);
+      deps.notifyExit(id, 0);
+    }
+    return !terms.has(id);
+  }
+
   return {
     spawn,
     resume,
     fork,
     launch,
     rename,
+    has: (id) => terms.has(id),
     write: (id, data) => terms.get(id)?.pty.write(data),
+    writeFrames,
+    modes,
+    waitForPromptReady,
+    waitForExit,
     resize: (id, cols, rows) => {
       const term = terms.get(id);
       if (!term) return;

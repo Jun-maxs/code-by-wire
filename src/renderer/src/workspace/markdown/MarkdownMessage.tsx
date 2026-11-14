@@ -29,11 +29,13 @@ const REHYPE_PLUGINS: Options["rehypePlugins"] = [
 
 export const MarkdownMessage = memo(function MarkdownMessage({
   text,
+  className = "text-body leading-relaxed",
 }: {
   text: string;
+  className?: string;
 }) {
   return (
-    <div className="text-body leading-relaxed">
+    <div className={className}>
       <Markdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}

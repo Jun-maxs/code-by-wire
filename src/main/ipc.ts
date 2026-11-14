@@ -1,5 +1,6 @@
 import type { AccountSwitcher } from "./account-switch";
 import type { SessionAccountStore } from "./session-accounts";
+import type { AgyQuotaOverview } from "@shared/agy-quota";
 import { normalizePrefs } from "@shared/account-switch";
 import { join } from "node:path";
 import { trashSessionFiles, type TrashResult } from "@shared/session-trash";
@@ -245,6 +246,8 @@ export interface IpcDeps {
   sessionOverlays?: Array<(sessions: Session[]) => Session[]>;
   /** Fork (2026-11-03): smart account switching over the reclaude bindings. Absent without reclaude. */
   accountSwitcher?: AccountSwitcher;
+  /** Antigravity multi-account pool quotas for the right sidebar overview. */
+  readAgyAccounts?: () => AgyQuotaOverview | null;
 }
 
 export function attachCliStatus<T extends object>(
@@ -291,6 +294,7 @@ export function registerIpc({
   usage,
   sessionOverlays,
   accountSwitcher,
+  readAgyAccounts,
 }: IpcDeps): { sync: () => Promise<void>; overview: () => OverviewData } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -533,6 +537,7 @@ export function registerIpc({
         homeDir: homedir(),
         projectState: projectState?.read() ?? {},
         accounts: accountSwitcher?.view() ?? null,
+        agyAccounts: readAgyAccounts?.() ?? null,
       },
       (agent) => cli.get(agent),
     );
@@ -1072,8 +1077,15 @@ export function registerIpc({
   );
   ipcMain.handle(
     IPC.readTurnActivity,
-    (_e, id: string, sinceMtimeMs?: number) =>
-      readTurnActivity(provider.resolveTranscriptPath(id), sinceMtimeMs),
+    async (_e, id: string, sinceMtimeMs?: number) => {
+      const path = provider.resolveTranscriptPath(id);
+      if (path) return readTurnActivity(path, sinceMtimeMs);
+      return (
+        (await provider.readTurnActivity?.(id, sinceMtimeMs)) ?? {
+          status: "absent",
+        }
+      );
+    },
   );
   ipcMain.handle(IPC.readShells, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readShells(id, sinceMtimeMs),
@@ -1207,18 +1219,24 @@ export function registerIpc({
   );
   ipcMain.handle(
     IPC.clipboardProbe,
-    async (_e, sessionId?: string): Promise<ClipboardProbe> => {
+    async (
+      _e,
+      sessionId?: string,
+      saveImage?: boolean,
+    ): Promise<ClipboardProbe> => {
       const probe = probeClipboard(clipboard, process.platform);
       const agent =
         typeof sessionId === "string"
           ? (managed?.agentOf(sessionId) ?? getSessionAgent(db, sessionId))
           : undefined;
-      if (!probe.hasImage || process.platform !== "win32" || agent !== "codex")
-        return probe;
+      const shouldPersist =
+        saveImage === true ||
+        (process.platform === "win32" && agent === "codex");
+      if (!probe.hasImage || !shouldPersist) return probe;
       const imagePath = await saveClipboardImage(
         clipboard,
         join(app.getPath("userData"), "clipboard-images"),
-        exportClipboardPngWindows,
+        process.platform === "win32" ? exportClipboardPngWindows : undefined,
       );
       // Do not send a native image-paste key if the clipboard changed while exporting.
       if (!imagePath) throw new Error("Clipboard image is no longer available");

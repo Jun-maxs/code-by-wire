@@ -39,6 +39,12 @@ export function createCompositeProvider(
     readMonitorOutput: (id, monitorId, since) =>
       by(id).readMonitorOutput(id, monitorId, since),
     readMetrics: (id, since) => by(id).readMetrics(id, since),
+    readTurnActivity: (id, since) => {
+      const p = by(id);
+      return p.readTurnActivity
+        ? p.readTurnActivity(id, since)
+        : { status: "absent" };
+    },
     resolveResumeTarget: (id) => by(id).resolveResumeTarget(id),
     resolveSessionCwd: (id) => by(id).resolveSessionCwd(id),
     resolveTranscriptPath: (id) => by(id).resolveTranscriptPath(id),

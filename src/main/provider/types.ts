@@ -2,6 +2,7 @@ import type { PersistedSession, SessionCandidate } from "@shared/types";
 import type { TranscriptReadWire, ToolResultDetail } from "@shared/transcript";
 import type {
   TaskRead,
+  TurnActivityRead,
   ShellsRead,
   ShellOutputRead,
   MonitorsRead,
@@ -91,6 +92,11 @@ export interface Provider {
     id: string,
     sinceMtimeMs?: number,
   ): Promise<MetricsRead> | MetricsRead;
+  /** Optional provider-native current-turn activity summary (split-pane progress line & task card). */
+  readTurnActivity?(
+    id: string,
+    sinceMtimeMs?: number,
+  ): Promise<TurnActivityRead> | TurnActivityRead;
   /** Resolve whether a session is still owned by a live process (the liveness re-check behind Resume's
    *  Ended-only state gate) and the working directory to resume it in. `rolloutPath` rides along for
    *  agents whose resume pty must register claim-bound to its file (codex); claude omits it. `transcript`

@@ -296,6 +296,8 @@ export interface PersistedSession {
   contextTokens: number;
   /** Transcript-scanned effort level (A6); the live capture's effort overlays it. */
   effortLevel?: string;
+  /** Cumulative in-flight API time (ms) when derived directly from the session's store (e.g. agy). */
+  apiDurationMs?: number;
   /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */
   compactionCount?: number;
   /** Tokens reclaimed across those compactions; the row's tooltip. */

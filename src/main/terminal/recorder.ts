@@ -18,6 +18,12 @@ export interface Recorder {
    *  snapshot reflects (so the renderer can dedupe in-flight output against it). Drains the parse queue
    *  first (xterm's write is async), so a snapshot taken right after a burst reflects that burst. */
   snapshot(): Promise<ReattachSnapshot>;
+  /** Current terminal input modes (e.g. `bracketedPasteMode` DECSET 2004). Optional so unit-test fakes omit it. */
+  modes?(): { bracketedPasteMode: boolean };
+  /** Flush queued xterm writes so `modes()` / `tailText()` reflect all bytes fed so far. */
+  drain?(): Promise<void>;
+  /** Last `maxLines` non-empty lines of the active buffer (for TUI prompt/state inspection). */
+  tailText?(maxLines?: number): string;
   dispose(): void;
 }
 
@@ -63,6 +69,19 @@ export function createRecorder({
         data: serialize.serialize({ scrollback: RECORDER_SCROLLBACK }),
         offset,
       };
+    },
+    modes: () => ({
+      bracketedPasteMode: term.modes.bracketedPasteMode,
+    }),
+    drain: () => new Promise<void>((resolve) => term.write("", resolve)),
+    tailText: (maxLines = 12) => {
+      const buf = term.buffer.active;
+      const lines: string[] = [];
+      for (let i = buf.length - 1; i >= 0 && lines.length < maxLines; i--) {
+        const text = buf.getLine(i)?.translateToString(true) ?? "";
+        if (text.trim()) lines.unshift(text);
+      }
+      return lines.join("\n");
     },
     dispose: () => term.dispose(),
   };

@@ -11,6 +11,8 @@ import { useStore } from "@nanostores/react";
 import type { Session, ModelSelection, Account } from "@shared/types";
 import type { CliStatusByAgent } from "@shared/cli-status";
 import type { AgentId } from "@shared/agents";
+import { AGENTS } from "@shared/agents";
+import { isMacPlatform } from "@shared/platform";
 import type { OverviewData } from "@shared/ipc";
 import {
   mergeManaged,
@@ -30,6 +32,11 @@ import { isUpdatePending } from "@shared/update";
 import { useI18n } from "./i18n";
 import { Workspace } from "./workspace/Workspace";
 import { SplitWorkspace } from "./workspace/SplitWorkspace";
+import {
+  isViewToggleKey,
+  renameWorkViewState,
+  toggleSessionViewMode,
+} from "./workspace/view-mode";
 import {
   $split,
   enterSplit,
@@ -88,7 +95,7 @@ import {
   CONTINUE_ON_ACCOUNT_EVENT,
   usePendingAccountMoves,
 } from "./settings/session-account";
-import { $accounts } from "./settings/accounts-store";
+import { $accounts, $agyAccounts } from "./settings/accounts-store";
 import { useSmartAccountSwitch } from "./settings/use-smart-account-switch";
 
 /** The middle column's sentinel for the inline new-session view (design spec §5), alongside
@@ -176,6 +183,7 @@ export function App() {
     setSessions(o.sessions);
     setAccount(o.account);
     $accounts.set(o.accounts ?? null);
+    $agyAccounts.set(o.agyAccounts ?? null);
     setCliStatus(o.cliStatus);
     setHomeDir(o.homeDir);
     setProjectState(o.projectState);
@@ -271,6 +279,7 @@ export function App() {
   useEffect(() => {
     return window.api.terminal.onRename((from, to) => {
       terminalStore.rename(from, to);
+      renameWorkViewState(from, to);
       const split = $split.get();
       $split.set({ ...split, ids: renameInSplit(split.ids, from, to) });
       setSessions((ss) => renameManaged(ss, from, to));
@@ -561,8 +570,22 @@ export function App() {
       ...recentIds.current.filter((id) => id !== selectedSessionId),
     ].slice(0, 20);
   }, [selectedSessionId]);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   useEffect(() => {
+    const isMac = isMacPlatform(window.api.platform);
     const onKey = (event: KeyboardEvent) => {
+      if (isViewToggleKey(event, isMac)) {
+        const cur = selectedRef.current;
+        if (!cur) return;
+        event.preventDefault();
+        event.stopPropagation();
+        toggleSessionViewMode(
+          cur,
+          AGENTS[cur.agent].capabilities.hasTranscript,
+        );
+        return;
+      }
       if (!event.ctrlKey || event.key !== "Tab") return;
       const ids = recentIds.current.filter((id) =>
         allRef.current.some((s) => s.id === id),
@@ -709,6 +732,23 @@ export function App() {
 
   useEffect(() => installTerminalKeybind(), []);
 
+  const handleBeforeAutoResume = useCallback((id: string) => {
+    terminalStore.dispose(id);
+    terminalStore.create(id);
+    setResuming((prev) => new Set(prev).add(id));
+    setEnding((prev) => dropEnding(prev, id));
+  }, []);
+
+  const handleAfterAutoResume = useCallback((_id: string, draft?: Session) => {
+    if (draft) {
+      setDrafts((ds) => [draft, ...ds.filter((d) => d.id !== draft.id)]);
+    }
+    void window.api
+      .refresh()
+      .then(applyOverview)
+      .catch(() => undefined);
+  }, []);
+
   const viewSwitch = (
     <ViewModeSwitch
       mode={splitOn ? "split" : "single"}
@@ -790,6 +830,8 @@ export function App() {
       onEnd={endSession}
       onRename={(id, title) => void renameSession(id, title)}
       onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
+      onBeforeAutoResume={handleBeforeAutoResume}
+      onAfterAutoResume={handleAfterAutoResume}
       leftEdgeExposed={leftEdgeExposed}
       rightEdgeExposed={rightEdgeExposed}
     />
@@ -804,6 +846,8 @@ export function App() {
       onEnd={endSession}
       onRename={(id, title) => void renameSession(id, title)}
       onTogglePin={(id, pinned) => void togglePinSession(id, pinned)}
+      onBeforeAutoResume={handleBeforeAutoResume}
+      onAfterAutoResume={handleAfterAutoResume}
       leftEdgeExposed={leftEdgeExposed}
       rightEdgeExposed={rightEdgeExposed}
     />

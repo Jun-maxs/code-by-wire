@@ -17,7 +17,9 @@ function codeText(node: ReactNode): string {
 /** Tailwind-token overrides for assistant markdown. Restrained: color stays state-only, teal only on
  *  links, code is the only multicolor surface (contained to the well by CodeBlock). */
 export const markdownComponents: Components = {
-  p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
+  p: ({ children }) => (
+    <p className="my-2 text-pretty first:mt-0 last:mb-0">{children}</p>
+  ),
   strong: ({ children }) => (
     <strong className="font-semibold text-fg">{children}</strong>
   ),
@@ -66,11 +68,11 @@ export const markdownComponents: Components = {
   ),
   li: ({ className, children }) =>
     className?.includes("task-list-item") ? (
-      <li className="my-0.5 [&>input]:mr-2 [&>input]:align-middle">
+      <li className="my-1 text-pretty [&>input]:mr-2 [&>input]:align-middle">
         {children}
       </li>
     ) : (
-      <li className="my-0.5">{children}</li>
+      <li className="my-1 text-pretty">{children}</li>
     ),
   blockquote: ({ children }) => (
     <blockquote className="my-2 border-l-2 border-ink-700 pl-3 text-fg-muted">
@@ -100,7 +102,7 @@ export const markdownComponents: Components = {
     const inline = node ? isInlineCode(node as unknown as Element) : false;
     if (inline) {
       return (
-        <code className="rounded-sm border border-ink-800 bg-ink-900 px-1 py-0.5 font-mono text-aux text-fg">
+        <code className="rounded-xs bg-ink-900 px-[3px] py-px font-mono text-aux text-fg">
           {children}
         </code>
       );
