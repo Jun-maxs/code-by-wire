@@ -53,7 +53,9 @@ export function LaunchCommandField({
   const prefix =
     agent === "claude"
       ? `claude --session-id <new>${model === "default" ? "" : ` --model ${model}`}`
-      : AGENTS[agent].binary;
+      : agent === "qoder"
+        ? "qodercli --session-id <new> --dangerously-skip-permissions"
+        : AGENTS[agent].binary;
 
   function saveDraft(): void {
     const name = (draftName ?? "").trim();

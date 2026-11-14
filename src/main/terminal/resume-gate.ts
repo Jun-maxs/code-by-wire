@@ -66,7 +66,7 @@ export function gateRelaunch(
   launch: FreshLaunch | undefined,
   live: boolean,
 ): RelaunchDecision {
-  if (agent !== "claude" || !launch) return null;
+  if ((agent !== "claude" && agent !== "qoder") || !launch) return null;
   if (target && target.transcript !== false) return null;
   if (target?.alive || live) return { ok: false, reason: "alive" };
   return { ok: true, launch };

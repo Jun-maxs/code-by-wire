@@ -106,6 +106,7 @@ const SPLIT_NEW_AGENTS: { agent: AgentId; label: string }[] = [
   { agent: "codex", label: "GPT" },
   { agent: "claude", label: "Claude" },
   { agent: "agy", label: "Gemini" },
+  { agent: "qoder", label: "Qoder" },
 ];
 
 export function App() {

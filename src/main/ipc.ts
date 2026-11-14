@@ -1125,7 +1125,11 @@ export function registerIpc({
             overviewNow().sessions.find((session) => session.id === sessionId),
           cliStatus: (agent) => cli.get(agent),
           configDir: (agent) =>
-            (agent === "claude" ? claudeDir : codexDir) ?? "unknown",
+            (agent === "claude"
+              ? claudeDir
+              : agent === "codex"
+                ? codexDir
+                : cli.get(agent)?.configDir.active) ?? "unknown",
           versionFloor: (agent) => AGENT_PROBES[agent].floor,
           resolveTranscriptPath: (sessionId) =>
             provider.resolveTranscriptPath(sessionId),
@@ -1434,6 +1438,7 @@ export function registerIpc({
     codex: null,
     pi: null,
     agy: null,
+    qoder: null,
   };
   // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
   // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is

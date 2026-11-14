@@ -59,6 +59,7 @@ describe("createCompositeProvider", () => {
         codex: fake("codex", calls),
         pi: fake("pi", calls),
         agy: fake("agy", calls),
+        qoder: fake("qoder", calls),
       },
       () => "claude",
     );
@@ -68,6 +69,7 @@ describe("createCompositeProvider", () => {
       "claude-1",
       "codex-1",
       "pi-1",
+      "qoder-1",
     ]);
     await p.summarize(cands.find((c) => c.agent === "codex")!);
     expect(calls).toContain("summarize:codex:codex-1");
@@ -80,6 +82,7 @@ describe("createCompositeProvider", () => {
         codex: fake("codex", calls),
         pi: fake("pi", calls),
         agy: fake("agy", calls),
+        qoder: fake("qoder", calls),
       },
       (id) => (id.startsWith("codex") ? "codex" : "claude"),
     );

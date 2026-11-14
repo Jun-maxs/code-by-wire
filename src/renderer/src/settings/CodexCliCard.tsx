@@ -28,19 +28,31 @@ export function CodexCliCard({
   checking,
   onRecheck,
 }: {
-  /** The same card serves the Antigravity CLI: only its names, docs link and data dir differ. */
-  agent?: "codex" | "agy";
+  /** The same card serves Antigravity and Qoder CLI: only its names, docs link and data dir differ. */
+  agent?: "codex" | "agy" | "qoder";
   status: CliStatus | null;
   checking: boolean;
   onRecheck: () => void;
 }) {
   const { t } = useI18n();
-  const copy = agent === "agy" ? t.settings.agyCli : t.settings.codexCli;
+  const copy =
+    agent === "agy"
+      ? t.settings.agyCli
+      : agent === "qoder"
+        ? t.settings.qoderCli
+        : t.settings.codexCli;
   const docsHref =
     agent === "agy"
       ? "https://antigravity.google/"
-      : "https://developers.openai.com/codex/cli";
-  const defaultDir = agent === "agy" ? "~/.gemini/antigravity-cli" : "~/.codex";
+      : agent === "qoder"
+        ? "https://qoder.com/"
+        : "https://developers.openai.com/codex/cli";
+  const defaultDir =
+    agent === "agy"
+      ? "~/.gemini/antigravity-cli"
+      : agent === "qoder"
+        ? "~/.qoder"
+        : "~/.codex";
   const word =
     status === null
       ? t.settings.cli.stateChecking

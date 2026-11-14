@@ -217,6 +217,11 @@ export const en = {
       notInstalledHeadline: "NOT DETECTED",
       docs: "Antigravity",
     },
+    qoderCli: {
+      title: "Qoder CLI",
+      notInstalledHeadline: "NOT DETECTED",
+      docs: "Qoder",
+    },
     statusline: {
       title: "Statusline",
       stateCapturing: "CAPTURING",
@@ -816,6 +821,8 @@ export const en = {
         "What this session has consumed: total tokens by kind — fresh input, generated output, and cached reads. Codex reports no cost accounting, so there is no $ figure.",
       infoAgy:
         "What this session has consumed: total tokens by kind — fresh input, generated output, and cached reads. Antigravity reports no cost accounting, so there is no $ figure.",
+      infoQoder:
+        "What this session has consumed: total tokens by kind — fresh input, generated output, and cached reads. Qoder CLI reports no cost accounting, so there is no $ figure.",
       // Mirrors ui/token-kinds.ts's TOKEN_KINDS, keyed the same way, so SpendPanel can render
       // translated label/description text while still iterating TOKEN_KINDS for order and key.
       kinds: {

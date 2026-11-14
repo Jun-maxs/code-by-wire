@@ -182,7 +182,7 @@ function SystemSection({
             </>
           ) : (
             <CodexCliCard
-              agent={id === "agy" ? "agy" : "codex"}
+              agent={id === "agy" ? "agy" : id === "qoder" ? "qoder" : "codex"}
               status={cliStatus[id] ?? null}
               checking={checking === id}
               onRecheck={() => onRecheck(id)}

@@ -119,8 +119,14 @@ describe("registerIpc db:info", () => {
       analytics: {
         path: analyticsPath,
         sizeBytes: 2048,
-        turns: { total: 2, byAgent: { claude: 1, codex: 1, pi: 0, agy: 0 } },
-        sessions: { total: 2, byAgent: { claude: 1, codex: 1, pi: 0, agy: 0 } },
+        turns: {
+          total: 2,
+          byAgent: { claude: 1, codex: 1, pi: 0, agy: 0, qoder: 0 },
+        },
+        sessions: {
+          total: 2,
+          byAgent: { claude: 1, codex: 1, pi: 0, agy: 0, qoder: 0 },
+        },
         oldestTs: 2000,
         processedFiles: 0,
         worktrees: 0,
@@ -128,7 +134,10 @@ describe("registerIpc db:info", () => {
       index: {
         path: indexPath,
         sizeBytes: 1024,
-        sessions: { total: 2, byAgent: { claude: 1, codex: 1, pi: 0, agy: 0 } },
+        sessions: {
+          total: 2,
+          byAgent: { claude: 1, codex: 1, pi: 0, agy: 0, qoder: 0 },
+        },
       },
     });
   });
@@ -156,8 +165,14 @@ describe("registerIpc db:info", () => {
       analytics: {
         path: analyticsPath,
         sizeBytes: 0,
-        turns: { total: 0, byAgent: { claude: 0, codex: 0, pi: 0, agy: 0 } },
-        sessions: { total: 0, byAgent: { claude: 0, codex: 0, pi: 0, agy: 0 } },
+        turns: {
+          total: 0,
+          byAgent: { claude: 0, codex: 0, pi: 0, agy: 0, qoder: 0 },
+        },
+        sessions: {
+          total: 0,
+          byAgent: { claude: 0, codex: 0, pi: 0, agy: 0, qoder: 0 },
+        },
         oldestTs: null,
         processedFiles: 0,
         worktrees: 0,
@@ -165,7 +180,10 @@ describe("registerIpc db:info", () => {
       index: {
         path: indexPath,
         sizeBytes: 0,
-        sessions: { total: 0, byAgent: { claude: 0, codex: 0, pi: 0, agy: 0 } },
+        sessions: {
+          total: 0,
+          byAgent: { claude: 0, codex: 0, pi: 0, agy: 0, qoder: 0 },
+        },
       },
     });
   });

@@ -224,8 +224,12 @@ export function registerTerminalIpc({
     persistLaunchArgs(req.id, raw);
     const remote = req.remote === true && req.agent === "claude";
     persistRemote(req.id, remote);
-    if (req.agent === "claude")
-      launches.set(req.id, { cwd: req.cwd, model: req.model, agent: "claude" });
+    if (req.agent === "claude" || req.agent === "qoder")
+      launches.set(req.id, {
+        cwd: req.cwd,
+        model: req.model,
+        agent: req.agent,
+      });
     manager.spawn({
       id: req.id,
       cwd: req.cwd,
@@ -261,9 +265,13 @@ export function registerTerminalIpc({
     if (again) {
       if (!again.ok) return { ok: false, reason: again.reason };
       const { launch } = again;
-      const remote = remoteSessions?.has(req.id) === true;
-      const extraArgs = resolveStoredExtraArgs("claude", stored);
-      const env = accounts?.launch(req.id, remote);
+      const remote =
+        launch.agent === "claude" && remoteSessions?.has(req.id) === true;
+      const extraArgs = resolveStoredExtraArgs(launch.agent, stored);
+      const env =
+        launch.agent === "claude"
+          ? accounts?.launch(req.id, remote)
+          : agentEnv?.(launch.agent);
       const size = { cols: req.cols, rows: req.rows };
       if (launch.fork)
         manager.fork({
@@ -284,7 +292,7 @@ export function registerTerminalIpc({
           id: req.id,
           cwd: launch.cwd,
           model: launch.model,
-          agent: "claude",
+          agent: launch.agent,
           extraArgs,
           remote,
           env,
@@ -292,7 +300,7 @@ export function registerTerminalIpc({
         });
       return {
         ok: true,
-        session: draftSession(req.id, launch.cwd, launch.model, "claude"),
+        session: draftSession(req.id, launch.cwd, launch.model, launch.agent),
       };
     }
     const d = gateResume(agent, target);

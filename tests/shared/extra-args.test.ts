@@ -143,7 +143,7 @@ describe("extraArgsErrorMessage", () => {
 describe("emptyLaunchPresets", () => {
   it("returns a fresh object per call with every agent keyed", () => {
     const a = emptyLaunchPresets();
-    expect(a).toEqual({ claude: [], codex: [], pi: [], agy: [] });
+    expect(a).toEqual({ claude: [], codex: [], pi: [], agy: [], qoder: [] });
     expect(emptyLaunchPresets()).not.toBe(a);
   });
 });

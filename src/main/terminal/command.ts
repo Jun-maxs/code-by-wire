@@ -25,13 +25,18 @@ const CODEX_DEFAULT_ARGS = [
 // compaction stay agy's own (the official defaults) — no override is passed.
 const AGY_DEFAULT_ARGS = ["--dangerously-skip-permissions"];
 
+// Qoder CLI also grants full tool permissions by default via `--dangerously-skip-permissions`.
+const QODER_DEFAULT_ARGS = ["--dangerously-skip-permissions"];
+
 /** The app-managed flags each non-Claude agent starts and resumes with. */
 const agentDefaults = (agent: AgentId): string[] =>
   agent === "codex"
     ? CODEX_DEFAULT_ARGS
     : agent === "agy"
       ? AGY_DEFAULT_ARGS
-      : [];
+      : agent === "qoder"
+        ? QODER_DEFAULT_ARGS
+        : [];
 
 export interface ClaudeCommand {
   file: string;
@@ -84,6 +89,16 @@ export function buildSpawnCommand(opts: {
       model: opts.model,
       extraArgs: opts.extraArgs,
     });
+  if (opts.agent === "qoder")
+    return {
+      file: AGENTS.qoder.binary,
+      args: [
+        "--session-id",
+        opts.id,
+        ...QODER_DEFAULT_ARGS,
+        ...(opts.extraArgs ?? []),
+      ],
+    };
   return {
     file: AGENTS[opts.agent].binary,
     args: [...agentDefaults(opts.agent), ...(opts.extraArgs ?? [])],
@@ -205,9 +220,13 @@ export function buildResumeCommand(opts: {
       file: claudeLauncher(),
       args: ["--resume", opts.id, ...(opts.extraArgs ?? [])],
     };
-  // agy reopens a conversation by flag (`agy --conversation <id>`), codex by subcommand.
+  // agy reopens a conversation by `--conversation`, qoder by `--resume`, codex by `resume` subcommand.
   const target =
-    opts.agent === "agy" ? ["--conversation", opts.id] : ["resume", opts.id];
+    opts.agent === "agy"
+      ? ["--conversation", opts.id]
+      : opts.agent === "qoder"
+        ? ["--resume", opts.id]
+        : ["resume", opts.id];
   return {
     file: AGENTS[opts.agent].binary,
     args: [...target, ...agentDefaults(opts.agent), ...(opts.extraArgs ?? [])],

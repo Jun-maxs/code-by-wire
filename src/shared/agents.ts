@@ -3,7 +3,7 @@
  *  branch in terminal/command.ts, one probe spec in main/cli-status.ts, one settings card, one
  *  icon in ui/agent-icons.tsx. Every picker/dropdown/menu iterates AGENT_IDS — never a hardcoded
  *  pair — so the surfaces pick a new agent up from here alone. */
-export const AGENT_IDS = ["claude", "codex", "pi", "agy"] as const;
+export const AGENT_IDS = ["claude", "codex", "pi", "agy", "qoder"] as const;
 
 export type AgentId = (typeof AGENT_IDS)[number];
 
@@ -121,6 +121,22 @@ export const AGENTS: Record<AgentId, AgentDescriptor> = {
       hasTranscript: true,
       hasTelemetry: true,
       hasRateLimits: true,
+      canResume: true,
+    },
+  },
+  // qoder (Qoder CLI, provider/qoder): Claude-Code-derived JSONL transcripts, subagents and tasks under
+  // ~/.qoder, pinned up front by `--session-id <id>`, resumed by `--resume <id>`, and launched with
+  // `--dangerously-skip-permissions` by default.
+  qoder: {
+    id: "qoder",
+    label: "Qoder",
+    binary: "qodercli",
+    capabilities: {
+      ...NONE,
+      hasTranscript: true,
+      hasSubagents: true,
+      hasActivity: true,
+      hasTelemetry: true,
       canResume: true,
     },
   },

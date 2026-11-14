@@ -191,6 +191,11 @@ export const zh: Translations = {
       notInstalledHeadline: "未检测到",
       docs: "Antigravity 官网",
     },
+    qoderCli: {
+      title: "Qoder CLI",
+      notInstalledHeadline: "未检测到",
+      docs: "Qoder 官网",
+    },
     statusline: {
       title: "Statusline",
       stateCapturing: "捕获中",
@@ -727,6 +732,8 @@ export const zh: Translations = {
         "本会话已消耗的用量：按种类划分的词元总量——新输入、生成输出与缓存读取。Codex 不提供费用记账，因此没有 $ 数值。",
       infoAgy:
         "本会话已消耗的用量：按种类划分的词元总量——新输入、生成输出与缓存读取。Antigravity 不提供费用记账，因此没有 $ 数值。",
+      infoQoder:
+        "本会话已消耗的用量：按种类划分的词元总量——新输入、生成输出与缓存读取。Qoder CLI 不提供费用记账，因此没有 $ 数值。",
       kinds: {
         input: {
           label: "输入",

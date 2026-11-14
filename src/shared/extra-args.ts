@@ -55,6 +55,20 @@ const AGY_RESERVED = new Set([
   "--prompt",
 ]);
 
+/** qoder's session-identity and one-shot flags: the app pins `--session-id` on spawn and passes
+ *  `--resume` on resume, and print/non-persistent flags would end or drop the interactive session. */
+const QODER_RESERVED = new Set([
+  "--session-id",
+  "--resume",
+  "-r",
+  "--continue",
+  "-c",
+  "--fork-session",
+  "-p",
+  "--print",
+  "--no-session-persistence",
+]);
+
 /** Shell-like tokenizer for the args suffix: splits on whitespace (spaces, tabs, and — since main is
  *  the trust boundary and can't assume a renderer already stripped a pasted line break — newlines
  *  too); `"…"` and `'…'` spans group (and may sit mid-token, so `--flag="a b"` is one token) and can
@@ -101,8 +115,13 @@ export function validateExtraArgs(
 ): ExtraArgsResult {
   const t = tokenize(input);
   if (!t.ok) return t;
-  if (agent === "claude" || agent === "agy") {
-    const reserved = agent === "claude" ? CLAUDE_RESERVED : AGY_RESERVED;
+  if (agent === "claude" || agent === "agy" || agent === "qoder") {
+    const reserved =
+      agent === "claude"
+        ? CLAUDE_RESERVED
+        : agent === "agy"
+          ? AGY_RESERVED
+          : QODER_RESERVED;
     for (const token of t.tokens) {
       const flag = token.split("=", 1)[0];
       if (reserved.has(flag))

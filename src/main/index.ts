@@ -23,6 +23,7 @@ import { createPiProvider, resolvePiDir } from "./provider/pi";
 import { createAgyProvider, scanClaimableAgy } from "./provider/agy";
 import { createAgyQuotaReader } from "./provider/agy/quota";
 import { resolveAgyDir } from "./provider/agy/store";
+import { createQoderProvider, resolveQoderDir } from "./provider/qoder";
 import { createAgyProxy } from "./agy-proxy";
 import { createCodexLimitsService } from "./provider/codex/limits";
 import {
@@ -528,6 +529,18 @@ app
       },
       quota: createAgyQuotaReader(),
     });
+    // qoder (Qoder CLI): JSONL transcripts, subagents and tasks under ~/.qoder.
+    const qoderDir = resolveQoderDir();
+    const qoderProvider = createQoderProvider({
+      qoderDir,
+      recentWindowMs,
+      managed: {
+        has: (id) => managed.agentOf(id) === "qoder",
+        cwdOf: (id) => managed.cwdOf(id),
+        qoderEntries: () => managed.qoderEntries(),
+      },
+      remote: createRemoteClaudeReads(parseWorker, qoderDir),
+    });
     // id → agent: live drafts answer from the registry; indexed rows from the sessions table;
     // anything unknown is claude (the legacy default — never a projects/ sweep for a codex id).
     const agentOf = (id: string): AgentId =>
@@ -539,6 +552,7 @@ app
         codex: codexProvider,
         pi: piProvider,
         agy: agyProvider,
+        qoder: qoderProvider,
       },
       agentOf,
     );
@@ -570,6 +584,7 @@ app
         codex: codexDir,
         pi: piDir,
         agy: agyDir,
+        qoder: qoderDir,
       },
     });
     services.cliStatus = cliStatus;
@@ -870,6 +885,7 @@ app
         (sessions) => codexProvider.overlaySessions(sessions),
         (sessions) => piProvider.overlaySessions(sessions),
         (sessions) => agyProvider.overlaySessions(sessions),
+        (sessions) => qoderProvider.overlaySessions(sessions),
       ],
     });
 

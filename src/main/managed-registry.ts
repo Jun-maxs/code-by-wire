@@ -66,6 +66,8 @@ export interface ManagedRegistry {
   codexEntries(): ManagedCodexPty[];
   /** The same claim inputs for agy, which also takes no session id up front. */
   agyEntries(): ManagedCodexPty[];
+  /** Live qoder ptys with their spawn cwd and timestamp (so a blank session shows before its JSONL lands). */
+  qoderEntries(): ManagedCodexPty[];
   /** Bind a discovered rollout file to a live codex pty (post-rename, under the rollout's id). */
   claim(id: string, rolloutPath: string): void;
   /** Rollout paths already bound to a live pty — the discovery-side duplicate suppressor. */
@@ -119,6 +121,7 @@ export function createManagedRegistry(): ManagedRegistry {
         .map(([id, { pid }]) => ({ id, pid })),
     codexEntries: () => claimEntries("codex"),
     agyEntries: () => claimEntries("agy"),
+    qoderEntries: () => claimEntries("qoder"),
     claim: (id, rolloutPath) => {
       const e = byId.get(id);
       if (e) e.claimedRollout = rolloutPath;

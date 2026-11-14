@@ -64,17 +64,30 @@ export function deriveTitle(
  * waste when one field on row 1 answers it. '' when no row resolves a cwd.
  */
 export function firstTranscriptCwd(jsonl: string): string {
+  let workspaceFallback = "";
   for (const line of jsonl.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const row = JSON.parse(trimmed);
+      const parsed: unknown = JSON.parse(trimmed);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+        continue;
+      const row = parsed as Record<string, unknown>;
       if (typeof row.cwd === "string" && row.cwd) return row.cwd;
+      if (
+        !workspaceFallback &&
+        row.type === "workspace-directories" &&
+        Array.isArray(row.directories) &&
+        typeof row.directories[0] === "string" &&
+        row.directories[0]
+      ) {
+        workspaceFallback = row.directories[0];
+      }
     } catch {
       // skip a half-written or malformed line, same as parseTranscript
     }
   }
-  return "";
+  return workspaceFallback;
 }
 
 /**

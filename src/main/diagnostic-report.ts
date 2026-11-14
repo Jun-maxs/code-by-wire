@@ -38,6 +38,24 @@ const KNOWN_ENTRY_TYPES: Record<AgentId, ReadonlySet<string>> = {
   ]),
   // agy keeps SQLite, not JSONL (resolveTranscriptPath answers null), so there's nothing to scan.
   agy: new Set(),
+  qoder: new Set([
+    "active-leaf",
+    "ai-title",
+    "assistant",
+    "attachment",
+    "custom-title",
+    "file-history-snapshot",
+    "last-prompt",
+    "progress",
+    "queue-operation",
+    "runtime-config",
+    "session_meta",
+    "summary",
+    "system",
+    "user",
+    "workspace-directories",
+    "worktree-state",
+  ]),
 };
 
 export interface TranscriptScanData {
@@ -229,7 +247,8 @@ export async function scanTranscriptFile(
       const type =
         typeof rawType === "string" && known.has(rawType) ? rawType : "other";
       result.entryTypes[type] = (result.entryTypes[type] ?? 0) + 1;
-      if (agent === "claude") collectAgentIds(row, referenced);
+      if (agent === "claude" || agent === "qoder")
+        collectAgentIds(row, referenced);
     } catch {
       if (terminated) result.malformedInteriorLines++;
       else result.incompleteTrailingLine = true;
@@ -282,7 +301,8 @@ async function inspectSource(
       mtimeMs: null,
       statError: null,
       scan: { status: "absent" },
-      subagentFileCount: session.agent === "claude" ? 0 : null,
+      subagentFileCount:
+        session.agent === "claude" || session.agent === "qoder" ? 0 : null,
     };
 
   let sizeBytes: number | null = null;
@@ -304,7 +324,7 @@ async function inspectSource(
   }
 
   let subagentFileCount: number | null = null;
-  if (session.agent === "claude") {
+  if (session.agent === "claude" || session.agent === "qoder") {
     const ids =
       scan.status === "ok"
         ? new Set(scan.referencedAgentIds)
